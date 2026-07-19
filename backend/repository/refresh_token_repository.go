@@ -1,9 +1,22 @@
+package repository
+
+import (
+	"coffee-reel/entity"
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+)
+
 type IRefreshTokenRepository interface {
 	Create(ctx context.Context, token *entity.RefreshToken) error
 	FindByTokenHash(ctx context.Context, tokenHash string) (*entity.RefreshToken, error)
-	Rotate(ctx context.Context, ctx context.Context, tokenHash string, nextToken *entity.RefreshToken, now time.Time) error
-	RevokeFamilly(ctx context.Context, familyID string, now time.Time) error
-	RevokeFamillyAndIncrementTokenVersion(ctx context.Context, userID uint64, famillyID string, now time.Time) error
+	Rotate(ctx context.Context, tokenHash string, nextToken *entity.RefreshToken, now time.Time) error
+	RevokeFamily(ctx context.Context, familyID string, now time.Time) error
+	RevokeFamilyAndIncrementTokenVersion(ctx context.Context, userID uint64, familyID string, now time.Time) error
 	RevokeByUserID(ctx context.Context, userID uint64, now time.Time) error
 	DeleteExpired(ctx context.Context, now time.Time) error
 }
@@ -116,8 +129,8 @@ func (r *refreshTokenRepository) Rotate(ctx context.Context, tokenHash string, n
 }
 
 // 同じFamilyIDのTokenを一括失効する
-func (r *refreshTokenRepository) RevokeFamilly(ctx context.Context, familyID string, now time.Time) error {
-	if famillyID == "" {
+func (r *refreshTokenRepository) RevokeFamily(ctx context.Context, familyID string, now time.Time) error {
+	if familyID == "" {
 		return fmt.Errorf("family ID is required")
 	}
 	if err := r.db.WithContext(ctx).Model(&entity.RefreshToken{}).Where("family_id = ? AND revoked_at IS NULL", familyID).Update("revoked_at", now.UTC()).Error; err != nil {
@@ -126,8 +139,58 @@ func (r *refreshTokenRepository) RevokeFamilly(ctx context.Context, familyID str
 	return nil
 }
 
-//再利用検知時にFamily失効とUser.TokenVersion更新を同じTransactionで行う
+// 再利用検知時にFamily失効とUser.TokenVersion更新を同じTransactionで行う
+func (r *refreshTokenRepository) RevokeFamilyAndIncrementTokenVersion(ctx context.Context, userID uint64, familyID string, now time.Time) error {
+	if userID == 0 {
+		return fmt.Errorf("user ID is required")
+	}
 
-//Userに属するRefresh Tokenを一括失効する
+	if familyID == "" {
+		return fmt.Errorf("family ID is required")
+	}
 
-//期限切れのTokenを削除する
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return revokeFamilyAndIncrementTokenVersion(tx, userID, familyID, now.UTC())
+	})
+}
+
+// Userに属するRefresh Tokenを一括失効する
+func (r *refreshTokenRepository) RevokeByUserID(ctx context.Context, userID uint64, now time.Time) error {
+	if userID == 0 {
+		return fmt.Errorf("user ID is required")
+	}
+
+	if err := r.db.WithContext(ctx).Model(&entity.RefreshToken{}).Where("user_id = ? AND revoked_at IS NULL", userID).Update("revoked_at", now.UTC()).Error; err != nil {
+		return fmt.Errorf("revoke refresh tokens by user ID: %w", err)
+	}
+	return nil
+}
+
+// 期限切れのTokenを削除する
+func (r *refreshTokenRepository) DeleteExpired(ctx context.Context, now time.Time) error {
+	if err := r.db.WithContext(ctx).Where("expires_at <= ?", now.UTC()).Delete(&entity.RefreshToken{}).Error; err != nil {
+		return fmt.Errorf("delete expired refresh tokens: %w", err)
+	}
+	return nil
+}
+
+func revokeFamilyAndIncrementTokenVersion(tx *gorm.DB, userID uint64, familyID string, now time.Time) error {
+	var user entity.User
+
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", userID).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return entity.ErrUserNotFound
+		}
+		return fmt.Errorf("lock user for refresh token reuse: %w", err)
+	}
+	if err := tx.Model(&entity.RefreshToken{}).Where("user_id = ? AND family_id = ? AND revoked_at IS NULL", userID, familyID).Update("revoked_at", now).Error; err != nil {
+		return fmt.Errorf("revoke refresh token family: %w", err)
+	}
+
+	user.InvalidateAccessTokens(now)
+
+	if err := tx.Model(&entity.User{}).Where("id = ?", user.ID).Select("token_version", "updated_at").Updates(&user).Error; err != nil {
+		return fmt.Errorf("increment user token version: %w", err)
+	}
+	return nil
+}
