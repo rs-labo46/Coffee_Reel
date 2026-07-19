@@ -12,7 +12,7 @@ import (
 
 const postgresUniqueViolation = "23505"
 
-type UserRepository interface {
+type IUserRepository interface {
 	Create(ctx context.Context, user *entity.User) error
 	FindByEmail(ctx context.Context, email string) (*entity.User, error)
 	FindByID(ctx context.Context, id uint64) (*entity.User, error)
@@ -23,7 +23,7 @@ type userRepository struct {
 	db *gorm.DB
 }
 
-func NewUserRepository(db *gorm.DB) UserRepository {
+func NewUserRepository(db *gorm.DB) IUserRepository {
 	return &userRepository{db}
 }
 
@@ -47,9 +47,7 @@ func (r *userRepository) Create(ctx context.Context, user *entity.User) error {
 func (r *userRepository) FindByEmail(ctx context.Context, email string) (*entity.User, error) {
 	var user entity.User
 
-	err := r.db.WithContext(ctx).Where("email=?", email).First(&user).Error
-
-	if err != nil {
+	if err := r.db.WithContext(ctx).Where("email = ?", email).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, entity.ErrUserNotFound
 		}
@@ -62,9 +60,7 @@ func (r *userRepository) FindByEmail(ctx context.Context, email string) (*entity
 func (r *userRepository) FindByID(ctx context.Context, id uint64) (*entity.User, error) {
 	var user entity.User
 
-	err := r.db.WithContext(ctx).Where("id=?", id).First(&user).Error
-
-	if err != nil {
+	if err := r.db.WithContext(ctx).Where("id=?", id).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, entity.ErrUserNotFound
 		}
