@@ -3,8 +3,10 @@ package controller
 import (
 	"coffee-reel/entity"
 	"coffee-reel/usecase"
+	"coffee-reel/validator"
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -26,9 +28,10 @@ type CookieConfig struct {
 }
 
 type userController struct {
-	users usecase.IUserUsecase
-	//のちにvalidator
-	cookies CookieConfig
+	users      usecase.IUserUsecase
+	rateLimits usecase.IRateLimitUsecase
+	validator  validator.IUserValidator
+	cookies    CookieConfig
 }
 
 type signUpRequest struct {
@@ -91,10 +94,12 @@ type apiErrorResponse struct {
 	RequestID string `json:"request_id"`
 }
 
-func NewUserController(users usecase.IUserUsecase, cookies CookieConfig) IUserController {
+func NewUserController(users usecase.IUserUsecase, rateLimits usecase.IRateLimitUsecase, userValidator validator.IUserValidator, cookies CookieConfig) IUserController {
 	return &userController{
-		users:   users,
-		cookies: cookies,
+		users:      users,
+		rateLimits: rateLimits,
+		validator:  userValidator,
+		cookies:    cookies,
 	}
 }
 
@@ -115,9 +120,12 @@ func (u *userController) SignUp(c echo.Context) error {
 		return writeError(c, entity.ErrInvalidInput)
 	}
 
-	//validator実装後追記
+	name, email, password, err := u.validator.ValidateSignup(req.Name, req.Email, req.Password)
+	if err != nil {
+		return writeError(c, err)
+	}
+	user, err := u.users.SignUp(c.Request().Context(), name, email, password)
 
-	user, err := u.users.SignUp(c.Request().Context(), req.Name, req.Email, req.Password)
 	if err != nil {
 		return writeError(c, err)
 	}
@@ -135,9 +143,27 @@ func (u *userController) Login(c echo.Context) error {
 		return writeError(c, entity.ErrInvalidInput)
 	}
 
-	//validator実装後追加
+	email, password, err := u.validator.ValidateLogin(req.Email, req.Password)
+	if err != nil {
+		return writeError(c, err)
+	}
 
-	result, err := u.users.Login(c.Request().Context(), req.Email, req.Password)
+	decision, err := u.rateLimits.AllowLoginEmail(c.Request().Context(), email)
+	if err != nil {
+		return writeAPIError(c, http.StatusServiceUnavailable, "service_unavailable", "一時的にサービスを利用できません")
+	}
+	if !decision.Allowed {
+		retryAfter := int64((decision.RetryAfter + time.Second - 1) / time.Second)
+		if retryAfter < 1 {
+			retryAfter = 1
+		}
+
+		c.Response().Header().Set("Retry-After", strconv.FormatInt(retryAfter, 10))
+
+		return writeAPIError(c, http.StatusTooManyRequests, "rate_limit_exceeded", "リクエスト回数が上限を超えました")
+	}
+
+	result, err := u.users.Login(c.Request().Context(), email, password)
 	if err != nil {
 		return writeError(c, err)
 	}

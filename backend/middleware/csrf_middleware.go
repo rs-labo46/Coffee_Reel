@@ -27,7 +27,7 @@ func (m *CSRFMiddleware) Validate(next echo.HandlerFunc) echo.HandlerFunc {
 		if err != nil {
 			return writeMiddlewareError(c, http.StatusForbidden, "csrf_invalid", "CSRFトークンが無効です")
 		}
-		headerToken := c.Request().Header.Get(csrfCookieName)
+		headerToken := c.Request().Header.Get(csrfHeaderName)
 
 		if err := m.tokens.CompareCSRFToken(cookie.Value, headerToken); err != nil {
 			return writeMiddlewareError(c, http.StatusForbidden, "csrf_invalid", "CSRFトークンが無効です")
