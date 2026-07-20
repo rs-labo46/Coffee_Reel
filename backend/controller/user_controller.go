@@ -20,8 +20,6 @@ type IUserController interface {
 	Me(c echo.Context) error
 }
 
-//interfaceのValidatorのち追記
-
 type CookieConfig struct {
 	Secure     bool
 	CSRFDomain string

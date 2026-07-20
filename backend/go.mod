@@ -11,6 +11,8 @@ require (
 	gorm.io/gorm v1.31.2
 )
 
+require golang.org/x/time v0.15.0 // indirect
+
 require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
