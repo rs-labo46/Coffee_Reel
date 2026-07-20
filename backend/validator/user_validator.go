@@ -71,9 +71,14 @@ func (v *userValidator) ValidateLogin(email, password string) (string, string, e
 
 // Emailをtrim・小文字化し、長さと形式を検証する。
 func normalizeAndValidateEmail(email string) (string, error) {
+
+	if !utf8.ValidString(email) {
+		return "", entity.ErrInvalidInput
+	}
+
 	email = strings.ToLower(strings.TrimSpace(email))
 
-	if email == "" || !utf8.ValidString(email) {
+	if email == "" {
 		return "", entity.ErrInvalidInput
 	}
 
