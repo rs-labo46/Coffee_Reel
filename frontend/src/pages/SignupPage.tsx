@@ -21,14 +21,14 @@ function validateInput(name: string, email: string, password: string): string {
 
   const nameLength = countCharacters(normalizedName);
   if (nameLength < 1 || nameLength > maxNameLength) {
-    return "名前は1文字以上50文字以内で入力してください";
+    return "名前は50文字以内で入力してください";
   }
 
   if (
     normalizedEmail === "" ||
     countCharacters(normalizedEmail) > maxEmailLength
   ) {
-    return "メールアドレスを254文字以内で入力してください";
+    return "メールアドレスを入力してください";
   }
 
   if (countCharacters(password) < minPasswordLength) {
@@ -36,7 +36,7 @@ function validateInput(name: string, email: string, password: string): string {
   }
 
   if (new TextEncoder().encode(password).length > maxPasswordBytes) {
-    return "パスワードはUTF-8で72バイト以内にしてください";
+    return "パスワードを入力してください";
   }
 
   return "";
@@ -48,7 +48,6 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
-  const [requestId, setRequestId] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -59,7 +58,6 @@ export default function SignupPage() {
     }
 
     setErrorMessage("");
-    setRequestId("");
 
     const validationMessage = validateInput(name, email, password);
     if (validationMessage !== "") {
@@ -84,7 +82,6 @@ export default function SignupPage() {
     } catch (error: unknown) {
       if (error instanceof ApiClientError) {
         setErrorMessage(error.message);
-        setRequestId(error.requestId);
       } else {
         setErrorMessage("会員登録に失敗しました");
       }
@@ -299,11 +296,6 @@ export default function SignupPage() {
                     </svg>
                     <div>
                       <p className="font-bold">{errorMessage}</p>
-                      {requestId !== "" && (
-                        <p className="mt-1 text-xs text-red-700">
-                          お問い合わせID: {requestId}
-                        </p>
-                      )}
                     </div>
                   </div>
                 </div>
