@@ -95,7 +95,7 @@ export default function SignupPage() {
 
   return (
     <>
-      <main className="relative min-h-screen overflow-hidden bg-[#100b08] text-stone-100 selection:bg-amber-300 selection:text-stone-950">
+      <main className="relative min-h-dvh overflow-x-hidden bg-[#100b08] text-stone-100 selection:bg-amber-300 selection:text-stone-950">
         <div
           aria-hidden="true"
           className="absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,rgba(217,119,6,0.22),transparent_28%),radial-gradient(circle_at_82%_74%,rgba(120,53,15,0.28),transparent_32%)]"
@@ -109,13 +109,13 @@ export default function SignupPage() {
           className="absolute -right-32 -top-24 h-96 w-96 rounded-full border border-white/5"
         />
 
-        <div className="relative mx-auto grid min-h-screen w-full max-w-7xl items-center gap-10 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(400px,520px)] lg:px-10 lg:py-12">
+        <div className="relative mx-auto grid w-full max-w-7xl content-start gap-5 px-4 py-4 sm:gap-7 sm:px-6 sm:py-7 lg:min-h-dvh lg:grid-cols-[minmax(0,1fr)_minmax(400px,520px)] lg:items-center lg:gap-12 lg:px-10 lg:py-10">
           <section
-            className="mx-auto w-full max-w-2xl lg:mx-0"
+            className="mx-auto w-full max-w-2xl text-center lg:mx-0 lg:text-left"
             aria-label="Coffee Reelの紹介"
           >
-            <div className="inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 backdrop-blur-sm">
-              <span className="grid h-8 w-8 place-items-center rounded-full bg-amber-300 text-stone-950 shadow-lg shadow-amber-500/20">
+            <div className="inline-flex items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.05] px-3.5 py-1.5 backdrop-blur-sm sm:gap-3 sm:px-4 sm:py-2">
+              <span className="grid h-7 w-7 place-items-center rounded-full bg-amber-300 text-stone-950 shadow-lg shadow-amber-500/20 sm:h-8 sm:w-8">
                 <svg
                   aria-hidden="true"
                   viewBox="0 0 24 24"
@@ -130,24 +130,22 @@ export default function SignupPage() {
                   <path d="M8 17c1.2-3.9 4.2-7.2 8.5-9.4" />
                 </svg>
               </span>
-              <span className="text-sm font-black tracking-[0.18em] text-amber-100 uppercase">
+              <span className="text-xs font-black tracking-[0.18em] text-amber-100 uppercase sm:text-sm">
                 Coffee Reel
               </span>
             </div>
 
-            <p className="mt-10 text-xs font-bold tracking-[0.3em] text-amber-300 uppercase sm:text-sm">
+            <p className="mt-5 text-[11px] font-bold tracking-[0.28em] text-amber-300 uppercase sm:mt-7 sm:text-xs lg:mt-10 lg:text-sm">
               Brew. Watch. Share.
             </p>
-            <h1 className="mt-4 max-w-xl text-4xl leading-[1.08] font-black tracking-[-0.04em] text-amber-300 sm:text-5xl lg:text-6xl">
-              <span className="block text-amber-300">
-                一杯の発見を、短い動画から。
-              </span>
+            <h1 className="mx-auto mt-2.5 max-w-xl text-[2rem] leading-[1.12] font-black tracking-[-0.04em] text-amber-300 sm:mt-4 sm:text-5xl lg:mx-0 lg:text-6xl">
+              <span className="block text-amber-300">一杯の発見を。</span>
             </h1>
-            <p className="mt-6 max-w-xl text-sm leading-7 text-stone-300 sm:text-base sm:leading-8">
-              抽出、焙煎、ラテアート。コーヒーの知識と技術を、縦型ショート動画で見つけて共有するサービスです。
+            <p className="mx-auto mt-3 max-w-xl text-xs leading-6 text-stone-300 sm:mt-5 sm:text-sm sm:leading-7 lg:mx-0 lg:text-base lg:leading-8">
+              抽出や焙煎、ラテアートなどコーヒーの知識と技術を共有
             </p>
 
-            <div className="mt-8 grid gap-3 sm:grid-cols-3">
+            <div className="mt-4 grid grid-cols-3 gap-2 sm:mt-6 sm:gap-3 lg:mt-8">
               {[
                 ["01", "見つける", "興味のある動画を探す"],
                 ["02", "残す", "気になる動画を保存する"],
@@ -155,13 +153,15 @@ export default function SignupPage() {
               ].map(([number, title, description]) => (
                 <div
                   key={number}
-                  className="rounded-3xl border border-white/10 bg-white/[0.045] p-4 backdrop-blur-sm"
+                  className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.045] px-2 py-2.5 backdrop-blur-sm sm:rounded-3xl sm:p-4"
                 >
-                  <span className="text-xs font-black tracking-[0.2em] text-amber-300">
+                  <span className="text-[10px] font-black tracking-[0.18em] text-amber-300 sm:text-xs sm:tracking-[0.2em]">
                     {number}
                   </span>
-                  <p className="mt-3 text-sm font-black text-white">{title}</p>
-                  <p className="mt-1 text-xs leading-5 text-stone-400">
+                  <p className="mt-1 text-xs font-black text-white sm:mt-3 sm:text-sm">
+                    {title}
+                  </p>
+                  <p className="mt-1 hidden text-xs leading-5 text-stone-400 sm:block">
                     {description}
                   </p>
                 </div>
@@ -170,37 +170,37 @@ export default function SignupPage() {
           </section>
 
           <section
-            className="relative mx-auto w-full max-w-[520px] rounded-[2.25rem] border border-white/70 bg-[#f7f0e7] p-5 text-[#2a1a12] shadow-[0_32px_90px_rgba(0,0,0,0.38)] sm:p-8 lg:p-10"
+            className="relative mx-auto w-full max-w-[520px] rounded-[1.75rem] border border-white/70 bg-[#f7f0e7] p-4 text-left text-[#2a1a12] shadow-[0_24px_70px_rgba(0,0,0,0.34)] sm:rounded-[2.25rem] sm:p-7 lg:p-9"
             aria-labelledby="signup-title"
           >
             <div
               aria-hidden="true"
-              className="absolute top-0 right-10 h-1 w-24 rounded-b-full bg-amber-500"
+              className="absolute top-0 right-8 h-1 w-20 rounded-b-full bg-amber-500 sm:right-10 sm:w-24"
             />
 
-            <div className="flex items-start justify-between gap-5">
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-black tracking-[0.22em] text-amber-800 uppercase">
+                <p className="text-[10px] font-black tracking-[0.22em] text-amber-800 uppercase sm:text-xs">
                   Create account
                 </p>
                 <h2
                   id="signup-title"
-                  className="mt-3 text-3xl font-black tracking-[-0.03em] text-stone-950 sm:text-4xl"
+                  className="mt-1.5 text-2xl font-black tracking-[-0.03em] text-stone-950 sm:mt-3 sm:text-4xl"
                 >
                   会員登録
                 </h2>
               </div>
-              <span className="rounded-full border border-stone-300 bg-white/70 px-3 py-1.5 text-xs font-bold text-stone-600">
+              <span className="rounded-full border border-stone-300 bg-white/70 px-2.5 py-1 text-[11px] font-bold text-stone-600 sm:px-3 sm:py-1.5 sm:text-xs">
                 無料
               </span>
             </div>
 
-            <p className="mt-4 text-sm leading-7 text-stone-600">
+            <p className="mt-2 text-xs leading-5 text-stone-600 sm:mt-4 sm:text-sm sm:leading-7">
               アカウントを作成すると、動画投稿・保存・いいねを利用できます。
             </p>
 
             <form
-              className="mt-8 space-y-5"
+              className="mt-5 space-y-3.5 sm:mt-7 sm:space-y-5"
               onSubmit={handleSubmit}
               noValidate
               aria-busy={isSubmitting}
@@ -208,7 +208,7 @@ export default function SignupPage() {
               <div>
                 <label
                   htmlFor="name"
-                  className="text-sm font-black text-stone-800"
+                  className="text-xs font-black text-stone-800 sm:text-sm"
                 >
                   名前
                 </label>
@@ -230,7 +230,7 @@ export default function SignupPage() {
               <div>
                 <label
                   htmlFor="email"
-                  className="text-sm font-black text-stone-800"
+                  className="text-xs font-black text-stone-800 sm:text-sm"
                 >
                   メールアドレス
                 </label>
@@ -253,11 +253,11 @@ export default function SignupPage() {
                 <div className="flex items-end justify-between gap-4">
                   <label
                     htmlFor="password"
-                    className="text-sm font-black text-stone-800"
+                    className="text-xs font-black text-stone-800 sm:text-sm"
                   >
                     パスワード
                   </label>
-                  <span className="text-xs font-medium text-stone-500">
+                  <span className="text-[11px] font-medium text-stone-500 sm:text-xs">
                     8文字以上
                   </span>
                 </div>
@@ -311,7 +311,7 @@ export default function SignupPage() {
 
               <button
                 type="submit"
-                className="group flex min-h-13 w-full items-center justify-center gap-2 rounded-2xl bg-stone-950 px-5 py-3.5 text-sm font-black text-white shadow-lg shadow-stone-950/20 transition hover:-translate-y-0.5 hover:bg-amber-600 hover:shadow-amber-700/20 focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:bg-stone-950"
+                className="group flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-stone-950 px-5 py-3 text-sm font-black text-white shadow-lg shadow-stone-950/20 transition hover:-translate-y-0.5 hover:bg-amber-600 hover:shadow-amber-700/20 focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:bg-stone-950 sm:min-h-13 sm:rounded-2xl sm:py-3.5"
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (
@@ -360,7 +360,7 @@ export default function SignupPage() {
               </button>
             </form>
 
-            <div className="mt-6 flex items-center gap-3 text-xs text-stone-500">
+            <div className="mt-4 flex items-center gap-3 text-[11px] text-stone-500 sm:mt-6 sm:text-xs">
               <span className="h-px flex-1 bg-stone-300" />
               <span>既に登録済みの方</span>
               <span className="h-px flex-1 bg-stone-300" />
@@ -368,14 +368,10 @@ export default function SignupPage() {
 
             <Link
               to="/login"
-              className="mt-4 flex min-h-12 w-full items-center justify-center rounded-2xl border border-stone-300 bg-white/60 px-5 py-3 text-sm font-black text-stone-800 transition hover:border-amber-700 hover:bg-white focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-amber-700"
+              className="mt-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-stone-300 bg-white/60 px-5 py-2.5 text-sm font-black text-stone-800 transition hover:border-amber-700 hover:bg-white focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-amber-700 sm:mt-4 sm:min-h-12 sm:rounded-2xl sm:py-3"
             >
               ログインへ進む
             </Link>
-
-            <p className="mt-6 text-center text-[11px] leading-5 text-stone-500">
-              パスワードはBackendでハッシュ化され、平文では保存されません。
-            </p>
           </section>
         </div>
       </main>
