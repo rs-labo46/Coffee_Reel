@@ -33,10 +33,10 @@ export default function LoginPage() {
   const { login } = useAuth();
   const locationState = location.state as LoginLocationState | null;
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [email, setEmail] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
+  const [errorMessage, setErrorMessage] = useState<string>("");
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,

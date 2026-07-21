@@ -6,6 +6,7 @@ import type { AuthState, LoginInput } from "../types/user";
 // AuthStateに加えて、ログイン処理を実行するlogin関数を持つ。
 export type AuthContextValue = AuthState & {
   login: (input: LoginInput) => Promise<void>;
+  logout: () => Promise<void>;
 };
 
 // 認証状態と認証操作をReact全体で共有するContext。

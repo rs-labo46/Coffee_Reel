@@ -1,10 +1,36 @@
+import { useState } from "react";
+
+import { ApiClientError } from "../api/client";
 import { useAuth } from "../auth/useAuth";
 
 export default function TemporaryHomePage() {
-  const { user } = useAuth();
+  const { logout, user } = useAuth();
+  const [errorMessage, setErrorMessage] = useState<string>("");
+  const [isLoggingOut, setIsLoggingOut] = useState<boolean>(false);
 
   if (user === null) {
     return null;
+  }
+
+  async function handleLogout(): Promise<void> {
+    if (isLoggingOut) {
+      return;
+    }
+
+    setErrorMessage("");
+    setIsLoggingOut(true);
+
+    try {
+      await logout();
+    } catch (error: unknown) {
+      if (error instanceof ApiClientError) {
+        setErrorMessage(error.message);
+      } else {
+        setErrorMessage("ログアウトに失敗しました");
+      }
+
+      setIsLoggingOut(false);
+    }
   }
 
   return (
@@ -14,10 +40,31 @@ export default function TemporaryHomePage() {
           <p className="text-xs font-black tracking-[0.24em] text-amber-300 uppercase">
             Coffee Reel
           </p>
-          <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs font-bold text-stone-300">
-            認証済み
-          </span>
+
+          <div className="flex items-center gap-3">
+            <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs font-bold text-stone-300">
+              認証済み
+            </span>
+
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className="rounded-full border border-amber-300/40 px-4 py-2 text-xs font-black text-amber-200 transition hover:border-amber-300 hover:bg-amber-300/10 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isLoggingOut ? "ログアウト中" : "ログアウト"}
+            </button>
+          </div>
         </header>
+
+        {errorMessage !== "" && (
+          <div
+            className="mt-5 rounded-2xl border border-red-400/40 bg-red-950/40 px-4 py-3 text-sm text-red-100"
+            role="alert"
+          >
+            {errorMessage}
+          </div>
+        )}
 
         <section className="mt-12 rounded-[2.5rem] border border-white/10 bg-white/[0.05] p-7 shadow-2xl shadow-black/30 sm:p-10">
           <p className="text-sm font-bold text-amber-300">

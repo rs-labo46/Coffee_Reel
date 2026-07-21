@@ -52,3 +52,17 @@ export function getMe(): Promise<MeResponse> {
     },
   );
 }
+
+export function logout(): Promise<void> {
+  return apiRequest<void>(
+    "/logout",
+    {
+      method: "POST",
+    },
+    {
+      auth: false,
+      csrf: true,
+      retryOnUnauthorized: false,
+    },
+  );
+}

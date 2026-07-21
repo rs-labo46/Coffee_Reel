@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { AuthState, LoginInput, User } from "../types/user";
-import { getMe, login as requestLogin } from "../api/user";
+import {
+  getMe,
+  login as requestLogin,
+  logout as requestLogout,
+} from "../api/user";
 import {
   clearAccessToken,
   setAccessToken,
@@ -101,9 +105,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
     });
   }
 
+  async function logout(): Promise<void> {
+    authRevisionRef.current += 1;
+
+    await requestLogout();
+
+    clearAccessToken();
+    setState({
+      user: null,
+      accessToken: null,
+      isAuthenticated: false,
+      isLoading: false,
+    });
+  }
+
   const value: AuthContextValue = {
     ...state,
     login,
+    logout,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -22,7 +22,7 @@ services:
       dockerfile: Dockerfile
     command: ["go", "run", "./cmd/migrate"]
     environment:
-      DATABASE_URL: "${DATABASE_URL}"
+      DATABASE_URL: "host=db user=${POSTGRES_USER} password=${POSTGRES_PASSWORD} dbname=${POSTGRES_DB} port=5432 sslmode=disable TimeZone=UTC"
     depends_on:
       db:
         condition: service_healthy
@@ -74,8 +74,8 @@ services:
     ports:
       - "${PORT}:${PORT}"
     depends_on:
-      db:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
 

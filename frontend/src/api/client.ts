@@ -20,6 +20,7 @@ let refreshPromise: Promise<string> | null = null;
 
 type ApiRequestOptions = {
   auth?: boolean;
+  csrf?: boolean;
   retryOnUnauthorized?: boolean;
 };
 
@@ -119,6 +120,10 @@ async function sendRequest<T>(
     );
   }
 
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
   const body = await readJSON(response);
 
   if (!response.ok) {
@@ -157,9 +162,10 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const usesAuth = options.auth !== false;
   const tokenUsed = usesAuth ? getAccessToken() : null;
+  const requestInit = options.csrf === true ? addCSRFHeader(init) : init;
 
   try {
-    return await sendRequest<T>(path, init, tokenUsed);
+    return await sendRequest<T>(path, requestInit, tokenUsed);
   } catch (error: unknown) {
     const canRetry =
       error instanceof ApiClientError &&
@@ -176,12 +182,12 @@ export async function apiRequest<T>(
     const currentToken = getAccessToken();
 
     if (currentToken !== null && currentToken !== tokenUsed) {
-      return retryRequest<T>(path, init, currentToken);
+      return retryRequest<T>(path, requestInit, currentToken);
     }
 
     const refreshedAccessToken = await refreshAccessToken();
 
-    return retryRequest<T>(path, init, refreshedAccessToken);
+    return retryRequest<T>(path, requestInit, refreshedAccessToken);
   }
 }
 
@@ -214,12 +220,7 @@ async function requestNewAccessToken(): Promise<string> {
   try {
     const response = await sendRequest<RefreshResponse>(
       refreshPath,
-      {
-        method: "POST",
-        headers: {
-          [csrfHeaderName]: csrfToken,
-        },
-      },
+      addCSRFHeader({ method: "POST" }),
       null,
     );
 
@@ -261,6 +262,27 @@ async function retryRequest<T>(
 
     throw error;
   }
+}
+
+// CSRF Cookieの値をRequest Headerへ設定する。RefreshとLogoutのようなCookie認証APIで使用する。
+function addCSRFHeader(init: RequestInit): RequestInit {
+  const csrfToken = readCookie(csrfCookieName);
+
+  if (csrfToken === "") {
+    throw new ApiClientError(
+      403,
+      "csrf_invalid",
+      "CSRFトークンが見つかりません",
+    );
+  }
+
+  const headers = new Headers(init.headers);
+  headers.set(csrfHeaderName, csrfToken);
+
+  return {
+    ...init,
+    headers,
+  };
 }
 
 // document.cookieから指定したCookieの値を取得する。HttpOnly CookieはJavaScriptから読めないため、CSRF Cookieの取得にだけ使用する。
