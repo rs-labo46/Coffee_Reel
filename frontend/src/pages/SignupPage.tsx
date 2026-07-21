@@ -135,8 +135,14 @@ export default function SignupPage() {
             <p className="mt-5 text-[11px] font-bold tracking-[0.28em] text-amber-300 uppercase sm:mt-7 sm:text-xs lg:mt-10 lg:text-sm">
               Brew. Watch. Share.
             </p>
-            <h1 className="mx-auto mt-2.5 max-w-xl text-[2rem] leading-[1.12] font-black tracking-[-0.04em] text-amber-300 sm:mt-4 sm:text-5xl lg:mx-0 lg:text-6xl">
-              <span className="block text-amber-300">一杯の発見を。</span>
+            <h1 className="mx-auto mt-2.5 max-w-xl font-black tracking-[-0.04em] text-amber-300 sm:mt-4 lg:mx-0">
+              <span className="block whitespace-nowrap text-[clamp(2rem,8vw,3.75rem)] leading-[1.08]">
+                今日の一杯に、
+              </span>
+
+              <span className="mt-1 block whitespace-nowrap text-[clamp(2rem,8vw,3.75rem)] leading-[1.08]">
+                新しい発見を。
+              </span>
             </h1>
             <p className="mx-auto mt-3 max-w-xl text-xs leading-6 text-stone-300 sm:mt-5 sm:text-sm sm:leading-7 lg:mx-0 lg:text-base lg:leading-8">
               抽出や焙煎、ラテアートなどコーヒーの知識と技術を共有
