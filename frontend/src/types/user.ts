@@ -33,6 +33,20 @@ export type AuthResponse = {
   };
 };
 
+export type RefreshResponse = {
+  data: {
+    access_token: string;
+    token_type: "Bearer";
+    expires_in: number;
+  };
+};
+
+export type MeResponse = {
+  data: User & {
+    created_at: string;
+  };
+};
+
 export type ApiErrorResponse = {
   status: number;
   code: string;

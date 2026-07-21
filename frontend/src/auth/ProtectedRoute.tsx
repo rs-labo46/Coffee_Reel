@@ -1,6 +1,5 @@
 import { Navigate, Outlet, useLocation } from "react-router";
-
-import { useAuth } from "./AuthContext";
+import { useAuth } from "./useAuth";
 
 //未認証の時にloginへ移動
 export default function ProtectedRoute() {
