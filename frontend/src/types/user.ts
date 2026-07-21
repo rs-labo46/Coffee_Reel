@@ -15,7 +15,7 @@ export type SignUpInput = {
   password: string;
 };
 
-export type SignupResponse = {
+export type SignUpResponse = {
   data: User & { created_at: string };
 };
 
