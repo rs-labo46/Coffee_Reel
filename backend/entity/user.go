@@ -39,3 +39,32 @@ func (u *User) InvalidateAccessTokens(now time.Time) {
 	u.TokenVersion++
 	u.UpdatedAt = now.UTC()
 }
+
+func (u *User) Suspend(now time.Time) error {
+	if u.Role != RoleUser {
+		return ErrUserManagementForbidden
+	}
+
+	if u.Status != StatusActive {
+		return ErrUserStatusConflict
+	}
+
+	u.Status = StatusSuspended
+	u.TokenVersion++
+	u.UpdatedAt = now.UTC()
+
+	return nil
+}
+
+func (u *User) Resume(now time.Time) error {
+	if u.Role != RoleUser {
+		return ErrUserManagementForbidden
+	}
+	if u.Status != StatusSuspended {
+		return ErrUserStatusConflict
+	}
+	u.Status = StatusActive
+	u.UpdatedAt = now.UTC()
+
+	return nil
+}
