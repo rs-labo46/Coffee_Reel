@@ -2,6 +2,7 @@ package entity
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -94,5 +95,178 @@ func TestUserJSONDoesNotExposeAuthenticationSecrets(t *testing.T) {
 		if !strings.Contains(jsonText, publicField) {
 			t.Fatalf("JSON is missing public field %s: %s", publicField, jsonText)
 		}
+	}
+}
+
+func TestUserSuspendRejectsInvalidState(t *testing.T) {
+	now := time.Date(2026, 7, 21, 8, 30, 0, 0, time.UTC)
+
+	tests := []struct {
+		name    string
+		user    User
+		wantErr error
+	}{
+		{
+			name: "admin cannot be suspended",
+			user: User{
+				Role:         RoleAdmin,
+				Status:       StatusActive,
+				TokenVersion: 3,
+			},
+			wantErr: ErrUserManagementForbidden,
+		},
+		{
+			name: "unknown role cannot be suspended",
+			user: User{
+				Role:         UserRole("owner"),
+				Status:       StatusActive,
+				TokenVersion: 3,
+			},
+			wantErr: ErrUserManagementForbidden,
+		},
+		{
+			name: "already suspended user is rejected",
+			user: User{
+				Role:         RoleUser,
+				Status:       StatusSuspended,
+				TokenVersion: 3,
+			},
+			wantErr: ErrUserStatusConflict,
+		},
+		{
+			name: "unknown status is rejected",
+			user: User{
+				Role:         RoleUser,
+				Status:       UserStatus("disabled"),
+				TokenVersion: 3,
+			},
+			wantErr: ErrUserStatusConflict,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			before := tt.user
+
+			err := tt.user.Suspend(now)
+
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("Suspend() error = %v, want %v", err, tt.wantErr)
+			}
+			if tt.user != before {
+				t.Fatalf(
+					"Suspend() changed user on error: got %+v, want %+v",
+					tt.user,
+					before,
+				)
+			}
+		})
+	}
+}
+
+func TestUserResume(t *testing.T) {
+	createdAt := time.Date(2026, 7, 20, 10, 0, 0, 0, time.FixedZone("JST", 9*60*60))
+	now := time.Date(2026, 7, 21, 8, 30, 0, 123, time.FixedZone("JST", 9*60*60))
+
+	user := User{
+		ID:           10,
+		Name:         "user",
+		Email:        "user@example.com",
+		PasswordHash: "secret-hash",
+		Role:         RoleUser,
+		Status:       StatusSuspended,
+		TokenVersion: 8,
+		CreatedAt:    createdAt,
+		UpdatedAt:    createdAt,
+	}
+
+	err := user.Resume(now)
+	if err != nil {
+		t.Fatalf("Resume() error = %v", err)
+	}
+
+	if user.Status != StatusActive {
+		t.Fatalf("Status = %q, want %q", user.Status, StatusActive)
+	}
+	if user.TokenVersion != 8 {
+		t.Fatalf("TokenVersion = %d, want 8", user.TokenVersion)
+	}
+	if !user.UpdatedAt.Equal(now.UTC()) {
+		t.Fatalf("UpdatedAt = %s, want %s", user.UpdatedAt, now.UTC())
+	}
+	if user.UpdatedAt.Location() != time.UTC {
+		t.Fatalf("UpdatedAt location = %s, want UTC", user.UpdatedAt.Location())
+	}
+	if !user.CreatedAt.Equal(createdAt) {
+		t.Fatal("Resume must not change CreatedAt")
+	}
+	if user.Role != RoleUser {
+		t.Fatalf("Role = %q, want %q", user.Role, RoleUser)
+	}
+}
+
+func TestUserResumeRejectsInvalidState(t *testing.T) {
+	now := time.Date(2026, 7, 21, 8, 30, 0, 0, time.UTC)
+
+	tests := []struct {
+		name    string
+		user    User
+		wantErr error
+	}{
+		{
+			name: "admin cannot be resumed",
+			user: User{
+				Role:         RoleAdmin,
+				Status:       StatusSuspended,
+				TokenVersion: 3,
+			},
+			wantErr: ErrUserManagementForbidden,
+		},
+		{
+			name: "unknown role cannot be resumed",
+			user: User{
+				Role:         UserRole("owner"),
+				Status:       StatusSuspended,
+				TokenVersion: 3,
+			},
+			wantErr: ErrUserManagementForbidden,
+		},
+		{
+			name: "already active user is rejected",
+			user: User{
+				Role:         RoleUser,
+				Status:       StatusActive,
+				TokenVersion: 3,
+			},
+			wantErr: ErrUserStatusConflict,
+		},
+		{
+			name: "unknown status is rejected",
+			user: User{
+				Role:         RoleUser,
+				Status:       UserStatus("disabled"),
+				TokenVersion: 3,
+			},
+			wantErr: ErrUserStatusConflict,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			before := tt.user
+
+			err := tt.user.Resume(now)
+
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("Resume() error = %v, want %v", err, tt.wantErr)
+			}
+			if tt.user != before {
+				t.Fatalf(
+					"Resume() changed user on error: got %+v, want %+v",
+					tt.user,
+					before,
+				)
+			}
+		})
 	}
 }
