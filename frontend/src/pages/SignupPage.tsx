@@ -21,7 +21,7 @@ function validateInput(name: string, email: string, password: string): string {
 
   const nameLength = countCharacters(normalizedName);
   if (nameLength < 1 || nameLength > maxNameLength) {
-    return "名前は50文字以内で入力してください";
+    return "名前は1文字以上50文字以内で入力してください";
   }
 
   if (
@@ -36,7 +36,7 @@ function validateInput(name: string, email: string, password: string): string {
   }
 
   if (new TextEncoder().encode(password).length > maxPasswordBytes) {
-    return "パスワードを入力してください";
+    return "パスワードはUTF-8で72バイト以内にしてください";
   }
 
   return "";
