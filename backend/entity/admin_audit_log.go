@@ -6,41 +6,39 @@ import (
 	"unicode/utf8"
 )
 
-type AuditTargetType string
+type AdminAuditTargetType string
 
 const (
-	AuditTargetUser  AuditTargetType = "user"
-	AuditTargetVideo AuditTargetType = "video"
+	AdminAuditTargetUser  AdminAuditTargetType = "user"
+	AdminAuditTargetVideo AdminAuditTargetType = "video"
 )
 
-type AuditAction string
+type AdminAuditAction string
 
 const (
-	AuditActionUserSuspend           AuditAction = "user_suspend"
-	AuditActionUserResume            AuditAction = "user_resume"
-	AuditActionVideoHide             AuditAction = "video_hide"
-	AuditActionVideoRestore          AuditAction = "video_restore"
-	AuditActionVideoHideBySuspension AuditAction = "video_hide_by_user_suspension"
+	AdminAuditActionUserSuspend               AdminAuditAction = "user_suspend"
+	AdminAuditActionUserResume                AdminAuditAction = "user_resume"
+	AdminAuditActionVideoHideByUserSuspension AdminAuditAction = "video_hide_by_user_suspension"
 )
 
 type AdminAuditLog struct {
-	ID           uint64          `json:"id" gorm:"primaryKey"`
-	AdminUserID  uint64          `json:"admin_user_id" gorm:"not null"`
-	TargetType   AuditTargetType `json:"target_type" gorm:"not null"`
-	TargetID     uint64          `json:"target_id" gorm:"not null"`
-	Action       AuditAction     `json:"action" gorm:"not null"`
-	BeforeStatus string          `json:"before_status" gorm:"not null"`
-	AfterStatus  string          `json:"after_status" gorm:"not null"`
-	Reason       string          `json:"reason" gorm:"type:varchar(500);not null"`
-	RequestID    string          `json:"request_id" gorm:"not null"`
-	CreatedAt    time.Time       `json:"created_at" gorm:"not null"`
+	ID           uint64               `json:"id" gorm:"primaryKey"`
+	AdminUserID  uint64               `json:"admin_user_id" gorm:"not null"`
+	TargetType   AdminAuditTargetType `json:"target_type" gorm:"not null"`
+	TargetID     uint64               `json:"target_id" gorm:"not null"`
+	Action       AdminAuditAction     `json:"action" gorm:"not null"`
+	BeforeStatus string               `json:"before_status" gorm:"not null"`
+	AfterStatus  string               `json:"after_status" gorm:"not null"`
+	Reason       string               `json:"reason" gorm:"type:varchar(500);not null"`
+	RequestID    string               `json:"request_id" gorm:"not null"`
+	CreatedAt    time.Time            `json:"created_at" gorm:"not null"`
 }
 
 func NewAdminAuditLog(
 	adminUserID uint64,
-	targetType AuditTargetType,
+	targetType AdminAuditTargetType,
 	targetID uint64,
-	action AuditAction,
+	action AdminAuditAction,
 	beforeStatus string,
 	afterStatus string,
 	reason string,
@@ -53,50 +51,16 @@ func NewAdminAuditLog(
 	if adminUserID == 0 || targetID == 0 || now.IsZero() {
 		return nil, ErrInvalidInput
 	}
-
 	if !utf8.ValidString(reason) {
 		return nil, ErrInvalidInput
 	}
-
-	reasonLength := utf8.RuneCountInString(reason)
-	if reasonLength < 1 || reasonLength > 500 {
+	if length := utf8.RuneCountInString(reason); length < 1 || length > 500 {
 		return nil, ErrInvalidInput
 	}
-
 	if requestID == "" || !utf8.ValidString(requestID) {
 		return nil, ErrInvalidInput
 	}
-
-	validTransition := false
-
-	switch action {
-	case AuditActionUserSuspend:
-		validTransition = targetType == AuditTargetUser &&
-			beforeStatus == string(StatusActive) &&
-			afterStatus == string(StatusSuspended)
-
-	case AuditActionUserResume:
-		validTransition = targetType == AuditTargetUser &&
-			beforeStatus == string(StatusSuspended) &&
-			afterStatus == string(StatusActive)
-
-	case AuditActionVideoHide:
-		validTransition = targetType == AuditTargetVideo &&
-			beforeStatus == "published" &&
-			afterStatus == "hidden"
-
-	case AuditActionVideoRestore:
-		validTransition = targetType == AuditTargetVideo &&
-			beforeStatus == "hidden" &&
-			afterStatus == "published"
-
-	case AuditActionVideoHideBySuspension:
-		validTransition = targetType == AuditTargetVideo &&
-			beforeStatus == "published" &&
-			afterStatus == "hidden"
-	}
-
-	if !validTransition {
+	if !isValidAdminAuditTransition(targetType, action, beforeStatus, afterStatus) {
 		return nil, ErrInvalidInput
 	}
 
@@ -111,4 +75,28 @@ func NewAdminAuditLog(
 		RequestID:    requestID,
 		CreatedAt:    now.UTC(),
 	}, nil
+}
+
+func isValidAdminAuditTransition(
+	targetType AdminAuditTargetType,
+	action AdminAuditAction,
+	beforeStatus string,
+	afterStatus string,
+) bool {
+	switch action {
+	case AdminAuditActionUserSuspend:
+		return targetType == AdminAuditTargetUser &&
+			beforeStatus == string(StatusActive) &&
+			afterStatus == string(StatusSuspended)
+	case AdminAuditActionUserResume:
+		return targetType == AdminAuditTargetUser &&
+			beforeStatus == string(StatusSuspended) &&
+			afterStatus == string(StatusActive)
+	case AdminAuditActionVideoHideByUserSuspension:
+		return targetType == AdminAuditTargetVideo &&
+			beforeStatus == "published" &&
+			afterStatus == "hidden"
+	default:
+		return false
+	}
 }
