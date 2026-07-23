@@ -17,14 +17,14 @@ const (
 )
 
 type User struct {
-	ID           uint64     `json:"id" gorm:"primaryKey"`
+	ID           uint64     `json:"id" gorm:"primaryKey;index:idx_users_admin_list,sort:desc,priority:3"`
 	Name         string     `json:"name" gorm:"not null"`
 	Email        string     `json:"email" gorm:"not null;uniqueIndex"`
 	PasswordHash string     `json:"-" gorm:"not null"`
-	Role         UserRole   `json:"role" gorm:"not null"`
+	Role         UserRole   `json:"role" gorm:"not null;index:idx_users_admin_list,priority:1"`
 	Status       UserStatus `json:"status" gorm:"not null"`
 	TokenVersion uint64     `json:"-" gorm:"not null;default:0"`
-	CreatedAt    time.Time  `json:"created_at" gorm:"not null"`
+	CreatedAt    time.Time  `json:"created_at" gorm:"not null;index:idx_users_admin_list,sort:desc,priority:2"`
 	UpdatedAt    time.Time  `json:"updated_at" gorm:"not null"`
 }
 

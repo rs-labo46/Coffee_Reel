@@ -27,5 +27,9 @@ func main() {
 		log.Fatal(err)
 	}
 
+	if err := migrate.MigrateAdminAuditLogs(postgresDB); err != nil {
+		log.Fatal(err)
+	}
+
 	log.Println("migration completed")
 }
