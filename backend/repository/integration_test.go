@@ -74,6 +74,12 @@ func openPostgresIntegrationDB(t *testing.T) *gorm.DB {
 		t.Fatalf("MigrateRefreshTokens: %v", err)
 	}
 
+	//----追加コード----
+	if err := migrate.MigrateAdminAuditLogs(db); err != nil {
+		t.Fatalf("MigrateAdminAuditLogs: %v", err)
+	}
+	//------------
+
 	t.Cleanup(func() {
 		_ = testSQL.Close()
 		_, _ = adminSQL.ExecContext(context.Background(), `DROP SCHEMA IF EXISTS "`+schema+`" CASCADE`)
