@@ -29,7 +29,10 @@ func openPostgresIntegrationDB(t *testing.T) *gorm.DB {
 
 	dsn := strings.TrimSpace(os.Getenv("TEST_DATABASE_URL"))
 	if dsn == "" {
-		t.Fatal("TEST_DATABASE_URL is required for PostgreSQL integration tests")
+		dsn = strings.TrimSpace(os.Getenv("DATABASE_URL"))
+	}
+	if dsn == "" {
+		t.Fatal("TEST_DATABASE_URL or DATABASE_URL is required for PostgreSQL integration tests")
 	}
 
 	cfg, err := pgx.ParseConfig(dsn)
@@ -74,11 +77,9 @@ func openPostgresIntegrationDB(t *testing.T) *gorm.DB {
 		t.Fatalf("MigrateRefreshTokens: %v", err)
 	}
 
-	//----追加コード----
 	if err := migrate.MigrateAdminAuditLogs(db); err != nil {
 		t.Fatalf("MigrateAdminAuditLogs: %v", err)
 	}
-	//------------
 
 	t.Cleanup(func() {
 		_ = testSQL.Close()

@@ -87,13 +87,14 @@ func main() {
 	}
 
 	userController := controller.NewUserController(userUsecase, rateLimitUsecase, userValidator, controller.CookieConfig{Secure: cookieSecure, CSRFDomain: os.Getenv("COOKIE_DOMAIN")})
+	adminUserController := controller.NewAdminUserController(adminUserUsecase, adminUserValidator)
 
 	authMiddleware := middleware.NewAuthMiddleware(userUsecase, tokenService)
 	csrfMiddleware := middleware.NewCSRFMiddleware(tokenService)
 	adminMiddleware := middleware.NewAdminMiddleware()
 	rateLimitMiddleware := middleware.NewRateLimitMiddleware(rateLimitUsecase)
 
-	e := router.NewRouter(userController, authMiddleware, csrfMiddleware, rateLimitMiddleware, os.Getenv("FE_URL"))
+	e := router.NewRouter(userController, authMiddleware, csrfMiddleware, rateLimitMiddleware, os.Getenv("FE_URL"), router.AdminComponents{Controller: adminUserController, Middleware: adminMiddleware})
 
 	port := os.Getenv("PORT")
 	if port == "" {

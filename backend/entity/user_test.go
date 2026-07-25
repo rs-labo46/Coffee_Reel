@@ -98,6 +98,57 @@ func TestUserJSONDoesNotExposeAuthenticationSecrets(t *testing.T) {
 	}
 }
 
+//----追加コード----
+
+func TestUserSuspend(t *testing.T) {
+	createdAt := time.Date(2026, 7, 20, 10, 0, 0, 0, time.FixedZone("JST", 9*60*60))
+	now := time.Date(2026, 7, 21, 8, 30, 0, 123, time.FixedZone("JST", 9*60*60))
+
+	user := User{
+		ID:           10,
+		Name:         "user",
+		Email:        "user@example.com",
+		PasswordHash: "secret-hash",
+		Role:         RoleUser,
+		Status:       StatusActive,
+		TokenVersion: 7,
+		CreatedAt:    createdAt,
+		UpdatedAt:    createdAt,
+	}
+
+	err := user.Suspend(now)
+	if err != nil {
+		t.Fatalf("Suspend() error = %v", err)
+	}
+
+	if user.Status != StatusSuspended {
+		t.Fatalf("Status = %q, want %q", user.Status, StatusSuspended)
+	}
+	if user.TokenVersion != 8 {
+		t.Fatalf("TokenVersion = %d, want 8", user.TokenVersion)
+	}
+	if !user.UpdatedAt.Equal(now.UTC()) {
+		t.Fatalf("UpdatedAt = %s, want %s", user.UpdatedAt, now.UTC())
+	}
+	if user.UpdatedAt.Location() != time.UTC {
+		t.Fatalf("UpdatedAt location = %s, want UTC", user.UpdatedAt.Location())
+	}
+	if !user.CreatedAt.Equal(createdAt) {
+		t.Fatal("Suspend must not change CreatedAt")
+	}
+	if user.Role != RoleUser {
+		t.Fatalf("Role = %q, want %q", user.Role, RoleUser)
+	}
+	if user.ID != 10 ||
+		user.Name != "user" ||
+		user.Email != "user@example.com" ||
+		user.PasswordHash != "secret-hash" {
+		t.Fatalf("Suspend changed immutable user fields: %+v", user)
+	}
+}
+
+//------------
+
 func TestUserSuspendRejectsInvalidState(t *testing.T) {
 	now := time.Date(2026, 7, 21, 8, 30, 0, 0, time.UTC)
 

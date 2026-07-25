@@ -135,6 +135,10 @@ func newTestRouter(userController controller.IUserController, users *userUsecase
 		appmiddleware.NewCSRFMiddleware(tokens),
 		appmiddleware.NewRateLimitMiddleware(rateLimits),
 		"http://localhost:3000",
+		AdminComponents{
+			Controller: &adminControllerStub{},
+			Middleware: appmiddleware.NewAdminMiddleware(),
+		},
 	)
 }
 

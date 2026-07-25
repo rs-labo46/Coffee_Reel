@@ -16,10 +16,42 @@ func TestAdminUserRepositoryListUsersUsesCursorAndExcludesAdmins(t *testing.T) {
 	base := time.Date(2026, 7, 23, 10, 0, 0, 0, time.UTC)
 
 	users := []*entity.User{
-		{Name: "admin", Email: "admin-list@example.com", PasswordHash: "hash", Role: entity.RoleAdmin, Status: entity.StatusActive, CreatedAt: base.Add(4 * time.Minute), UpdatedAt: base.Add(4 * time.Minute)},
-		{Name: "user-3", Email: "user-3@example.com", PasswordHash: "hash", Role: entity.RoleUser, Status: entity.StatusActive, CreatedAt: base.Add(3 * time.Minute), UpdatedAt: base.Add(3 * time.Minute)},
-		{Name: "user-2", Email: "user-2@example.com", PasswordHash: "hash", Role: entity.RoleUser, Status: entity.StatusSuspended, CreatedAt: base.Add(2 * time.Minute), UpdatedAt: base.Add(2 * time.Minute)},
-		{Name: "user-1", Email: "user-1@example.com", PasswordHash: "hash", Role: entity.RoleUser, Status: entity.StatusActive, CreatedAt: base.Add(time.Minute), UpdatedAt: base.Add(time.Minute)},
+		{
+			Name:         "admin",
+			Email:        "admin-list@example.com",
+			PasswordHash: "hash",
+			Role:         entity.RoleAdmin,
+			Status:       entity.StatusActive,
+			CreatedAt:    base.Add(4 * time.Minute),
+			UpdatedAt:    base.Add(4 * time.Minute),
+		},
+		{
+			Name:         "user-3",
+			Email:        "user-3@example.com",
+			PasswordHash: "hash",
+			Role:         entity.RoleUser,
+			Status:       entity.StatusActive,
+			CreatedAt:    base.Add(3 * time.Minute),
+			UpdatedAt:    base.Add(3 * time.Minute),
+		},
+		{
+			Name:         "user-2",
+			Email:        "user-2@example.com",
+			PasswordHash: "hash",
+			Role:         entity.RoleUser,
+			Status:       entity.StatusSuspended,
+			CreatedAt:    base.Add(2 * time.Minute),
+			UpdatedAt:    base.Add(2 * time.Minute),
+		},
+		{
+			Name:         "user-1",
+			Email:        "user-1@example.com",
+			PasswordHash: "hash",
+			Role:         entity.RoleUser,
+			Status:       entity.StatusActive,
+			CreatedAt:    base.Add(time.Minute),
+			UpdatedAt:    base.Add(time.Minute),
+		},
 	}
 	for _, user := range users {
 		if err := db.Create(user).Error; err != nil {
@@ -38,11 +70,20 @@ func TestAdminUserRepositoryListUsersUsesCursorAndExcludesAdmins(t *testing.T) {
 		t.Fatalf("first users = %#v", first.Users)
 	}
 
-	second, err := repository.ListUsers(context.Background(), 2, &AdminUserCursor{CreatedAt: first.LastCreatedAt, ID: first.LastID})
+	second, err := repository.ListUsers(
+		context.Background(),
+		2,
+		&AdminUserCursor{
+			CreatedAt: first.LastCreatedAt,
+			ID:        first.LastID,
+		},
+	)
 	if err != nil {
 		t.Fatalf("ListUsers(second) error = %v", err)
 	}
-	if len(second.Users) != 1 || second.HasMore || second.Users[0].Name != "user-1" {
+	if len(second.Users) != 1 ||
+		second.HasMore ||
+		second.Users[0].Name != "user-1" {
 		t.Fatalf("second = %#v", second)
 	}
 }
@@ -52,8 +93,25 @@ func TestAdminUserRepositorySuspendAndResumeAreAtomic(t *testing.T) {
 	repository := NewAdminUserRepository(db)
 	now := time.Date(2026, 7, 23, 12, 0, 0, 0, time.UTC)
 
-	admin := &entity.User{Name: "admin", Email: "admin-state@example.com", PasswordHash: "hash", Role: entity.RoleAdmin, Status: entity.StatusActive, CreatedAt: now, UpdatedAt: now}
-	user := &entity.User{Name: "user", Email: "user-state@example.com", PasswordHash: "hash", Role: entity.RoleUser, Status: entity.StatusActive, TokenVersion: 3, CreatedAt: now, UpdatedAt: now}
+	admin := &entity.User{
+		Name:         "admin",
+		Email:        "admin-state@example.com",
+		PasswordHash: "hash",
+		Role:         entity.RoleAdmin,
+		Status:       entity.StatusActive,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	user := &entity.User{
+		Name:         "user",
+		Email:        "user-state@example.com",
+		PasswordHash: "hash",
+		Role:         entity.RoleUser,
+		Status:       entity.StatusActive,
+		TokenVersion: 3,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
 	if err := db.Create(admin).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -72,11 +130,19 @@ func TestAdminUserRepositorySuspendAndResumeAreAtomic(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	suspended, err := repository.SuspendUser(context.Background(), admin.ID, user.ID, "policy violation", "request-suspend", now.Add(time.Minute))
+	suspended, err := repository.SuspendUser(
+		context.Background(),
+		admin.ID,
+		user.ID,
+		"policy violation",
+		"request-suspend",
+		now.Add(time.Minute),
+	)
 	if err != nil {
 		t.Fatalf("SuspendUser() error = %v", err)
 	}
-	if suspended.Status != entity.StatusSuspended || suspended.TokenVersion != 4 {
+	if suspended.Status != entity.StatusSuspended ||
+		suspended.TokenVersion != 4 {
 		t.Fatalf("suspended user = %#v", suspended)
 	}
 
@@ -89,29 +155,51 @@ func TestAdminUserRepositorySuspendAndResumeAreAtomic(t *testing.T) {
 	}
 
 	var auditCount int64
-	if err := db.Model(&entity.AdminAuditLog{}).Where("target_id = ?", user.ID).Count(&auditCount).Error; err != nil {
+	if err := db.
+		Model(&entity.AdminAuditLog{}).
+		Where("target_id = ?", user.ID).
+		Count(&auditCount).Error; err != nil {
 		t.Fatal(err)
 	}
 	if auditCount != 1 {
 		t.Fatalf("auditCount = %d, want 1", auditCount)
 	}
 
-	_, err = repository.SuspendUser(context.Background(), admin.ID, user.ID, "duplicate", "request-duplicate", now.Add(2*time.Minute))
+	_, err = repository.SuspendUser(
+		context.Background(),
+		admin.ID,
+		user.ID,
+		"duplicate",
+		"request-duplicate",
+		now.Add(2*time.Minute),
+	)
 	if !errors.Is(err, entity.ErrUserStatusConflict) {
 		t.Fatalf("second SuspendUser() error = %v", err)
 	}
-	if err := db.Model(&entity.AdminAuditLog{}).Where("target_id = ?", user.ID).Count(&auditCount).Error; err != nil {
+
+	if err := db.
+		Model(&entity.AdminAuditLog{}).
+		Where("target_id = ?", user.ID).
+		Count(&auditCount).Error; err != nil {
 		t.Fatal(err)
 	}
 	if auditCount != 1 {
 		t.Fatalf("duplicate auditCount = %d, want 1", auditCount)
 	}
 
-	resumed, err := repository.ResumeUser(context.Background(), admin.ID, user.ID, "review complete", "request-resume", now.Add(3*time.Minute))
+	resumed, err := repository.ResumeUser(
+		context.Background(),
+		admin.ID,
+		user.ID,
+		"review complete",
+		"request-resume",
+		now.Add(3*time.Minute),
+	)
 	if err != nil {
 		t.Fatalf("ResumeUser() error = %v", err)
 	}
-	if resumed.Status != entity.StatusActive || resumed.TokenVersion != 4 {
+	if resumed.Status != entity.StatusActive ||
+		resumed.TokenVersion != 4 {
 		t.Fatalf("resumed user = %#v", resumed)
 	}
 
@@ -121,7 +209,11 @@ func TestAdminUserRepositorySuspendAndResumeAreAtomic(t *testing.T) {
 	if storedToken.RevokedAt == nil {
 		t.Fatal("revoked token was restored")
 	}
-	if err := db.Model(&entity.AdminAuditLog{}).Where("target_id = ?", user.ID).Count(&auditCount).Error; err != nil {
+
+	if err := db.
+		Model(&entity.AdminAuditLog{}).
+		Where("target_id = ?", user.ID).
+		Count(&auditCount).Error; err != nil {
 		t.Fatal(err)
 	}
 	if auditCount != 2 {
@@ -134,8 +226,25 @@ func TestAdminUserRepositoryRollsBackWhenAuditLogIsInvalid(t *testing.T) {
 	repository := NewAdminUserRepository(db)
 	now := time.Date(2026, 7, 23, 13, 0, 0, 0, time.UTC)
 
-	admin := &entity.User{Name: "admin", Email: "admin-rollback@example.com", PasswordHash: "hash", Role: entity.RoleAdmin, Status: entity.StatusActive, CreatedAt: now, UpdatedAt: now}
-	user := &entity.User{Name: "user", Email: "user-rollback@example.com", PasswordHash: "hash", Role: entity.RoleUser, Status: entity.StatusActive, TokenVersion: 5, CreatedAt: now, UpdatedAt: now}
+	admin := &entity.User{
+		Name:         "admin",
+		Email:        "admin-rollback@example.com",
+		PasswordHash: "hash",
+		Role:         entity.RoleAdmin,
+		Status:       entity.StatusActive,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	user := &entity.User{
+		Name:         "user",
+		Email:        "user-rollback@example.com",
+		PasswordHash: "hash",
+		Role:         entity.RoleUser,
+		Status:       entity.StatusActive,
+		TokenVersion: 5,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
 	if err := db.Create(admin).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +279,8 @@ func TestAdminUserRepositoryRollsBackWhenAuditLogIsInvalid(t *testing.T) {
 	if err := db.First(&storedUser, user.ID).Error; err != nil {
 		t.Fatal(err)
 	}
-	if storedUser.Status != entity.StatusActive || storedUser.TokenVersion != 5 {
+	if storedUser.Status != entity.StatusActive ||
+		storedUser.TokenVersion != 5 {
 		t.Fatalf("storedUser = %#v, want unchanged active user", storedUser)
 	}
 
@@ -179,12 +289,152 @@ func TestAdminUserRepositoryRollsBackWhenAuditLogIsInvalid(t *testing.T) {
 		t.Fatal(err)
 	}
 	if storedToken.RevokedAt != nil {
-		t.Fatalf("RevokedAt = %v, want nil after rollback", storedToken.RevokedAt)
+		t.Fatalf(
+			"RevokedAt = %v, want nil after rollback",
+			storedToken.RevokedAt,
+		)
 	}
 
 	var auditCount int64
-	if err := db.Model(&entity.AdminAuditLog{}).Where("target_id = ?", user.ID).Count(&auditCount).Error; err != nil {
+	if err := db.
+		Model(&entity.AdminAuditLog{}).
+		Where("target_id = ?", user.ID).
+		Count(&auditCount).Error; err != nil {
 		t.Fatal(err)
+	}
+	if auditCount != 0 {
+		t.Fatalf("auditCount = %d, want 0", auditCount)
+	}
+}
+
+func TestAdminUserRepositorySuspendRejectsAdmin(t *testing.T) {
+	db := openPostgresIntegrationDB(t)
+	repository := NewAdminUserRepository(db)
+	now := time.Date(2026, 7, 23, 14, 0, 0, 0, time.UTC)
+
+	actor := &entity.User{
+		Name:         "actor-admin",
+		Email:        "actor-admin-suspend@example.com",
+		PasswordHash: "hash",
+		Role:         entity.RoleAdmin,
+		Status:       entity.StatusActive,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	target := &entity.User{
+		Name:         "target-admin",
+		Email:        "target-admin-suspend@example.com",
+		PasswordHash: "hash",
+		Role:         entity.RoleAdmin,
+		Status:       entity.StatusActive,
+		TokenVersion: 7,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	if err := db.Create(actor).Error; err != nil {
+		t.Fatalf("create actor admin: %v", err)
+	}
+	if err := db.Create(target).Error; err != nil {
+		t.Fatalf("create target admin: %v", err)
+	}
+
+	_, err := repository.SuspendUser(
+		context.Background(),
+		actor.ID,
+		target.ID,
+		"management restriction check",
+		"request-reject-admin-suspend",
+		now.Add(time.Minute),
+	)
+	if !errors.Is(err, entity.ErrUserManagementForbidden) {
+		t.Fatalf(
+			"SuspendUser() error = %v, want ErrUserManagementForbidden",
+			err,
+		)
+	}
+
+	var stored entity.User
+	if err := db.First(&stored, target.ID).Error; err != nil {
+		t.Fatalf("find target admin: %v", err)
+	}
+	if stored.Status != entity.StatusActive ||
+		stored.TokenVersion != 7 {
+		t.Fatalf("target admin changed: %#v", stored)
+	}
+
+	var auditCount int64
+	if err := db.
+		Model(&entity.AdminAuditLog{}).
+		Where("target_id = ?", target.ID).
+		Count(&auditCount).Error; err != nil {
+		t.Fatalf("count audit logs: %v", err)
+	}
+	if auditCount != 0 {
+		t.Fatalf("auditCount = %d, want 0", auditCount)
+	}
+}
+
+func TestAdminUserRepositoryResumeRejectsAdmin(t *testing.T) {
+	db := openPostgresIntegrationDB(t)
+	repository := NewAdminUserRepository(db)
+	now := time.Date(2026, 7, 23, 15, 0, 0, 0, time.UTC)
+
+	actor := &entity.User{
+		Name:         "actor-admin",
+		Email:        "actor-admin-resume@example.com",
+		PasswordHash: "hash",
+		Role:         entity.RoleAdmin,
+		Status:       entity.StatusActive,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	target := &entity.User{
+		Name:         "target-admin",
+		Email:        "target-admin-resume@example.com",
+		PasswordHash: "hash",
+		Role:         entity.RoleAdmin,
+		Status:       entity.StatusSuspended,
+		TokenVersion: 9,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	if err := db.Create(actor).Error; err != nil {
+		t.Fatalf("create actor admin: %v", err)
+	}
+	if err := db.Create(target).Error; err != nil {
+		t.Fatalf("create target admin: %v", err)
+	}
+
+	_, err := repository.ResumeUser(
+		context.Background(),
+		actor.ID,
+		target.ID,
+		"management restriction check",
+		"request-reject-admin-resume",
+		now.Add(time.Minute),
+	)
+	if !errors.Is(err, entity.ErrUserManagementForbidden) {
+		t.Fatalf(
+			"ResumeUser() error = %v, want ErrUserManagementForbidden",
+			err,
+		)
+	}
+
+	var stored entity.User
+	if err := db.First(&stored, target.ID).Error; err != nil {
+		t.Fatalf("find target admin: %v", err)
+	}
+	if stored.Status != entity.StatusSuspended ||
+		stored.TokenVersion != 9 {
+		t.Fatalf("target admin changed: %#v", stored)
+	}
+
+	var auditCount int64
+	if err := db.
+		Model(&entity.AdminAuditLog{}).
+		Where("target_id = ?", target.ID).
+		Count(&auditCount).Error; err != nil {
+		t.Fatalf("count audit logs: %v", err)
 	}
 	if auditCount != 0 {
 		t.Fatalf("auditCount = %d, want 0", auditCount)

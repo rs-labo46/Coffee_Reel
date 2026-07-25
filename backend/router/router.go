@@ -9,6 +9,11 @@ import (
 	echomw "github.com/labstack/echo/v4/middleware"
 )
 
+type AdminComponents struct {
+	Controller controller.IAdminUserController
+	Middleware *middleware.AdminMiddleware
+}
+
 // 共通Middlewareと認証APIをEchoへ接続する。
 func NewRouter(
 	userController controller.IUserController,
@@ -16,6 +21,7 @@ func NewRouter(
 	csrfMiddleware *middleware.CSRFMiddleware,
 	rateLimitMiddleware *middleware.RateLimitMiddleware,
 	frontendURL string,
+	adminComponents AdminComponents,
 ) *echo.Echo {
 	e := echo.New()
 	e.IPExtractor = echo.ExtractIPDirect()
@@ -45,6 +51,7 @@ func NewRouter(
 		AllowMethods: []string{
 			http.MethodGet,
 			http.MethodPost,
+			http.MethodPatch,
 			http.MethodOptions,
 		},
 		AllowCredentials: true,
@@ -56,6 +63,12 @@ func NewRouter(
 	e.POST("/refresh", userController.Refresh, rateLimitMiddleware.Refresh, csrfMiddleware.Validate)
 	e.POST("/logout", userController.Logout, csrfMiddleware.Validate)
 	e.GET("/me", userController.Me, authMiddleware.Authenticate)
+
+	adminGroup := e.Group("/admin", authMiddleware.Authenticate, adminComponents.Middleware.Authorize)
+	adminGroup.GET("/users", adminComponents.Controller.ListUsers)
+	adminGroup.GET("/users/:user_id", adminComponents.Controller.GetUserDetail)
+	adminGroup.PATCH("/users/:user_id/suspend", adminComponents.Controller.SuspendUser)
+	adminGroup.PATCH("/users/:user_id/resume", adminComponents.Controller.ResumeUser)
 
 	return e
 }

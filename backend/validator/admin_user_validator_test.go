@@ -117,3 +117,102 @@ func TestAdminUserValidatorRejectsInvalidCursor(t *testing.T) {
 		}
 	}
 }
+
+func TestAdminUserValidatorValidateReasonBoundaries(t *testing.T) {
+	adminValidator := newAdminUserValidatorForTest()
+
+	oneRune, err := adminValidator.ValidateReason("あ")
+	if err != nil {
+		t.Fatalf("ValidateReason(one rune) error = %v", err)
+	}
+	if oneRune != "あ" {
+		t.Fatalf("ValidateReason(one rune) = %q, want %q", oneRune, "あ")
+	}
+
+	reason500 := strings.Repeat("あ", 500)
+	normalized, err := adminValidator.ValidateReason(
+		" \t" + reason500 + "\n ",
+	)
+	if err != nil {
+		t.Fatalf("ValidateReason(500 runes) error = %v", err)
+	}
+	if normalized != reason500 {
+		t.Fatalf(
+			"ValidateReason(500 runes) length = %d, want 500",
+			len([]rune(normalized)),
+		)
+	}
+
+	invalidUTF8 := string([]byte{0xff})
+	if _, err := adminValidator.ValidateReason(invalidUTF8); !errors.Is(
+		err,
+		entity.ErrInvalidInput,
+	) {
+		t.Fatalf(
+			"ValidateReason(invalid UTF-8) error = %v, want ErrInvalidInput",
+			err,
+		)
+	}
+}
+
+func TestAdminUserValidatorValidateUserListQueryMinimumLimit(t *testing.T) {
+	adminValidator := newAdminUserValidatorForTest()
+
+	input, err := adminValidator.ValidateUserListQuery("1", "")
+	if err != nil {
+		t.Fatalf("ValidateUserListQuery() error = %v", err)
+	}
+	if input.Limit != 1 {
+		t.Fatalf("Limit = %d, want 1", input.Limit)
+	}
+	if input.Cursor != nil {
+		t.Fatalf("Cursor = %#v, want nil", input.Cursor)
+	}
+}
+
+func TestAdminUserValidatorRejectsIncompleteOrTrailingCursorJSON(t *testing.T) {
+	adminValidator := newAdminUserValidatorForTest()
+
+	tests := []struct {
+		name string
+		json string
+	}{
+		{
+			name: "missing created_at",
+			json: `{"id":1}`,
+		},
+		{
+			name: "missing id",
+			json: `{"created_at":"2026-07-23T10:00:00Z"}`,
+		},
+		{
+			name: "zero created_at",
+			json: `{"created_at":"0001-01-01T00:00:00Z","id":1}`,
+		},
+		{
+			name: "second JSON object",
+			json: `{"created_at":"2026-07-23T10:00:00Z","id":1}` +
+				`{"created_at":"2026-07-23T09:00:00Z","id":2}`,
+		},
+		{
+			name: "trailing null",
+			json: `{"created_at":"2026-07-23T10:00:00Z","id":1} null`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			encoded := base64.RawURLEncoding.EncodeToString(
+				[]byte(tt.json),
+			)
+
+			_, err := adminValidator.ValidateUserListQuery("20", encoded)
+			if !errors.Is(err, entity.ErrInvalidInput) {
+				t.Fatalf(
+					"ValidateUserListQuery() error = %v, want ErrInvalidInput",
+					err,
+				)
+			}
+		})
+	}
+}

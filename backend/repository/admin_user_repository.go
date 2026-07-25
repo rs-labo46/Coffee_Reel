@@ -138,9 +138,7 @@ func (r *adminUserRepository) SuspendUser(
 
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var user entity.User
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("id = ? AND role = ?", targetUserID, entity.RoleUser).
-			Take(&user).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", targetUserID).Take(&user).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return entity.ErrUserNotFound
 			}
@@ -209,9 +207,7 @@ func (r *adminUserRepository) ResumeUser(
 
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var user entity.User
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("id = ? AND role = ?", targetUserID, entity.RoleUser).
-			Take(&user).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", targetUserID).Take(&user).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return entity.ErrUserNotFound
 			}
