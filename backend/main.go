@@ -60,6 +60,7 @@ func main() {
 	userRepository := repository.NewUserRepository(postgresDB)
 	refreshTokenRepository := repository.NewRefreshTokenRepository(postgresDB)
 	rateLimitRepository := repository.NewRateLimitRepository(redisClient)
+	adminUserRepository := repository.NewAdminUserRepository(postgresDB)
 
 	tokenService, err := usecase.NewTokenService(os.Getenv("JWT_SECRET"), os.Getenv("REFRESH_TOKEN_HMAC_KEY"))
 	if err != nil {
@@ -67,6 +68,7 @@ func main() {
 	}
 
 	userUsecase := usecase.NewUserUsecase(userRepository, refreshTokenRepository, tokenService)
+	adminUserUsecase := usecase.NewAdminUserUsecase(userRepository, adminUserRepository, tokenService)
 
 	rateLimitUsecase, err := usecase.NewRateLimitUsecase(rateLimitRepository, tokenService, os.Getenv("RATE_LIMIT_HMAC_KEY"))
 	if err != nil {
@@ -74,6 +76,7 @@ func main() {
 	}
 
 	userValidator := validator.NewUserValidator()
+	adminUserValidator := validator.NewAdminUserValidator(userValidator)
 
 	cookieSecure := false
 	if value := os.Getenv("COOKIE_SECURE"); value != "" {
@@ -87,6 +90,7 @@ func main() {
 
 	authMiddleware := middleware.NewAuthMiddleware(userUsecase, tokenService)
 	csrfMiddleware := middleware.NewCSRFMiddleware(tokenService)
+	adminMiddleware := middleware.NewAdminMiddleware()
 	rateLimitMiddleware := middleware.NewRateLimitMiddleware(rateLimitUsecase)
 
 	e := router.NewRouter(userController, authMiddleware, csrfMiddleware, rateLimitMiddleware, os.Getenv("FE_URL"))
