@@ -129,10 +129,6 @@ export default function AdminUsersPage() {
     };
   }, []);
 
-  function handleReload(): void {
-    void loadUsers(null, true);
-  }
-
   function handleLoadMore(): void {
     if (!hasMore || nextCursor === null || isLoadingRef.current) {
       return;
@@ -161,14 +157,6 @@ export default function AdminUsersPage() {
             >
               トップへ戻る
             </Link>
-            <button
-              type="button"
-              onClick={handleReload}
-              disabled={isLoading}
-              className="rounded-full bg-amber-300 px-4 py-2 text-sm font-black text-stone-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              再読み込み
-            </button>
           </div>
         </header>
 

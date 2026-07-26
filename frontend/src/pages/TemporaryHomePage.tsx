@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { ApiClientError } from "../api/client";
 import { useAuth } from "../auth/useAuth";
+import { Link } from "react-router";
 
 export default function TemporaryHomePage() {
   const { logout, user } = useAuth();
@@ -100,6 +101,28 @@ export default function TemporaryHomePage() {
               </dd>
             </div>
           </dl>
+          {user.role === "admin" && (
+            <div className="mt-6 rounded-3xl border border-amber-300/20 bg-amber-300/[0.06] p-5 sm:flex sm:items-center sm:justify-between sm:gap-6">
+              <div>
+                <p className="text-xs font-black tracking-[0.16em] text-amber-300 uppercase">
+                  Admin Menu
+                </p>
+                <h2 className="mt-2 text-xl font-black text-white">
+                  ユーザー管理
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-stone-400">
+                  一般ユーザーの一覧、詳細、利用停止・再開を確認。
+                </p>
+              </div>
+
+              <Link
+                to="/admin/users"
+                className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-amber-300 px-5 py-2 text-sm font-black text-stone-950 transition hover:bg-amber-200 sm:mt-0 sm:w-auto"
+              >
+                ユーザー管理を開く
+              </Link>
+            </div>
+          )}
         </section>
       </div>
     </main>
