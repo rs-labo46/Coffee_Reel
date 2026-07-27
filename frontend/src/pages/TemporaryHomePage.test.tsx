@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
 import { ApiClientError } from "../api/client";
 import { useAuth } from "../auth/useAuth";
 import TemporaryHomePage from "./TemporaryHomePage";
@@ -36,9 +36,46 @@ describe("TemporaryHomePage", () => {
   it("Login Userの名前、Email、Roleを表示する", () => {
     render(<TemporaryHomePage />);
 
-    expect(screen.getByText("コーヒー太郎さん、ようこそ。")).toBeInTheDocument();
+    expect(
+      screen.getByText("コーヒー太郎さん、ようこそ。"),
+    ).toBeInTheDocument();
     expect(screen.getByText("coffee@example.com")).toBeInTheDocument();
     expect(screen.getByText("user")).toBeInTheDocument();
+  });
+
+  it("一般ユーザーにはユーザー管理の導線を表示しない", () => {
+    render(<TemporaryHomePage />);
+
+    expect(
+      screen.queryByRole("link", { name: "ユーザー管理を開く" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("管理者にはユーザー管理の導線を表示する", () => {
+    useAuthMock.mockReturnValue({
+      user: {
+        id: 2,
+        name: "管理者",
+        email: "admin@example.com",
+        role: "admin",
+        status: "active",
+      },
+      accessToken: "admin-access-token",
+      isAuthenticated: true,
+      isLoading: false,
+      login: vi.fn(),
+      logout: logoutMock,
+    });
+
+    render(
+      <MemoryRouter>
+        <TemporaryHomePage />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByRole("link", { name: "ユーザー管理を開く" }),
+    ).toHaveAttribute("href", "/admin/users");
   });
 
   it("LogoutボタンからAuthContextのLogoutを実行する", async () => {
