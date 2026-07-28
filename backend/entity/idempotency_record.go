@@ -17,8 +17,17 @@ type IdempotencyRecord struct {
 	CreatedAt   time.Time        `json:"created_at" gorm:"not null"`
 }
 
+func (s IdempotencyScope) IsValid() bool {
+	return s == IdempotencyScopeVideoCreate
+}
+
 func NewIdempotencyRecord(userID uint64, keyHash, requestHash string, expiresAt, now time.Time) (*IdempotencyRecord, error) {
-	if userID == 0 || len(keyHash) != 64 || len(requestHash) != 64 || now.IsZero() || !expiresAt.After(now) {
+	if userID == 0 || !isLowerHex64(keyHash) || !isLowerHex64(requestHash) || now.IsZero() || expiresAt.IsZero() {
+		return nil, ErrInvalidInput
+	}
+	now = now.UTC()
+	expiresAt = expiresAt.UTC()
+	if !expiresAt.After(now) {
 		return nil, ErrInvalidInput
 	}
 	return &IdempotencyRecord{
@@ -26,7 +35,19 @@ func NewIdempotencyRecord(userID uint64, keyHash, requestHash string, expiresAt,
 		Scope:       IdempotencyScopeVideoCreate,
 		KeyHash:     keyHash,
 		RequestHash: requestHash,
-		ExpiresAt:   expiresAt.UTC(),
-		CreatedAt:   now.UTC(),
+		ExpiresAt:   expiresAt,
+		CreatedAt:   now,
 	}, nil
+}
+
+func isLowerHex64(value string) bool {
+	if len(value) != 64 {
+		return false
+	}
+	for i := 0; i < len(value); i++ {
+		if (value[i] < '0' || value[i] > '9') && (value[i] < 'a' || value[i] > 'f') {
+			return false
+		}
+	}
+	return true
 }

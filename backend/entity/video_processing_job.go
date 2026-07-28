@@ -1,6 +1,16 @@
 package entity
 
-import "time"
+import (
+	"strings"
+	"time"
+	"unicode/utf8"
+)
+
+const (
+	videoProcessingMaxAttempts = 4
+	jobErrorMessageMaxRunes    = 500
+	videoJobErrorWorkerTimeout = "worker_timeout"
+)
 
 type VideoProcessingJobStatus string
 
@@ -43,6 +53,33 @@ type VideoProcessingJob struct {
 	UpdatedAt        time.Time                `json:"updated_at" gorm:"not null"`
 }
 
+func (s VideoProcessingJobStatus) IsValid() bool {
+	switch s {
+	case VideoJobQueued, VideoJobRunning, VideoJobRetryWait, VideoJobSucceeded, VideoJobFailed, VideoJobCancelled:
+		return true
+	default:
+		return false
+	}
+}
+
+func (c VideoFailureCode) IsValid() bool {
+	switch c {
+	case VideoFailureInvalidFormat,
+		VideoFailureCorrupt,
+		VideoFailureDurationExceeded,
+		VideoFailureSizeExceeded,
+		VideoFailureResolutionExceeded,
+		VideoFailureInvalidAspectRatio,
+		VideoFailureFrameRateExceeded,
+		VideoFailureVideoTrackMissing,
+		VideoFailureProcessingFailed,
+		VideoFailureStorageUnavailable:
+		return true
+	default:
+		return false
+	}
+}
+
 func NewVideoProcessingJob(videoID uint64, now time.Time) (*VideoProcessingJob, error) {
 	if videoID == 0 || now.IsZero() {
 		return nil, ErrInvalidInput
@@ -52,7 +89,7 @@ func NewVideoProcessingJob(videoID uint64, now time.Time) (*VideoProcessingJob, 
 		VideoID:          videoID,
 		Status:           VideoJobQueued,
 		AttemptCount:     0,
-		MaxAttempts:      4,
+		MaxAttempts:      videoProcessingMaxAttempts,
 		AvailableAt:      now,
 		LastErrorCode:    "",
 		LastErrorMessage: "",
@@ -62,10 +99,13 @@ func NewVideoProcessingJob(videoID uint64, now time.Time) (*VideoProcessingJob, 
 }
 
 func (j *VideoProcessingJob) Claim(now time.Time) error {
-	if j == nil || (j.Status != VideoJobQueued && j.Status != VideoJobRetryWait) || j.AttemptCount >= j.MaxAttempts || now.UTC().Before(j.AvailableAt.UTC()) {
-		return ErrProcessingJobConflict
+	if now.IsZero() {
+		return ErrInvalidInput
 	}
 	now = now.UTC()
+	if j == nil || (j.Status != VideoJobQueued && j.Status != VideoJobRetryWait) || j.AttemptCount < 0 || j.MaxAttempts != videoProcessingMaxAttempts || j.AttemptCount >= j.MaxAttempts || j.AvailableAt.IsZero() || now.Before(j.AvailableAt.UTC()) {
+		return ErrProcessingJobConflict
+	}
 	j.Status = VideoJobRunning
 	j.AttemptCount++
 	j.StartedAt = &now
@@ -75,19 +115,32 @@ func (j *VideoProcessingJob) Claim(now time.Time) error {
 }
 
 func (j *VideoProcessingJob) ScheduleRetry(availableAt time.Time, code, message string, now time.Time) error {
-	if j == nil || j.Status != VideoJobRunning || j.AttemptCount >= j.MaxAttempts || !availableAt.After(now) {
+	if now.IsZero() || availableAt.IsZero() {
+		return ErrInvalidInput
+	}
+	now = now.UTC()
+	availableAt = availableAt.UTC()
+	message, ok := normalizeVideoJobError(code, message)
+	if !ok {
+		return ErrInvalidInput
+	}
+	if j == nil || j.Status != VideoJobRunning || j.AttemptCount < 1 || j.AttemptCount >= j.MaxAttempts || j.MaxAttempts != videoProcessingMaxAttempts || j.StartedAt == nil || j.FinishedAt != nil || !availableAt.After(now) {
 		return ErrProcessingJobConflict
 	}
 	j.Status = VideoJobRetryWait
-	j.AvailableAt = availableAt.UTC()
+	j.AvailableAt = availableAt
+	j.FinishedAt = nil
 	j.LastErrorCode = code
 	j.LastErrorMessage = message
-	j.UpdatedAt = now.UTC()
+	j.UpdatedAt = now
 	return nil
 }
 
 func (j *VideoProcessingJob) MarkSucceeded(now time.Time) error {
-	if j == nil || j.Status != VideoJobRunning {
+	if now.IsZero() {
+		return ErrInvalidInput
+	}
+	if j == nil || j.Status != VideoJobRunning || j.AttemptCount < 1 || j.StartedAt == nil || j.FinishedAt != nil {
 		return ErrProcessingJobConflict
 	}
 	now = now.UTC()
@@ -100,7 +153,14 @@ func (j *VideoProcessingJob) MarkSucceeded(now time.Time) error {
 }
 
 func (j *VideoProcessingJob) MarkFailed(code, message string, now time.Time) error {
-	if j == nil || j.Status != VideoJobRunning {
+	if now.IsZero() {
+		return ErrInvalidInput
+	}
+	message, ok := normalizeVideoJobError(code, message)
+	if !ok {
+		return ErrInvalidInput
+	}
+	if j == nil || j.Status != VideoJobRunning || j.AttemptCount < 1 || j.StartedAt == nil || j.FinishedAt != nil {
 		return ErrProcessingJobConflict
 	}
 	now = now.UTC()
@@ -113,7 +173,10 @@ func (j *VideoProcessingJob) MarkFailed(code, message string, now time.Time) err
 }
 
 func (j *VideoProcessingJob) Cancel(now time.Time) error {
-	if j == nil || (j.Status != VideoJobQueued && j.Status != VideoJobRetryWait && j.Status != VideoJobRunning) {
+	if now.IsZero() {
+		return ErrInvalidInput
+	}
+	if j == nil || (j.Status != VideoJobQueued && j.Status != VideoJobRetryWait && j.Status != VideoJobRunning) || j.FinishedAt != nil {
 		return ErrProcessingJobConflict
 	}
 	now = now.UTC()
@@ -121,4 +184,16 @@ func (j *VideoProcessingJob) Cancel(now time.Time) error {
 	j.FinishedAt = &now
 	j.UpdatedAt = now
 	return nil
+}
+
+func normalizeVideoJobError(code, message string) (string, bool) {
+	if (!VideoFailureCode(code).IsValid() && code != videoJobErrorWorkerTimeout) || !utf8.ValidString(message) {
+		return "", false
+	}
+	message = strings.TrimSpace(message)
+	count := utf8.RuneCountInString(message)
+	if count < 1 || count > jobErrorMessageMaxRunes {
+		return "", false
+	}
+	return message, true
 }

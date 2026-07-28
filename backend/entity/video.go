@@ -125,6 +125,9 @@ func (v *Video) CanBeViewedPublicly() bool {
 }
 
 func (v *Video) CompleteUpload(now time.Time) error {
+	if now.IsZero() {
+		return ErrInvalidInput
+	}
 	now = now.UTC()
 	if v == nil || v.IsDeleted() {
 		return ErrVideoStateConflict
@@ -141,6 +144,9 @@ func (v *Video) CompleteUpload(now time.Time) error {
 }
 
 func (v *Video) ExpireUpload(now time.Time) error {
+	if now.IsZero() {
+		return ErrInvalidInput
+	}
 	now = now.UTC()
 	if v == nil || v.IsDeleted() || v.ProcessingStatus != VideoProcessingUploading || v.PublishStatus != VideoPublishPrivate {
 		return ErrVideoStateConflict
@@ -154,6 +160,9 @@ func (v *Video) ExpireUpload(now time.Time) error {
 }
 
 func (v *Video) StartProcessing(now time.Time) error {
+	if now.IsZero() {
+		return ErrInvalidInput
+	}
 	if v == nil || v.IsDeleted() || v.ProcessingStatus != VideoProcessingUploaded || v.PublishStatus != VideoPublishPrivate {
 		return ErrVideoStateConflict
 	}
@@ -163,28 +172,36 @@ func (v *Video) StartProcessing(now time.Time) error {
 }
 
 func (v *Video) RecordSourceValidation(meta SourceVideoMeta, now time.Time) error {
-	if v == nil || v.IsDeleted() || v.ProcessingStatus != VideoProcessingProcessing || v.SourceMeta != nil {
+	if now.IsZero() {
+		return ErrInvalidInput
+	}
+	if v == nil || v.IsDeleted() || v.ProcessingStatus != VideoProcessingProcessing || v.PublishStatus != VideoPublishPrivate || v.SourceMeta != nil {
 		return ErrVideoStateConflict
 	}
 	if err := meta.Validate(); err != nil {
 		return err
 	}
+	now = now.UTC()
 	meta.VideoID = v.ID
-	meta.CreatedAt = now.UTC()
+	meta.CreatedAt = now
 	v.SourceMeta = &meta
-	v.UpdatedAt = now.UTC()
+	v.UpdatedAt = now
 	return nil
 }
 
 func (v *Video) CompleteProcessing(meta OutputVideoMeta, ownerActive bool, now time.Time) error {
-	if v == nil || v.IsDeleted() || v.ProcessingStatus != VideoProcessingProcessing || v.SourceMeta == nil {
+	if now.IsZero() {
+		return ErrInvalidInput
+	}
+	if v == nil || v.IsDeleted() || v.ProcessingStatus != VideoProcessingProcessing || v.PublishStatus != VideoPublishPrivate || v.SourceMeta == nil || v.OutputMeta != nil {
 		return ErrVideoStateConflict
 	}
 	if err := meta.Validate(); err != nil {
 		return err
 	}
+	now = now.UTC()
 	meta.VideoID = v.ID
-	meta.CreatedAt = now.UTC()
+	meta.CreatedAt = now
 	v.OutputMeta = &meta
 	v.ProcessingStatus = VideoProcessingReady
 	if ownerActive {
@@ -192,12 +209,15 @@ func (v *Video) CompleteProcessing(meta OutputVideoMeta, ownerActive bool, now t
 	} else {
 		v.PublishStatus = VideoPublishPrivate
 	}
-	v.UpdatedAt = now.UTC()
+	v.UpdatedAt = now
 	return nil
 }
 
 func (v *Video) FailProcessing(now time.Time) error {
-	if v == nil || v.IsDeleted() || v.ProcessingStatus != VideoProcessingProcessing {
+	if now.IsZero() {
+		return ErrInvalidInput
+	}
+	if v == nil || v.IsDeleted() || v.ProcessingStatus != VideoProcessingProcessing || v.PublishStatus != VideoPublishPrivate {
 		return ErrVideoStateConflict
 	}
 	v.ProcessingStatus = VideoProcessingFailed
@@ -207,6 +227,9 @@ func (v *Video) FailProcessing(now time.Time) error {
 }
 
 func (v *Video) SetPrivateByOwner(userID uint64, now time.Time) error {
+	if now.IsZero() {
+		return ErrInvalidInput
+	}
 	if v == nil || !v.IsOwnedBy(userID) {
 		return ErrVideoForbidden
 	}
@@ -219,14 +242,17 @@ func (v *Video) SetPrivateByOwner(userID uint64, now time.Time) error {
 }
 
 func (v *Video) RepublishByOwner(userID uint64, ownerActive bool, now time.Time) error {
+	if now.IsZero() {
+		return ErrInvalidInput
+	}
 	if v == nil || !v.IsOwnedBy(userID) {
 		return ErrVideoForbidden
 	}
-	if !ownerActive {
-		return ErrUserSuspended
-	}
 	if v.IsDeleted() || v.ProcessingStatus != VideoProcessingReady || v.PublishStatus != VideoPublishPrivate {
 		return ErrVideoStateConflict
+	}
+	if !ownerActive {
+		return ErrUserSuspended
 	}
 	v.PublishStatus = VideoPublishPublished
 	v.UpdatedAt = now.UTC()
@@ -234,6 +260,9 @@ func (v *Video) RepublishByOwner(userID uint64, ownerActive bool, now time.Time)
 }
 
 func (v *Video) HideByAdmin(now time.Time) error {
+	if now.IsZero() {
+		return ErrInvalidInput
+	}
 	if v == nil || v.IsDeleted() || v.ProcessingStatus != VideoProcessingReady || v.PublishStatus != VideoPublishPublished {
 		return ErrVideoStateConflict
 	}
@@ -243,11 +272,14 @@ func (v *Video) HideByAdmin(now time.Time) error {
 }
 
 func (v *Video) RestoreByAdmin(ownerActive bool, now time.Time) error {
-	if !ownerActive {
-		return ErrUserSuspended
+	if now.IsZero() {
+		return ErrInvalidInput
 	}
 	if v == nil || v.IsDeleted() || v.ProcessingStatus != VideoProcessingReady || v.PublishStatus != VideoPublishHidden {
 		return ErrVideoStateConflict
+	}
+	if !ownerActive {
+		return ErrUserSuspended
 	}
 	v.PublishStatus = VideoPublishPublished
 	v.UpdatedAt = now.UTC()
@@ -255,6 +287,9 @@ func (v *Video) RestoreByAdmin(ownerActive bool, now time.Time) error {
 }
 
 func (v *Video) DeleteByOwner(userID uint64, now time.Time) error {
+	if now.IsZero() {
+		return ErrInvalidInput
+	}
 	if v == nil || !v.IsOwnedBy(userID) {
 		return ErrVideoForbidden
 	}
@@ -269,10 +304,9 @@ func (v *Video) DeleteByOwner(userID uint64, now time.Time) error {
 }
 
 func (m SourceVideoMeta) Validate() error {
-	if m.MIMEType != "video/mp4" && m.MIMEType != "video/quicktime" {
-		return ErrVideoSourceInvalid
-	}
-	if m.Container != "mp4" && m.Container != "mov" {
+	validFormat := (m.MIMEType == "video/mp4" && m.Container == "mp4") ||
+		(m.MIMEType == "video/quicktime" && m.Container == "mov")
+	if !validFormat {
 		return ErrVideoSourceInvalid
 	}
 	if m.SizeBytes < 1 || m.SizeBytes > 30_000_000 || m.DurationMillis < 1 || m.DurationMillis > 10_000 {
@@ -294,7 +328,9 @@ func (m SourceVideoMeta) Validate() error {
 }
 
 func (m OutputVideoMeta) Validate() error {
-	if strings.TrimSpace(m.VideoObjectKey) == "" || strings.TrimSpace(m.ThumbnailObjectKey) == "" {
+	videoObjectKey := strings.TrimSpace(m.VideoObjectKey)
+	thumbnailObjectKey := strings.TrimSpace(m.ThumbnailObjectKey)
+	if videoObjectKey == "" || thumbnailObjectKey == "" || videoObjectKey == thumbnailObjectKey {
 		return ErrVideoOutputInvalid
 	}
 	if m.Container != "mp4" || m.Width != 720 || m.Height != 1280 || m.FrameRate <= 0 || m.FrameRate > 30 || m.VideoCodec != "h264" {
