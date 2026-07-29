@@ -11,28 +11,65 @@ func MigrateVideoSourceMetas(db *gorm.DB) error {
 	if db == nil {
 		return fmt.Errorf("database is required")
 	}
+
 	if !db.Migrator().HasTable(&entity.SourceVideoMeta{}) {
 		if err := db.Migrator().CreateTable(&entity.SourceVideoMeta{}); err != nil {
 			return fmt.Errorf("create video source metas table: %w", err)
 		}
 	}
-	if err := addForeignKey(db, "video_source_metas", "fk_video_source_metas_video", "video_id", "videos", "id", "CASCADE"); err != nil {
+
+	if err := addForeignKey(
+		db,
+		"video_source_metas",
+		"fk_video_source_metas_video",
+		"video_id",
+		"videos",
+		"id",
+		"CASCADE",
+	); err != nil {
 		return err
 	}
-	checks := []struct{ name, expression string }{
-		{"chk_video_source_metas_size", "size_bytes BETWEEN 1 AND 30000000"},
-		{"chk_video_source_metas_duration", "duration_millis BETWEEN 1 AND 10000"},
-		{"chk_video_source_metas_resolution", "width BETWEEN 1 AND 1080 AND height BETWEEN 1 AND 1920"},
-		{"chk_video_source_metas_aspect", "width * 16 = height * 9"},
-		{"chk_video_source_metas_frame_rate", "frame_rate > 0 AND frame_rate <= 60"},
-		{"chk_video_source_metas_mime", "mime_type IN ('video/mp4','video/quicktime')"},
-		{"chk_video_source_metas_container", "container IN ('mp4','mov')"},
-		{"chk_video_source_metas_audio", "(has_audio AND char_length(audio_codec) > 0) OR (NOT has_audio AND audio_codec = '')"},
+
+	checks := []migrationCheck{
+		{name: "chk_source_mime_container",
+			expression: "(container = 'mp4' AND mime_type = 'video/mp4') OR (container = 'mov' AND mime_type = 'video/quicktime')",
+		},
+		{
+			name:       "chk_source_size",
+			expression: "size_bytes BETWEEN 1 AND 30000000",
+		},
+		{
+			name:       "chk_source_duration",
+			expression: "duration_millis BETWEEN 1 AND 10000",
+		},
+		{
+			name:       "chk_source_resolution",
+			expression: "width BETWEEN 1 AND 1080 AND height BETWEEN 1 AND 1920",
+		},
+		{
+			name:       "chk_source_aspect_ratio",
+			expression: "width * 16 = height * 9",
+		},
+		{
+			name:       "chk_source_frame_rate",
+			expression: "frame_rate > 0 AND frame_rate <= 60",
+		},
+		{
+			name:       "chk_source_video_codec",
+			expression: "char_length(btrim(video_codec)) > 0",
+		},
+		{
+			name:       "chk_source_audio",
+			expression: "(has_audio AND char_length(btrim(audio_codec)) > 0) OR (NOT has_audio AND audio_codec = '')",
+		},
 	}
-	for _, check := range checks {
-		if err := addCheck(db, "video_source_metas", check.name, check.expression); err != nil {
-			return err
-		}
+	if err := addChecks(db, "video_source_metas", checks); err != nil {
+		return err
 	}
-	return nil
+
+	return createIndexIfMissing(
+		db,
+		"uq_video_source_metas_video_id",
+		"CREATE UNIQUE INDEX uq_video_source_metas_video_id ON video_source_metas (video_id)",
+	)
 }

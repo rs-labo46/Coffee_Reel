@@ -31,5 +31,26 @@ func main() {
 		log.Fatal(err)
 	}
 
+	if err := migrate.MigrateVideos(postgresDB); err != nil {
+		log.Fatal(err)
+	}
+	if err := migrate.MigrateVideoSourceMetas(postgresDB); err != nil {
+		log.Fatal(err)
+	}
+	if err := migrate.MigrateVideoOutputMetas(postgresDB); err != nil {
+		log.Fatal(err)
+	}
+	if err := migrate.MigrateVideoProcessingJobs(postgresDB); err != nil {
+		log.Fatal(err)
+	}
+	if err := migrate.MigrateSavedVideos(postgresDB); err != nil {
+		log.Fatal(err)
+	}
+	if err := migrate.MigrateIdempotencyRecords(postgresDB); err != nil {
+		log.Fatal(err)
+	}
+	if err := migrate.MigrateStorageCleanupJobs(postgresDB); err != nil {
+		log.Fatal(err)
+	}
 	log.Println("migration completed")
 }
