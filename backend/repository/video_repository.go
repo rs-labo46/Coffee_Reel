@@ -3,9 +3,13 @@ package repository
 import (
 	"coffee-reel/entity"
 	"context"
+	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type IVideoRepository interface {
@@ -104,4 +108,73 @@ type videoRepository struct {
 
 func NewVideoRepository(db *gorm.DB) IVideoRepository {
 	return &videoRepository{db}
+}
+
+func (r *videoRepository) CreateWithIdempotency(ctx context.Context, video *entity.Video, record *entity.IdempotencyRecord) (VideoCreateResult, error) {
+	if video == nil ||
+		record == nil ||
+		video.ID != 0 ||
+		record.ID != 0 ||
+		record.ResourceID != 0 ||
+		video.UserID == 0 ||
+		video.UserID != record.UserID ||
+		!record.Scope.IsValid() ||
+		strings.TrimSpace(video.OriginalObjectKey) == "" {
+		return VideoCreateResult{}, entity.ErrInvalidInput
+	}
+	var result VideoCreateResult
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var existing entity.IdempotencyRecord
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("user_id = ? AND scope = ? AND key_hash = ?", record.UserID, record.Scope, record.KeyHash).
+			Take(&existing).Error
+		if err == nil {
+			return loadIdempotentVideo(tx, existing, record.RequestHash, &result)
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("find idempotency record: %w", err)
+		}
+
+		if err := tx.Create(video).Error; err != nil {
+			return fmt.Errorf("create video: %w", err)
+		}
+		record.ResourceID = video.ID
+		if err := tx.Create(record).Error; err != nil {
+			return fmt.Errorf("create idempotency record: %w", err)
+		}
+		result = VideoCreateResult{Video: video, Created: true}
+		return nil
+	})
+	if err == nil {
+		return result, nil
+	}
+	if errors.Is(err, entity.ErrIdempotencyConflict) {
+		return VideoCreateResult{}, err
+	}
+	if !isConstraintViolation(err, "uq_idempotency_records_user_scope_key") {
+		return VideoCreateResult{}, fmt.Errorf("create video with idempotency: %w", err)
+	}
+
+	var existing entity.IdempotencyRecord
+	if findErr := r.db.WithContext(ctx).
+		Where("user_id = ? AND scope = ? AND key_hash = ?", record.UserID, record.Scope, record.KeyHash).
+		Take(&existing).Error; findErr != nil {
+		return VideoCreateResult{}, fmt.Errorf("find concurrent idempotency record: %w", findErr)
+	}
+	if err := loadIdempotentVideo(r.db.WithContext(ctx), existing, record.RequestHash, &result); err != nil {
+		return VideoCreateResult{}, err
+	}
+	return result, nil
+}
+
+func loadIdempotentVideo(db *gorm.DB, record entity.IdempotencyRecord, requestHash string, result *VideoCreateResult) error {
+	if record.RequestHash != requestHash {
+		return entity.ErrIdempotencyConflict
+	}
+	var video entity.Video
+	if err := db.Where("id = ?", record.ResourceID).Take(&video).Error; err != nil {
+		return fmt.Errorf("find idempotent video: %w", err)
+	}
+	*result = VideoCreateResult{Video: &video, Created: false}
+	return nil
 }
