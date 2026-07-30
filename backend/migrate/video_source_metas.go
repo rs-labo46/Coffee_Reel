@@ -12,10 +12,8 @@ func MigrateVideoSourceMetas(db *gorm.DB) error {
 		return fmt.Errorf("database is required")
 	}
 
-	if !db.Migrator().HasTable(&entity.SourceVideoMeta{}) {
-		if err := db.Migrator().CreateTable(&entity.SourceVideoMeta{}); err != nil {
-			return fmt.Errorf("create video source metas table: %w", err)
-		}
+	if err := db.AutoMigrate(&entity.SourceVideoMeta{}); err != nil {
+		return fmt.Errorf("auto migrate video source metas table: %w", err)
 	}
 
 	if err := addForeignKey(
@@ -67,9 +65,5 @@ func MigrateVideoSourceMetas(db *gorm.DB) error {
 		return err
 	}
 
-	return createIndexIfMissing(
-		db,
-		"uq_video_source_metas_video_id",
-		"CREATE UNIQUE INDEX uq_video_source_metas_video_id ON video_source_metas (video_id)",
-	)
+	return nil
 }

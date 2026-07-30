@@ -11,11 +11,8 @@ func MigrateAdminAuditLogs(db *gorm.DB) error {
 	if db == nil {
 		return fmt.Errorf("database is required")
 	}
-	if db.Migrator().HasTable(&entity.AdminAuditLog{}) {
-		return nil
-	}
-	if err := db.Migrator().CreateTable(&entity.AdminAuditLog{}); err != nil {
-		return fmt.Errorf("create admin audit logs table: %w", err)
+	if err := db.AutoMigrate(&entity.AdminAuditLog{}); err != nil {
+		return fmt.Errorf("auto migrate admin audit logs table: %w", err)
 	}
 	return nil
 }

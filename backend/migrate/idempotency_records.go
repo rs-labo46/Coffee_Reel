@@ -12,10 +12,8 @@ func MigrateIdempotencyRecords(db *gorm.DB) error {
 		return fmt.Errorf("database is required")
 	}
 
-	if !db.Migrator().HasTable(&entity.IdempotencyRecord{}) {
-		if err := db.Migrator().CreateTable(&entity.IdempotencyRecord{}); err != nil {
-			return fmt.Errorf("create idempotency records table: %w", err)
-		}
+	if err := db.AutoMigrate(&entity.IdempotencyRecord{}); err != nil {
+		return fmt.Errorf("auto migrate idempotency records table: %w", err)
 	}
 
 	if err := addForeignKey(
@@ -63,15 +61,5 @@ func MigrateIdempotencyRecords(db *gorm.DB) error {
 		return err
 	}
 
-	indexes := []migrationIndex{
-		{
-			name:      "uq_idempotency_records_user_scope_key",
-			statement: "CREATE UNIQUE INDEX uq_idempotency_records_user_scope_key ON idempotency_records (user_id, scope, key_hash)",
-		},
-		{
-			name:      "idx_idempotency_records_expires_at",
-			statement: "CREATE INDEX idx_idempotency_records_expires_at ON idempotency_records (expires_at)",
-		},
-	}
-	return createIndexesIfMissing(db, indexes)
+	return nil
 }

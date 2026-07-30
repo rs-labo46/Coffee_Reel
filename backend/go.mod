@@ -11,7 +11,10 @@ require (
 	gorm.io/gorm v1.31.2
 )
 
-require golang.org/x/time v0.15.0 // indirect
+require (
+	github.com/klauspost/cpuid/v2 v2.2.11 // indirect
+	golang.org/x/time v0.15.0 // indirect
+)
 
 require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect

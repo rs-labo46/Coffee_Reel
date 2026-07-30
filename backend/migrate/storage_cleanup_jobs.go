@@ -12,10 +12,8 @@ func MigrateStorageCleanupJobs(db *gorm.DB) error {
 		return fmt.Errorf("database is required")
 	}
 
-	if !db.Migrator().HasTable(&entity.StorageCleanupJob{}) {
-		if err := db.Migrator().CreateTable(&entity.StorageCleanupJob{}); err != nil {
-			return fmt.Errorf("create storage cleanup jobs table: %w", err)
-		}
+	if err := db.AutoMigrate(&entity.StorageCleanupJob{}); err != nil {
+		return fmt.Errorf("auto migrate storage cleanup jobs table: %w", err)
 	}
 
 	if err := addForeignKey(

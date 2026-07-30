@@ -41,11 +41,11 @@ const (
 type VideoProcessingJob struct {
 	ID               uint64                   `json:"id" gorm:"primaryKey"`
 	VideoID          uint64                   `json:"video_id" gorm:"not null;uniqueIndex:uq_video_processing_jobs_video_id"`
-	Status           VideoProcessingJobStatus `json:"status" gorm:"type:varchar(32);not null;index:idx_video_processing_jobs_claim,priority:1"`
+	Status           VideoProcessingJobStatus `json:"status" gorm:"type:varchar(32);not null"`
 	AttemptCount     int                      `json:"attempt_count" gorm:"not null;default:0"`
 	MaxAttempts      int                      `json:"max_attempts" gorm:"not null;default:4"`
-	AvailableAt      time.Time                `json:"available_at" gorm:"not null;index:idx_video_processing_jobs_claim,priority:2"`
-	StartedAt        *time.Time               `json:"started_at" gorm:"index:idx_video_processing_jobs_timeout"`
+	AvailableAt      time.Time                `json:"available_at" gorm:"not null"`
+	StartedAt        *time.Time               `json:"started_at"`
 	FinishedAt       *time.Time               `json:"finished_at"`
 	LastErrorCode    string                   `json:"-" gorm:"type:varchar(64);not null"`
 	LastErrorMessage string                   `json:"-" gorm:"type:varchar(500);not null"`

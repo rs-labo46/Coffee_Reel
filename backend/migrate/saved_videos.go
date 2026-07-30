@@ -12,10 +12,8 @@ func MigrateSavedVideos(db *gorm.DB) error {
 		return fmt.Errorf("database is required")
 	}
 
-	if !db.Migrator().HasTable(&entity.SavedVideo{}) {
-		if err := db.Migrator().CreateTable(&entity.SavedVideo{}); err != nil {
-			return fmt.Errorf("create saved videos table: %w", err)
-		}
+	if err := db.AutoMigrate(&entity.SavedVideo{}); err != nil {
+		return fmt.Errorf("auto migrate saved videos table: %w", err)
 	}
 
 	if err := addForeignKey(
@@ -45,19 +43,5 @@ func MigrateSavedVideos(db *gorm.DB) error {
 		return err
 	}
 
-	indexes := []migrationIndex{
-		{
-			name:      "uq_saved_videos_user_video",
-			statement: "CREATE UNIQUE INDEX uq_saved_videos_user_video ON saved_videos (user_id, video_id)",
-		},
-		{
-			name:      "idx_saved_videos_user_list",
-			statement: "CREATE INDEX idx_saved_videos_user_list ON saved_videos (user_id, created_at DESC, id DESC)",
-		},
-		{
-			name:      "idx_saved_videos_video",
-			statement: "CREATE INDEX idx_saved_videos_video ON saved_videos (video_id)",
-		},
-	}
-	return createIndexesIfMissing(db, indexes)
+	return nil
 }

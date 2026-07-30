@@ -22,12 +22,8 @@ func MigrateVideos(db *gorm.DB) error {
 		return fmt.Errorf("database is required")
 	}
 
-	created := false
-	if !db.Migrator().HasTable(&entity.Video{}) {
-		if err := db.Migrator().CreateTable(&entity.Video{}); err != nil {
-			return fmt.Errorf("create videos table: %w", err)
-		}
-		created = true
+	if err := db.AutoMigrate(&entity.Video{}); err != nil {
+		return fmt.Errorf("auto migrate videos table: %w", err)
 	}
 
 	if err := addForeignKey(db, "videos", "fk_videos_user", "user_id", "users", "id", "RESTRICT"); err != nil {
@@ -51,19 +47,11 @@ func MigrateVideos(db *gorm.DB) error {
 		return err
 	}
 
-	if created {
-		for _, name := range []string{"idx_videos_owner_list", "idx_videos_upload_expiration"} {
-			if err := dropIndexIfExists(db, name); err != nil {
-				return err
-			}
-		}
+	if err := dropIndexIfExists(db, "idx_videos_upload_expiration"); err != nil {
+		return err
 	}
 
 	indexes := []migrationIndex{
-		{
-			name:      "uq_videos_original_object_key",
-			statement: "CREATE UNIQUE INDEX uq_videos_original_object_key ON videos (original_object_key)",
-		},
 		{
 			name:      "idx_videos_public_feed",
 			statement: "CREATE INDEX idx_videos_public_feed ON videos (created_at DESC, id DESC) WHERE processing_status = 'ready' AND publish_status = 'published' AND deleted_at IS NULL",
@@ -71,10 +59,6 @@ func MigrateVideos(db *gorm.DB) error {
 		{
 			name:      "idx_videos_public_category",
 			statement: "CREATE INDEX idx_videos_public_category ON videos (category, created_at DESC, id DESC) WHERE processing_status = 'ready' AND publish_status = 'published' AND deleted_at IS NULL",
-		},
-		{
-			name:      "idx_videos_owner_list",
-			statement: "CREATE INDEX idx_videos_owner_list ON videos (user_id, created_at DESC, id DESC)",
 		},
 		{
 			name:      "idx_videos_admin_list",

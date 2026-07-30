@@ -12,10 +12,8 @@ func MigrateVideoOutputMetas(db *gorm.DB) error {
 		return fmt.Errorf("database is required")
 	}
 
-	if !db.Migrator().HasTable(&entity.OutputVideoMeta{}) {
-		if err := db.Migrator().CreateTable(&entity.OutputVideoMeta{}); err != nil {
-			return fmt.Errorf("create video output metas table: %w", err)
-		}
+	if err := db.AutoMigrate(&entity.OutputVideoMeta{}); err != nil {
+		return fmt.Errorf("auto migrate video output metas table: %w", err)
 	}
 
 	if err := addForeignKey(
@@ -60,19 +58,5 @@ func MigrateVideoOutputMetas(db *gorm.DB) error {
 		return err
 	}
 
-	indexes := []migrationIndex{
-		{
-			name:      "uq_video_output_metas_video_id",
-			statement: "CREATE UNIQUE INDEX uq_video_output_metas_video_id ON video_output_metas (video_id)",
-		},
-		{
-			name:      "uq_video_output_metas_video_object_key",
-			statement: "CREATE UNIQUE INDEX uq_video_output_metas_video_object_key ON video_output_metas (video_object_key)",
-		},
-		{
-			name:      "uq_video_output_metas_thumbnail_object_key",
-			statement: "CREATE UNIQUE INDEX uq_video_output_metas_thumbnail_object_key ON video_output_metas (thumbnail_object_key)",
-		},
-	}
-	return createIndexesIfMissing(db, indexes)
+	return nil
 }

@@ -26,14 +26,14 @@ const (
 )
 
 type Video struct {
-	ID                uint64                `json:"id" gorm:"primaryKey"`
+	ID                uint64                `json:"id" gorm:"primaryKey;index:idx_videos_owner_list,sort:desc,priority:3"`
 	UserID            uint64                `json:"user_id" gorm:"not null;index:idx_videos_owner_list,priority:1"`
 	Category          CategoryCode          `json:"category" gorm:"type:varchar(32);not null"`
 	Title             string                `json:"title" gorm:"type:varchar(100);not null"`
 	Description       string                `json:"description" gorm:"type:varchar(1000);not null"`
 	OriginalObjectKey string                `json:"-" gorm:"type:varchar(1024);not null;uniqueIndex:uq_videos_original_object_key"`
-	UploadExpiresAt   time.Time             `json:"upload_expires_at" gorm:"not null;index:idx_videos_upload_expiration,priority:2"`
-	ProcessingStatus  VideoProcessingStatus `json:"processing_status" gorm:"type:varchar(32);not null;index:idx_videos_upload_expiration,priority:1"`
+	UploadExpiresAt   time.Time             `json:"upload_expires_at" gorm:"not null"`
+	ProcessingStatus  VideoProcessingStatus `json:"processing_status" gorm:"type:varchar(32);not null"`
 	PublishStatus     VideoPublishStatus    `json:"publish_status" gorm:"type:varchar(32);not null"`
 	CreatedAt         time.Time             `json:"created_at" gorm:"not null;index:idx_videos_owner_list,sort:desc,priority:2"`
 	UpdatedAt         time.Time             `json:"updated_at" gorm:"not null"`

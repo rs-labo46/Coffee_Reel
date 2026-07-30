@@ -12,10 +12,8 @@ func MigrateVideoProcessingJobs(db *gorm.DB) error {
 		return fmt.Errorf("database is required")
 	}
 
-	if !db.Migrator().HasTable(&entity.VideoProcessingJob{}) {
-		if err := db.Migrator().CreateTable(&entity.VideoProcessingJob{}); err != nil {
-			return fmt.Errorf("create video processing jobs table: %w", err)
-		}
+	if err := db.AutoMigrate(&entity.VideoProcessingJob{}); err != nil {
+		return fmt.Errorf("auto migrate video processing jobs table: %w", err)
 	}
 
 	if err := addForeignKey(
@@ -97,10 +95,6 @@ func MigrateVideoProcessingJobs(db *gorm.DB) error {
 	}
 
 	indexes := []migrationIndex{
-		{
-			name:      "uq_video_processing_jobs_video_id",
-			statement: "CREATE UNIQUE INDEX uq_video_processing_jobs_video_id ON video_processing_jobs (video_id)",
-		},
 		{
 			name:      "idx_video_jobs_claim",
 			statement: "CREATE INDEX idx_video_jobs_claim ON video_processing_jobs (available_at, id) WHERE status IN ('queued','retry_wait')",
