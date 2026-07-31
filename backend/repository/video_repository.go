@@ -178,3 +178,84 @@ func loadIdempotentVideo(db *gorm.DB, record entity.IdempotencyRecord, requestHa
 	*result = VideoCreateResult{Video: &video, Created: false}
 	return nil
 }
+
+func (r *videoRepository) CompleteUpload(ctx context.Context, userID, videoID uint64, now time.Time) (*entity.Video, error) {
+	if userID == 0 || videoID == 0 || now.IsZero() {
+		return nil, entity.ErrInvalidInput
+	}
+
+	var output entity.Video
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var video entity.Video
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND user_id = ? AND deleted_at IS NULL", videoID, userID).Take(&video).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return entity.ErrVideoNotFound
+			}
+			return fmt.Errorf("lock video for upload completion: %w", err)
+		}
+
+		switch video.ProcessingStatus {
+		case entity.VideoProcessingUploading:
+			if err := video.CompleteUpload(now); err != nil {
+				return err
+			}
+			if err := tx.Model(&entity.Video{}).Where("id = ?", video.ID).Select("processing_status", "updated_at").Updates(&video).Error; err != nil {
+				return fmt.Errorf("save completed upload: %w", err)
+			}
+			job, err := entity.NewVideoProcessingJob(video.ID, now)
+			if err != nil {
+				return err
+			}
+			if err := tx.Clauses(clause.OnConflict{
+				Columns:   []clause.Column{{Name: "video_id"}},
+				DoNothing: true,
+			}).Create(job).Error; err != nil {
+				return fmt.Errorf("create processing job: %w", err)
+			}
+		case entity.VideoProcessingExpired:
+			return entity.ErrUploadExpired
+		case entity.VideoProcessingUploaded,
+			entity.VideoProcessingProcessing,
+			entity.VideoProcessingReady,
+			entity.VideoProcessingFailed:
+			// 完了通知の再送では状態を変更せず、現在のVideoを返す。
+		default:
+			return entity.ErrVideoStateConflict
+		}
+
+		output = video
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &output, nil
+}
+func (r *videoRepository) FindPublicByID(ctx context.Context, videoID uint64, viewerUserID *uint64) (*PublicVideoItem, error) {
+	viewerID := uint64(0)
+	if viewerUserID != nil {
+		viewerID = *viewerUserID
+	}
+	var item PublicVideoItem
+	err := r.publicQuery(ctx, viewerID).Where("videos.id = ?", videoID).Take(&item).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, entity.ErrVideoNotFound
+		}
+		return nil, fmt.Errorf("find public video: %w", err)
+	}
+	return &item, nil
+}
+
+func (r *videoRepository) publicQuery(ctx context.Context, viewerID uint64) *gorm.DB {
+	return r.db.WithContext(ctx).
+		Table("videos").
+		Select(`videos.id, videos.user_id, users.name AS author_name, videos.category, videos.title, videos.description,
+			video_output_metas.video_object_key, video_output_metas.thumbnail_object_key, videos.created_at,
+			CASE WHEN ? = 0 THEN FALSE ELSE EXISTS (
+				SELECT 1 FROM saved_videos WHERE saved_videos.user_id = ? AND saved_videos.video_id = videos.id
+			) END AS is_saved`, viewerID, viewerID).
+		Joins("JOIN users ON users.id = videos.user_id").
+		Joins("JOIN video_output_metas ON video_output_metas.video_id = videos.id").
+		Where("videos.processing_status = ? AND videos.publish_status = ? AND videos.deleted_at IS NULL", entity.VideoProcessingReady, entity.VideoPublishPublished)
+}
