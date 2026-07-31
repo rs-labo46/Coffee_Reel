@@ -247,6 +247,31 @@ func (r *videoRepository) FindPublicByID(ctx context.Context, videoID uint64, vi
 	return &item, nil
 }
 
+func (r *videoRepository) ListPublic(ctx context.Context, limit int, cursor *VideoCursor, viewerUserID *uint64) (PublicVideoPage, error) {
+	viewerID := uint64(0)
+	if viewerUserID != nil {
+		viewerID = *viewerUserID
+	}
+	items := make([]PublicVideoItem, 0, limit+1)
+	query := r.publicQuery(ctx, viewerID)
+	if cursor != nil {
+		query = query.Where("videos.created_at < ? OR (videos.created_at = ? AND videos.id < ?)", cursor.CreatedAt.UTC(), cursor.CreatedAt.UTC(), cursor.ID)
+	}
+	if err := query.Order("videos.created_at DESC").Order("videos.id DESC").Limit(limit + 1).Scan(&items).Error; err != nil {
+		return PublicVideoPage{}, fmt.Errorf("list public videos: %w", err)
+	}
+	hasMore := len(items) > limit
+	if hasMore {
+		items = items[:limit]
+	}
+	page := PublicVideoPage{Items: items, HasMore: hasMore}
+	if len(items) > 0 {
+		last := items[len(items)-1]
+		page.LastCreatedAt = last.CreatedAt.UTC()
+		page.LastID = last.ID
+	}
+	return page, nil
+}
 func (r *videoRepository) publicQuery(ctx context.Context, viewerID uint64) *gorm.DB {
 	return r.db.WithContext(ctx).
 		Table("videos").
