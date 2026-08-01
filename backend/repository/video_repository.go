@@ -284,3 +284,114 @@ func (r *videoRepository) publicQuery(ctx context.Context, viewerID uint64) *gor
 		Joins("JOIN video_output_metas ON video_output_metas.video_id = videos.id").
 		Where("videos.processing_status = ? AND videos.publish_status = ? AND videos.deleted_at IS NULL", entity.VideoProcessingReady, entity.VideoPublishPublished)
 }
+
+func (r *videoRepository) FindOwnedByID(ctx context.Context, userID, videoID uint64) (*OwnedVideoDetail, error) {
+	var video entity.Video
+	if err := r.db.WithContext(ctx).Where("id = ? AND user_id = ? AND deleted_at IS NULL", videoID, userID).Take(&video).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, entity.ErrVideoNotFound
+		}
+		return nil, fmt.Errorf("find owned video: %w", err)
+	}
+	detail := &OwnedVideoDetail{Video: &video}
+	var source entity.SourceVideoMeta
+	if err := r.db.WithContext(ctx).Where("video_id = ?", video.ID).Take(&source).Error; err == nil {
+		detail.SourceMeta = &source
+		video.SourceMeta = &source
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("find source meta: %w", err)
+	}
+	var output entity.OutputVideoMeta
+	if err := r.db.WithContext(ctx).Where("video_id = ?", video.ID).Take(&output).Error; err == nil {
+		detail.OutputMeta = &output
+		video.OutputMeta = &output
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("find output meta: %w", err)
+	}
+	if video.ProcessingStatus == entity.VideoProcessingFailed {
+		var job entity.VideoProcessingJob
+		if err := r.db.WithContext(ctx).Where("video_id = ?", video.ID).Take(&job).Error; err == nil && job.LastErrorCode != "" {
+			code := publicFailureCode(job.LastErrorCode)
+			detail.FailureCode = &code
+		}
+	}
+	return detail, nil
+}
+func publicFailureCode(code string) entity.VideoFailureCode {
+	switch entity.VideoFailureCode(code) {
+	case entity.VideoFailureInvalidFormat,
+		entity.VideoFailureCorrupt,
+		entity.VideoFailureDurationExceeded,
+		entity.VideoFailureSizeExceeded,
+		entity.VideoFailureResolutionExceeded,
+		entity.VideoFailureInvalidAspectRatio,
+		entity.VideoFailureFrameRateExceeded,
+		entity.VideoFailureVideoTrackMissing:
+		return entity.VideoFailureCode(code)
+	default:
+		return entity.VideoFailureProcessingFailed
+	}
+}
+
+func (r *videoRepository) SetPrivateByOwner(ctx context.Context, userID, videoID uint64, now time.Time) (*entity.Video, error) {
+	return r.updateOwnedVideo(ctx, userID, videoID, func(video *entity.Video) error {
+		return video.SetPrivateByOwner(userID, now)
+	}, []string{"publish_status", "updated_at"})
+}
+
+func (r *videoRepository) updateOwnedVideo(ctx context.Context, userID, videoID uint64, change func(*entity.Video) error, fields []string) (*entity.Video, error) {
+	var output entity.Video
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var video entity.Video
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND user_id = ? AND deleted_at IS NULL", videoID, userID).Take(&video).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return entity.ErrVideoNotFound
+			}
+			return fmt.Errorf("lock owned video: %w", err)
+		}
+		if err := change(&video); err != nil {
+			return err
+		}
+		if err := tx.Model(&entity.Video{}).Where("id = ?", video.ID).Select(fields).Updates(&video).Error; err != nil {
+			return fmt.Errorf("save owned video: %w", err)
+		}
+		output = video
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &output, nil
+}
+
+func (r *videoRepository) RepublishByOwner(ctx context.Context, userID, videoID uint64, now time.Time) (*entity.Video, error) {
+	var output entity.Video
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var user entity.User
+		if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).Where("id = ?", userID).Take(&user).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return entity.ErrUserNotFound
+			}
+			return fmt.Errorf("lock owner for republish: %w", err)
+		}
+		var video entity.Video
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND user_id = ? AND deleted_at IS NULL", videoID, userID).Take(&video).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return entity.ErrVideoNotFound
+			}
+			return fmt.Errorf("lock video for republish: %w", err)
+		}
+		if err := video.RepublishByOwner(userID, user.IsActive(), now); err != nil {
+			return err
+		}
+		if err := tx.Model(&entity.Video{}).Where("id = ?", video.ID).Select("publish_status", "updated_at").Updates(&video).Error; err != nil {
+			return fmt.Errorf("save republished video: %w", err)
+		}
+		output = video
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &output, nil
+}
