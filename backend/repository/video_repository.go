@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -333,6 +334,77 @@ func publicFailureCode(code string) entity.VideoFailureCode {
 	}
 }
 
+func (r *videoRepository) ListOwned(
+	ctx context.Context,
+	userID uint64,
+	limit int,
+	cursor *VideoCursor,
+) (OwnedVideoPage, error) {
+	if userID == 0 ||
+		limit < 1 ||
+		limit > 100 ||
+		(cursor != nil && (cursor.CreatedAt.IsZero() || cursor.ID == 0)) {
+		return OwnedVideoPage{}, entity.ErrInvalidInput
+	}
+
+	items := make([]OwnedVideoItem, 0, limit+1)
+
+	query := r.db.WithContext(ctx).
+		Table("videos").
+		Select(`videos.id,
+			videos.category,
+			videos.title,
+			videos.description,
+			videos.processing_status,
+			videos.publish_status,
+			videos.upload_expires_at,
+			videos.created_at,
+			videos.updated_at,
+			COALESCE(video_output_metas.thumbnail_object_key, '') AS thumbnail_object_key`).
+		Joins("LEFT JOIN video_output_metas ON video_output_metas.video_id = videos.id").
+		Where("videos.user_id = ? AND videos.deleted_at IS NULL", userID)
+
+	if cursor != nil {
+		query = query.Where(
+			"(videos.created_at < ? OR (videos.created_at = ? AND videos.id < ?))",
+			cursor.CreatedAt.UTC(),
+			cursor.CreatedAt.UTC(),
+			cursor.ID,
+		)
+	}
+
+	if err := query.
+		Order("videos.created_at DESC").
+		Order("videos.id DESC").
+		Limit(limit + 1).
+		Scan(&items).Error; err != nil {
+		return OwnedVideoPage{}, fmt.Errorf("list owned videos: %w", err)
+	}
+
+	hasMore := len(items) > limit
+	if hasMore {
+		items = items[:limit]
+	}
+
+	for i := range items {
+		items[i].UploadExpiresAt = items[i].UploadExpiresAt.UTC()
+		items[i].CreatedAt = items[i].CreatedAt.UTC()
+		items[i].UpdatedAt = items[i].UpdatedAt.UTC()
+	}
+
+	page := OwnedVideoPage{
+		Items:   items,
+		HasMore: hasMore,
+	}
+
+	if len(items) > 0 {
+		last := items[len(items)-1]
+		page.LastCreatedAt = last.CreatedAt
+		page.LastID = last.ID
+	}
+
+	return page, nil
+}
 func (r *videoRepository) SetPrivateByOwner(ctx context.Context, userID, videoID uint64, now time.Time) (*entity.Video, error) {
 	return r.updateOwnedVideo(ctx, userID, videoID, func(video *entity.Video) error {
 		return video.SetPrivateByOwner(userID, now)
@@ -394,4 +466,291 @@ func (r *videoRepository) RepublishByOwner(ctx context.Context, userID, videoID 
 		return nil, err
 	}
 	return &output, nil
+}
+
+func (r *videoRepository) DeleteByOwner(ctx context.Context, userID, videoID uint64, now time.Time) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var video entity.Video
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND user_id = ? AND deleted_at IS NULL", videoID, userID).Take(&video).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return entity.ErrVideoNotFound
+			}
+			return fmt.Errorf("lock video for deletion: %w", err)
+		}
+		if err := video.DeleteByOwner(userID, now); err != nil {
+			return err
+		}
+		if err := tx.Model(&entity.Video{}).Where("id = ?", video.ID).
+			Select("publish_status", "deleted_at", "updated_at").Updates(&video).Error; err != nil {
+			return fmt.Errorf("save deleted video: %w", err)
+		}
+		if err := tx.Model(&entity.VideoProcessingJob{}).
+			Where("video_id = ? AND status IN ?", video.ID, []entity.VideoProcessingJobStatus{entity.VideoJobQueued, entity.VideoJobRetryWait}).
+			Updates(entity.VideoProcessingJob{Status: entity.VideoJobCancelled, FinishedAt: ptrTime(now.UTC()), UpdatedAt: now.UTC()}).Error; err != nil {
+			return fmt.Errorf("cancel processing job: %w", err)
+		}
+		if err := createCleanupJob(tx, &video.ID, video.OriginalObjectKey, entity.StorageAssetOriginal, entity.StorageCleanupVideoDelete, now); err != nil {
+			return err
+		}
+		var output entity.OutputVideoMeta
+		if err := tx.Where("video_id = ?", video.ID).Take(&output).Error; err == nil {
+			if err := createCleanupJob(tx, &video.ID, output.VideoObjectKey, entity.StorageAssetProcessed, entity.StorageCleanupVideoDelete, now); err != nil {
+				return err
+			}
+			if err := createCleanupJob(tx, &video.ID, output.ThumbnailObjectKey, entity.StorageAssetThumbnail, entity.StorageCleanupVideoDelete, now); err != nil {
+				return err
+			}
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("find output meta for deletion: %w", err)
+		}
+		return nil
+	})
+}
+
+func createCleanupJob(tx *gorm.DB, videoID *uint64, objectKey string, assetType entity.StorageAssetType, cause entity.StorageCleanupCause, now time.Time) error {
+	if strings.TrimSpace(objectKey) == "" {
+		return nil
+	}
+	job, err := entity.NewStorageCleanupJob(videoID, objectKey, assetType, cause, now)
+	if err != nil {
+		return err
+	}
+	if err := tx.Create(job).Error; err != nil {
+		if isConstraintViolation(err, "uq_storage_cleanup_jobs_unfinished_object") {
+			return nil
+		}
+		return fmt.Errorf("create storage cleanup job: %w", err)
+	}
+	return nil
+}
+
+func isConstraintViolation(err error, constraint string) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == postgresUniqueViolation && (constraint == "" || pgErr.ConstraintName == constraint)
+}
+
+func ptrTime(value time.Time) *time.Time {
+	value = value.UTC()
+	return &value
+}
+
+func (r *videoRepository) ExpireUploads(ctx context.Context, now time.Time, limit int) (int, error) {
+	if limit < 1 {
+		return 0, entity.ErrInvalidInput
+	}
+	count := 0
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var videos []entity.Video
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+			Where("processing_status = ? AND publish_status = ? AND deleted_at IS NULL AND upload_expires_at <= ?", entity.VideoProcessingUploading, entity.VideoPublishPrivate, now.UTC()).
+			Order("upload_expires_at ASC").Order("id ASC").Limit(limit).Find(&videos).Error; err != nil {
+			return fmt.Errorf("claim expired uploads: %w", err)
+		}
+		for i := range videos {
+			video := &videos[i]
+			if err := video.ExpireUpload(now); err != nil {
+				return err
+			}
+			if err := tx.Model(&entity.Video{}).Where("id = ?", video.ID).Select("processing_status", "updated_at").Updates(video).Error; err != nil {
+				return fmt.Errorf("save expired upload: %w", err)
+			}
+			if err := createCleanupJob(tx, &video.ID, video.OriginalObjectKey, entity.StorageAssetOriginal, entity.StorageCleanupUploadExpired, now); err != nil {
+				return err
+			}
+			count++
+		}
+		return nil
+	})
+	return count, err
+}
+
+func (r *videoRepository) RecordSourceValidation(ctx context.Context, videoID uint64, meta entity.SourceVideoMeta, now time.Time) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var video entity.Video
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND deleted_at IS NULL", videoID).Take(&video).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return entity.ErrVideoNotFound
+			}
+			return fmt.Errorf("lock video for source validation: %w", err)
+		}
+		var existing int64
+		if err := tx.Model(&entity.SourceVideoMeta{}).Where("video_id = ?", videoID).Count(&existing).Error; err != nil {
+			return fmt.Errorf("check source meta: %w", err)
+		}
+		if existing > 0 {
+			return nil
+		}
+		if err := video.RecordSourceValidation(meta, now); err != nil {
+			return err
+		}
+		if err := tx.Create(video.SourceMeta).Error; err != nil {
+			return fmt.Errorf("create source meta: %w", err)
+		}
+		if err := tx.Model(&entity.Video{}).Where("id = ?", video.ID).Update("updated_at", video.UpdatedAt).Error; err != nil {
+			return fmt.Errorf("update video source validation time: %w", err)
+		}
+		return nil
+	})
+}
+
+func (r *videoRepository) CompleteProcessing(ctx context.Context, input ProcessingCompletionInput) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var job entity.VideoProcessingJob
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", input.JobID).Take(&job).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return entity.ErrProcessingJobNotFound
+			}
+			return fmt.Errorf("lock processing job for completion: %w", err)
+		}
+		var video entity.Video
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", job.VideoID).Take(&video).Error; err != nil {
+			return fmt.Errorf("lock video for processing completion: %w", err)
+		}
+		if video.DeletedAt != nil {
+			if err := job.Cancel(input.Now); err != nil && !errors.Is(err, entity.ErrProcessingJobConflict) {
+				return err
+			}
+			if err := tx.Model(&entity.VideoProcessingJob{}).Where("id = ?", job.ID).
+				Select("status", "finished_at", "updated_at").Updates(&job).Error; err != nil {
+				return fmt.Errorf("cancel deleted video job: %w", err)
+			}
+			if err := createCleanupJob(tx, &video.ID, input.OutputMeta.VideoObjectKey, entity.StorageAssetProcessed, entity.StorageCleanupRollback, input.Now); err != nil {
+				return err
+			}
+			if err := createCleanupJob(tx, &video.ID, input.OutputMeta.ThumbnailObjectKey, entity.StorageAssetThumbnail, entity.StorageCleanupRollback, input.Now); err != nil {
+				return err
+			}
+			return nil
+		}
+		var source entity.SourceVideoMeta
+		if err := tx.Where("video_id = ?", video.ID).Take(&source).Error; err != nil {
+			return fmt.Errorf("find source meta for completion: %w", err)
+		}
+		video.SourceMeta = &source
+		var owner entity.User
+		if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).Where("id = ?", video.UserID).Take(&owner).Error; err != nil {
+			return fmt.Errorf("lock video owner for completion: %w", err)
+		}
+		if err := video.CompleteProcessing(input.OutputMeta, owner.IsActive(), input.Now); err != nil {
+			return err
+		}
+		if err := job.MarkSucceeded(input.Now); err != nil {
+			return err
+		}
+		if err := tx.Create(video.OutputMeta).Error; err != nil {
+			return fmt.Errorf("create output meta: %w", err)
+		}
+		if err := tx.Model(&entity.Video{}).Where("id = ?", video.ID).
+			Select("processing_status", "publish_status", "updated_at").Updates(&video).Error; err != nil {
+			return fmt.Errorf("save completed video: %w", err)
+		}
+		if err := tx.Model(&entity.VideoProcessingJob{}).Where("id = ?", job.ID).
+			Select("status", "finished_at", "last_error_code", "last_error_message", "updated_at").Updates(&job).Error; err != nil {
+			return fmt.Errorf("save succeeded processing job: %w", err)
+		}
+		return nil
+	})
+}
+func (r *videoRepository) FailProcessing(ctx context.Context, input ProcessingFailureInput) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var job entity.VideoProcessingJob
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", input.JobID).Take(&job).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return entity.ErrProcessingJobNotFound
+			}
+			return fmt.Errorf("lock processing job for failure: %w", err)
+		}
+		var video entity.Video
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", job.VideoID).Take(&video).Error; err != nil {
+			return fmt.Errorf("lock video for processing failure: %w", err)
+		}
+		if video.DeletedAt != nil {
+			if err := job.Cancel(input.Now); err != nil {
+				return err
+			}
+		} else {
+			if err := video.FailProcessing(input.Now); err != nil {
+				return err
+			}
+			if err := tx.Model(&entity.Video{}).Where("id = ?", video.ID).Select("processing_status", "publish_status", "updated_at").Updates(&video).Error; err != nil {
+				return fmt.Errorf("save failed video: %w", err)
+			}
+			if err := job.MarkFailed(string(input.FailureCode), safeErrorMessage(input.FailureMessage), input.Now); err != nil {
+				return err
+			}
+		}
+		if err := tx.Model(&entity.VideoProcessingJob{}).Where("id = ?", job.ID).
+			Select("status", "finished_at", "last_error_code", "last_error_message", "updated_at").Updates(&job).Error; err != nil {
+			return fmt.Errorf("save failed processing job: %w", err)
+		}
+
+		if input.GeneratedVideoKey != "" {
+			if err := createCleanupJob(
+				tx,
+				&video.ID,
+				input.GeneratedVideoKey,
+				entity.StorageAssetProcessed,
+				entity.StorageCleanupProcessFailed,
+				input.Now,
+			); err != nil {
+				return err
+			}
+		}
+
+		if input.GeneratedThumbnailKey != "" {
+			if err := createCleanupJob(
+				tx,
+				&video.ID,
+				input.GeneratedThumbnailKey,
+				entity.StorageAssetThumbnail,
+				entity.StorageCleanupProcessFailed,
+				input.Now,
+			); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func safeErrorMessage(message string) string {
+	message = strings.TrimSpace(message)
+	if len(message) > 500 {
+		message = message[:500]
+	}
+	return message
+}
+
+func (r *videoRepository) IsObjectReferenced(ctx context.Context, objectKey string) (bool, error) {
+	if strings.TrimSpace(objectKey) == "" {
+		return false, entity.ErrInvalidInput
+	}
+	var count int64
+	if err := r.db.WithContext(ctx).Table("videos").Where("original_object_key = ?", objectKey).Count(&count).Error; err != nil {
+		return false, fmt.Errorf("check original object reference: %w", err)
+	}
+	if count > 0 {
+		return true, nil
+	}
+	if err := r.db.WithContext(ctx).Table("video_output_metas").Where("video_object_key = ? OR thumbnail_object_key = ?", objectKey, objectKey).Count(&count).Error; err != nil {
+		return false, fmt.Errorf("check output object reference: %w", err)
+	}
+	return count > 0, nil
+}
+func (r *videoRepository) DeleteExpiredIdempotencyRecords(ctx context.Context, now time.Time, limit int) (int64, error) {
+	if limit < 1 {
+		return 0, entity.ErrInvalidInput
+	}
+	var ids []uint64
+	if err := r.db.WithContext(ctx).Model(&entity.IdempotencyRecord{}).Where("expires_at <= ?", now.UTC()).Order("expires_at ASC").Limit(limit).Pluck("id", &ids).Error; err != nil {
+		return 0, fmt.Errorf("list expired idempotency records: %w", err)
+	}
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	result := r.db.WithContext(ctx).Where("id IN ? AND expires_at <= ?", ids, now.UTC()).Delete(&entity.IdempotencyRecord{})
+	if result.Error != nil {
+		return 0, fmt.Errorf("delete expired idempotency records: %w", result.Error)
+	}
+	return result.RowsAffected, nil
 }
