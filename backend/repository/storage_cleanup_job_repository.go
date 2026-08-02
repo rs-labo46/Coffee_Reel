@@ -18,13 +18,6 @@ const (
 	storageCleanupTimeoutMessage  = "cleanup worker timed out"
 )
 
-type StorageCleanupRecoveryInput struct {
-	TimeoutBefore time.Time
-	Now           time.Time
-	Limit         int
-	RetryDelays   [storageCleanupRetryDelayCount]time.Duration
-}
-
 type IStorageCleanupJobRepository interface {
 	Create(ctx context.Context, job *entity.StorageCleanupJob) error
 	ClaimNext(ctx context.Context, now time.Time) (*entity.StorageCleanupJob, error)
@@ -32,6 +25,13 @@ type IStorageCleanupJobRepository interface {
 	MarkSucceeded(ctx context.Context, jobID uint64, now time.Time) error
 	MarkFailed(ctx context.Context, jobID uint64, code, message string, now time.Time) error
 	RecoverTimedOut(ctx context.Context, input StorageCleanupRecoveryInput) (int, error)
+}
+
+type StorageCleanupRecoveryInput struct {
+	TimeoutBefore time.Time
+	Now           time.Time
+	Limit         int
+	RetryDelays   [storageCleanupRetryDelayCount]time.Duration
 }
 
 type storageCleanupJobRepository struct {

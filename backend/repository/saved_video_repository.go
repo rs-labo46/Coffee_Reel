@@ -12,6 +12,12 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+type ISavedVideoRepository interface {
+	Save(ctx context.Context, userID, videoID uint64, now time.Time) error
+	Remove(ctx context.Context, userID, videoID uint64) error
+	ListByUser(ctx context.Context, userID uint64, limit int, cursor *SavedVideoCursor) (SavedVideoPage, error)
+	Exists(ctx context.Context, userID, videoID uint64) (bool, error)
+}
 type SavedVideoCursor struct {
 	CreatedAt time.Time
 	ID        uint64
@@ -22,13 +28,6 @@ type SavedVideoPage struct {
 	HasMore       bool
 	LastCreatedAt time.Time
 	LastID        uint64
-}
-
-type ISavedVideoRepository interface {
-	Save(ctx context.Context, userID, videoID uint64, now time.Time) error
-	Remove(ctx context.Context, userID, videoID uint64) error
-	ListByUser(ctx context.Context, userID uint64, limit int, cursor *SavedVideoCursor) (SavedVideoPage, error)
-	Exists(ctx context.Context, userID, videoID uint64) (bool, error)
 }
 
 type savedVideoRepository struct {

@@ -20,6 +20,13 @@ const (
 	processingTimeoutMessage  = "worker execution timed out"
 )
 
+type IVideoProcessingJobRepository interface {
+	ClaimNext(ctx context.Context, now time.Time) (*ProcessingClaim, error)
+	ScheduleRetry(ctx context.Context, jobID uint64, availableAt time.Time, code, message string, now time.Time) error
+	Cancel(ctx context.Context, jobID uint64, now time.Time) error
+	RecoverTimedOut(ctx context.Context, input ProcessingRecoveryInput) (int, error)
+}
+
 type ProcessingClaim struct {
 	Job        *entity.VideoProcessingJob
 	Video      *entity.Video
@@ -31,13 +38,6 @@ type ProcessingRecoveryInput struct {
 	Now           time.Time
 	Limit         int
 	RetryDelays   [processingRetryDelayCount]time.Duration
-}
-
-type IVideoProcessingJobRepository interface {
-	ClaimNext(ctx context.Context, now time.Time) (*ProcessingClaim, error)
-	ScheduleRetry(ctx context.Context, jobID uint64, availableAt time.Time, code, message string, now time.Time) error
-	Cancel(ctx context.Context, jobID uint64, now time.Time) error
-	RecoverTimedOut(ctx context.Context, input ProcessingRecoveryInput) (int, error)
 }
 
 type videoProcessingJobRepository struct {
