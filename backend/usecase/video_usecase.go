@@ -64,9 +64,13 @@ type ReadInfo struct {
 
 type StartUploadResult struct {
 	VideoID          uint64
+	Title            string
+	Description      string
+	Category         entity.CategoryCode
 	ProcessingStatus entity.VideoProcessingStatus
 	PublishStatus    entity.VideoPublishStatus
 	UploadExpiresAt  time.Time
+	CreatedAt        time.Time
 	Upload           UploadInfo
 	Created          bool
 }
@@ -255,9 +259,13 @@ func (u *videoUsecase) StartUpload(ctx context.Context, actor *entity.User, inpu
 
 	return StartUploadResult{
 		VideoID:          current.ID,
+		Title:            current.Title,
+		Description:      current.Description,
+		Category:         current.Category,
 		ProcessingStatus: current.ProcessingStatus,
 		PublishStatus:    current.PublishStatus,
 		UploadExpiresAt:  current.UploadExpiresAt.UTC(),
+		CreatedAt:        current.CreatedAt.UTC(),
 		Upload:           uploadInfoFromRepository(uploadTarget),
 		Created:          created.Created,
 	}, nil
@@ -399,11 +407,20 @@ func (u *videoUsecase) ListMine(ctx context.Context, actor *entity.User, input V
 			UpdatedAt:        item.UpdatedAt.UTC(),
 		}
 
-		if item.ProcessingStatus == entity.VideoProcessingReady && item.PublishStatus == entity.VideoPublishPrivate && strings.TrimSpace(item.ThumbnailObjectKey) != "" {
-			thumbnail, err := u.storage.CreateReadURL(ctx, item.ThumbnailObjectKey, u.readURLTTL)
+		if item.ProcessingStatus == entity.VideoProcessingReady &&
+			(item.PublishStatus == entity.VideoPublishPrivate ||
+				item.PublishStatus == entity.VideoPublishPublished) &&
+			strings.TrimSpace(item.ThumbnailObjectKey) != "" {
+
+			thumbnail, err := u.storage.CreateReadURL(
+				ctx,
+				item.ThumbnailObjectKey,
+				u.readURLTTL,
+			)
 			if err != nil {
 				return OwnedVideoListResult{}, err
 			}
+
 			readInfo := readInfoFromRepository(thumbnail)
 			result.Thumbnail = &readInfo
 		}
@@ -468,15 +485,29 @@ func (u *videoUsecase) GetMine(ctx context.Context, actor *entity.User, videoID 
 		}
 	}
 
-	if video.ProcessingStatus == entity.VideoProcessingReady && video.PublishStatus == entity.VideoPublishPrivate && detail.OutputMeta != nil {
-		videoTarget, err := u.storage.CreateReadURL(ctx, detail.OutputMeta.VideoObjectKey, u.readURLTTL)
+	if video.ProcessingStatus == entity.VideoProcessingReady &&
+		(video.PublishStatus == entity.VideoPublishPrivate ||
+			video.PublishStatus == entity.VideoPublishPublished) &&
+		detail.OutputMeta != nil {
+
+		videoTarget, err := u.storage.CreateReadURL(
+			ctx,
+			detail.OutputMeta.VideoObjectKey,
+			u.readURLTTL,
+		)
 		if err != nil {
 			return OwnedVideoDetailResult{}, err
 		}
-		thumbnailTarget, err := u.storage.CreateReadURL(ctx, detail.OutputMeta.ThumbnailObjectKey, u.readURLTTL)
+
+		thumbnailTarget, err := u.storage.CreateReadURL(
+			ctx,
+			detail.OutputMeta.ThumbnailObjectKey,
+			u.readURLTTL,
+		)
 		if err != nil {
 			return OwnedVideoDetailResult{}, err
 		}
+
 		result.OutputMeta = &OwnedOutputMetaResult{
 			Container:  detail.OutputMeta.Container,
 			Width:      detail.OutputMeta.Width,
