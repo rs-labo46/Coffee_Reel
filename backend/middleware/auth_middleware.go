@@ -67,6 +67,20 @@ func (m *AuthMiddleware) Authenticate(next echo.HandlerFunc) echo.HandlerFunc {
 	}
 }
 
+// OptionalAuthenticateはAuthorization Headerがない場合だけGuestとして後続処理へ進める。
+// Headerが存在する場合は通常認証を行い、不正なTokenをGuestへ降格させない。
+func (m *AuthMiddleware) OptionalAuthenticate(next echo.HandlerFunc) echo.HandlerFunc {
+	authenticated := m.Authenticate(next)
+
+	return func(c echo.Context) error {
+		if _, exists := c.Request().Header[echo.HeaderAuthorization]; !exists {
+			return next(c)
+		}
+
+		return authenticated(c)
+	}
+}
+
 // Authorization HeaderからBearer Tokenを取り出す
 func bearerToken(authorization string) (string, bool) {
 	parts := strings.Fields(authorization)

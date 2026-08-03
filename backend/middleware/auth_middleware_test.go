@@ -191,3 +191,296 @@ func TestAuthMiddlewareRejectsInvalidAuthenticationBeforeController(t *testing.T
 		})
 	}
 }
+func TestOptionalAuthAllowsGuest(t *testing.T) {
+	tokens := &tokenServiceMock{
+		parseAccessTokenFunc: func(
+			string,
+			time.Time,
+		) (usecase.AccessTokenClaims, error) {
+			t.Fatal("ParseAccessToken was called for guest request")
+			return usecase.AccessTokenClaims{}, nil
+		},
+	}
+	users := &userUsecaseMock{
+		getMeFunc: func(
+			context.Context,
+			uint64,
+		) (*entity.User, error) {
+			t.Fatal("GetMe was called for guest request")
+			return nil, nil
+		},
+		validateTokenVersionFunc: func(
+			*entity.User,
+			uint64,
+		) error {
+			t.Fatal("ValidateTokenVersion was called for guest request")
+			return nil
+		},
+	}
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/videos", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	nextCalled := false
+
+	handler := NewAuthMiddleware(
+		users,
+		tokens,
+	).OptionalAuthenticate(
+		func(c echo.Context) error {
+			nextCalled = true
+
+			if c.Get(userContextKey) != nil {
+				t.Fatalf(
+					"context user = %#v, want nil",
+					c.Get(userContextKey),
+				)
+			}
+
+			return c.NoContent(http.StatusNoContent)
+		},
+	)
+
+	if err := handler(c); err != nil {
+		t.Fatalf("OptionalAuthenticate() error = %v", err)
+	}
+	if !nextCalled {
+		t.Fatal("controller was not called")
+	}
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf(
+			"status = %d, want %d",
+			rec.Code,
+			http.StatusNoContent,
+		)
+	}
+}
+
+func TestOptionalAuthAuthenticatesUser(t *testing.T) {
+	dbUser := &entity.User{
+		ID:           10,
+		Name:         "current",
+		Role:         entity.RoleUser,
+		Status:       entity.StatusActive,
+		TokenVersion: 4,
+	}
+
+	tokens := &tokenServiceMock{
+		parseAccessTokenFunc: func(
+			token string,
+			now time.Time,
+		) (usecase.AccessTokenClaims, error) {
+			if token != "access-token" {
+				t.Fatalf(
+					"token = %q, want access-token",
+					token,
+				)
+			}
+			if now.Location() != time.UTC {
+				t.Fatalf(
+					"now location = %v, want UTC",
+					now.Location(),
+				)
+			}
+
+			return usecase.AccessTokenClaims{
+				UserID:       dbUser.ID,
+				Role:         entity.RoleAdmin,
+				TokenVersion: 4,
+			}, nil
+		},
+	}
+
+	users := &userUsecaseMock{
+		getMeFunc: func(
+			_ context.Context,
+			userID uint64,
+		) (*entity.User, error) {
+			if userID != dbUser.ID {
+				t.Fatalf(
+					"userID = %d, want %d",
+					userID,
+					dbUser.ID,
+				)
+			}
+
+			return dbUser, nil
+		},
+		validateTokenVersionFunc: func(
+			user *entity.User,
+			tokenVersion uint64,
+		) error {
+			if user != dbUser {
+				t.Fatal("current DB user was not used")
+			}
+			if tokenVersion != dbUser.TokenVersion {
+				t.Fatalf(
+					"tokenVersion = %d, want %d",
+					tokenVersion,
+					dbUser.TokenVersion,
+				)
+			}
+
+			return nil
+		},
+	}
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/videos", nil)
+	req.Header.Set(
+		echo.HeaderAuthorization,
+		"Bearer access-token",
+	)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	nextCalled := false
+
+	handler := NewAuthMiddleware(
+		users,
+		tokens,
+	).OptionalAuthenticate(
+		func(c echo.Context) error {
+			nextCalled = true
+
+			stored, ok := c.Get(userContextKey).(*entity.User)
+			if !ok || stored != dbUser {
+				t.Fatalf(
+					"context user = %#v, want DB user",
+					c.Get(userContextKey),
+				)
+			}
+			if stored.Role != entity.RoleUser {
+				t.Fatal("JWT role was trusted instead of DB role")
+			}
+
+			return c.NoContent(http.StatusNoContent)
+		},
+	)
+
+	if err := handler(c); err != nil {
+		t.Fatalf("OptionalAuthenticate() error = %v", err)
+	}
+	if !nextCalled {
+		t.Fatal("controller was not called")
+	}
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf(
+			"status = %d, want %d",
+			rec.Code,
+			http.StatusNoContent,
+		)
+	}
+}
+
+func TestOptionalAuthRejectsInvalidHeader(t *testing.T) {
+	tests := []struct {
+		name   string
+		header string
+		tokens *tokenServiceMock
+	}{
+		{
+			name:   "empty",
+			header: "",
+			tokens: &tokenServiceMock{},
+		},
+		{
+			name:   "whitespace",
+			header: "   ",
+			tokens: &tokenServiceMock{},
+		},
+		{
+			name:   "missing token",
+			header: "Bearer",
+			tokens: &tokenServiceMock{},
+		},
+		{
+			name:   "wrong scheme",
+			header: "Basic token",
+			tokens: &tokenServiceMock{},
+		},
+		{
+			name:   "invalid token",
+			header: "Bearer invalid-token",
+			tokens: &tokenServiceMock{
+				parseAccessTokenFunc: func(
+					string,
+					time.Time,
+				) (usecase.AccessTokenClaims, error) {
+					return usecase.AccessTokenClaims{},
+						entity.ErrUnauthorized
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := echo.New()
+			req := httptest.NewRequest(
+				http.MethodGet,
+				"/videos",
+				nil,
+			)
+			req.Header.Set(
+				echo.HeaderAuthorization,
+				tt.header,
+			)
+			req.Header.Set(
+				echo.HeaderXRequestID,
+				"request-123",
+			)
+
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			nextCalled := false
+
+			handler := NewAuthMiddleware(
+				&userUsecaseMock{},
+				tt.tokens,
+			).OptionalAuthenticate(
+				func(echo.Context) error {
+					nextCalled = true
+					return nil
+				},
+			)
+
+			if err := handler(c); err != nil {
+				t.Fatalf(
+					"OptionalAuthenticate() error = %v",
+					err,
+				)
+			}
+			if nextCalled {
+				t.Fatal("controller was called")
+			}
+			if rec.Code != http.StatusUnauthorized {
+				t.Fatalf(
+					"status = %d, want %d",
+					rec.Code,
+					http.StatusUnauthorized,
+				)
+			}
+			if !strings.Contains(
+				rec.Body.String(),
+				`"code":"unauthorized"`,
+			) {
+				t.Fatalf(
+					"response = %s, want unauthorized",
+					rec.Body.String(),
+				)
+			}
+			if !strings.Contains(
+				rec.Body.String(),
+				`"request_id":"request-123"`,
+			) {
+				t.Fatalf(
+					"request ID is missing: %s",
+					rec.Body.String(),
+				)
+			}
+		})
+	}
+}
