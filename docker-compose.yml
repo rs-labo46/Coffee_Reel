@@ -20,6 +20,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      target: api
     command: ["go", "run", "./cmd/migrate"]
     environment:
       DATABASE_URL: "host=db user=${POSTGRES_USER} password=${POSTGRES_PASSWORD} dbname=${POSTGRES_DB} port=5432 sslmode=disable TimeZone=UTC"
@@ -31,14 +32,13 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      target: api
     command: ["go", "run", "./cmd/create_admin"]
     restart: "no"
     environment:
       DATABASE_URL: "host=db user=${POSTGRES_USER} password=${POSTGRES_PASSWORD} dbname=${POSTGRES_DB} port=5432 sslmode=disable TimeZone=UTC"
-
       JWT_SECRET: "${JWT_SECRET}"
       REFRESH_TOKEN_HMAC_KEY: "${REFRESH_TOKEN_HMAC_KEY}"
-
       ADMIN_NAME: "${ADMIN_NAME}"
       ADMIN_EMAIL: "${ADMIN_EMAIL}"
       ADMIN_PASSWORD: "${ADMIN_PASSWORD}"
@@ -67,30 +67,76 @@ services:
       timeout: 5s
       retries: 10
 
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    restart: always
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: "${MINIO_ROOT_USER}"
+      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD}"
+    ports:
+      - "${MINIO_API_PORT}:9000"
+      - "${MINIO_CONSOLE_PORT}:9001"
+    volumes:
+      - minio_data:/data
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    restart: "no"
+    depends_on:
+      minio:
+        condition: service_started
+    volumes:
+      - ./infra/minio/cors.xml:/config/cors.xml:ro
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        until mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"; do
+          sleep 2
+        done
+        mc mb --ignore-existing local/$${STORAGE_BUCKET}
+        mc cors set local/$${STORAGE_BUCKET} /config/cors.xml
+    environment:
+      MINIO_ROOT_USER: "${MINIO_ROOT_USER}"
+      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD}"
+      STORAGE_BUCKET: "${STORAGE_BUCKET}"
+
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      target: api
     restart: always
     environment:
       PORT: "${PORT}"
-
+      GO_ENV: "local"
       DATABASE_URL: "host=db user=${POSTGRES_USER} password=${POSTGRES_PASSWORD} dbname=${POSTGRES_DB} port=5432 sslmode=disable TimeZone=UTC"
-
       REDIS_HOST: "redis"
       REDIS_PORT: "6379"
       REDIS_PASSWORD: "${REDIS_PASSWORD}"
       REDIS_DB: "${REDIS_DB}"
-
       FE_URL: "${FE_URL}"
-
       COOKIE_SECURE: "${COOKIE_SECURE}"
       COOKIE_DOMAIN: "${COOKIE_DOMAIN}"
-
       JWT_SECRET: "${JWT_SECRET}"
       REFRESH_TOKEN_HMAC_KEY: "${REFRESH_TOKEN_HMAC_KEY}"
       RATE_LIMIT_HMAC_KEY: "${RATE_LIMIT_HMAC_KEY}"
-
+      STORAGE_PROVIDER: "${STORAGE_PROVIDER}"
+      STORAGE_ENDPOINT: "http://minio:9000"
+      STORAGE_PRESIGN_ENDPOINT: "http://localhost:${MINIO_API_PORT}"
+      STORAGE_REGION: "${STORAGE_REGION}"
+      STORAGE_BUCKET: "${STORAGE_BUCKET}"
+      STORAGE_ACCESS_KEY_ID: "${STORAGE_ACCESS_KEY_ID}"
+      STORAGE_SECRET_ACCESS_KEY: "${STORAGE_SECRET_ACCESS_KEY}"
+      STORAGE_FORCE_PATH_STYLE: "${STORAGE_FORCE_PATH_STYLE}"
+      STORAGE_MANAGED_PREFIX: "${STORAGE_MANAGED_PREFIX}"
+      STORAGE_UPLOAD_URL_TTL: "${STORAGE_UPLOAD_URL_TTL}"
+      STORAGE_READ_URL_TTL: "${STORAGE_READ_URL_TTL}"
+      VIDEO_IDEMPOTENCY_TTL: "${VIDEO_IDEMPOTENCY_TTL}"
+      VIDEO_IDEMPOTENCY_HMAC_KEY: "${VIDEO_IDEMPOTENCY_HMAC_KEY}"
+      VIDEO_IDEMPOTENCY_KEY_MAX_BYTES: "${VIDEO_IDEMPOTENCY_KEY_MAX_BYTES}"
     ports:
       - "${PORT}:${PORT}"
     depends_on:
@@ -98,6 +144,52 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: worker
+    restart: always
+    command: ["go", "run", "./cmd/worker"]
+    environment:
+      GO_ENV: "local"
+      DATABASE_URL: "host=db user=${POSTGRES_USER} password=${POSTGRES_PASSWORD} dbname=${POSTGRES_DB} port=5432 sslmode=disable TimeZone=UTC"
+      STORAGE_PROVIDER: "${STORAGE_PROVIDER}"
+      STORAGE_ENDPOINT: "http://minio:9000"
+      STORAGE_PRESIGN_ENDPOINT: "http://minio:9000"
+      STORAGE_REGION: "${STORAGE_REGION}"
+      STORAGE_BUCKET: "${STORAGE_BUCKET}"
+      STORAGE_ACCESS_KEY_ID: "${STORAGE_ACCESS_KEY_ID}"
+      STORAGE_SECRET_ACCESS_KEY: "${STORAGE_SECRET_ACCESS_KEY}"
+      STORAGE_FORCE_PATH_STYLE: "${STORAGE_FORCE_PATH_STYLE}"
+      STORAGE_MANAGED_PREFIX: "${STORAGE_MANAGED_PREFIX}"
+      FFPROBE_PATH: "${FFPROBE_PATH}"
+      FFMPEG_PATH: "${FFMPEG_PATH}"
+      VIDEO_PROCESSING_RETRY_DELAYS: "${VIDEO_PROCESSING_RETRY_DELAYS}"
+      STORAGE_CLEANUP_RETRY_DELAYS: "${STORAGE_CLEANUP_RETRY_DELAYS}"
+      STORAGE_CLEANUP_TIMEOUT: "${STORAGE_CLEANUP_TIMEOUT}"
+      STORAGE_ORPHAN_MIN_AGE: "${STORAGE_ORPHAN_MIN_AGE}"
+      STORAGE_ORPHAN_LIST_LIMIT: "${STORAGE_ORPHAN_LIST_LIMIT}"
+      WORKER_PROCESSING_CONCURRENCY: "${WORKER_PROCESSING_CONCURRENCY}"
+      WORKER_PROCESSING_POLL_INTERVAL: "${WORKER_PROCESSING_POLL_INTERVAL}"
+      WORKER_CLEANUP_POLL_INTERVAL: "${WORKER_CLEANUP_POLL_INTERVAL}"
+      WORKER_UPLOAD_EXPIRY_INTERVAL: "${WORKER_UPLOAD_EXPIRY_INTERVAL}"
+      WORKER_UPLOAD_EXPIRY_LIMIT: "${WORKER_UPLOAD_EXPIRY_LIMIT}"
+      WORKER_PROCESSING_RECOVERY_INTERVAL: "${WORKER_PROCESSING_RECOVERY_INTERVAL}"
+      WORKER_PROCESSING_RECOVERY_LIMIT: "${WORKER_PROCESSING_RECOVERY_LIMIT}"
+      WORKER_CLEANUP_RECOVERY_INTERVAL: "${WORKER_CLEANUP_RECOVERY_INTERVAL}"
+      WORKER_CLEANUP_RECOVERY_LIMIT: "${WORKER_CLEANUP_RECOVERY_LIMIT}"
+      WORKER_ORPHAN_DETECTION_INTERVAL: "${WORKER_ORPHAN_DETECTION_INTERVAL}"
+      WORKER_IDEMPOTENCY_CLEANUP_INTERVAL: "${WORKER_IDEMPOTENCY_CLEANUP_INTERVAL}"
+      WORKER_IDEMPOTENCY_CLEANUP_LIMIT: "${WORKER_IDEMPOTENCY_CLEANUP_LIMIT}"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
 
   frontend:
     build:
@@ -119,3 +211,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  minio_data:

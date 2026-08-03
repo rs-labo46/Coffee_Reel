@@ -14,7 +14,11 @@ type AdminComponents struct {
 	Middleware *middleware.AdminMiddleware
 }
 
-// 共通Middlewareと認証APIをEchoへ接続する。
+type VideoComponents struct {
+	Controller      controller.IVideoController
+	SavedController controller.ISavedVideoController
+}
+
 func NewRouter(
 	userController controller.IUserController,
 	authMiddleware *middleware.AuthMiddleware,
@@ -22,6 +26,7 @@ func NewRouter(
 	rateLimitMiddleware *middleware.RateLimitMiddleware,
 	frontendURL string,
 	adminComponents AdminComponents,
+	videoComponents ...VideoComponents,
 ) *echo.Echo {
 	e := echo.New()
 	e.IPExtractor = echo.ExtractIPDirect()
@@ -38,26 +43,28 @@ func NewRouter(
 	}))
 
 	e.Use(echomw.CORSWithConfig(echomw.CORSConfig{
-		AllowOrigins: []string{
-			frontendURL,
-		},
+		AllowOrigins: []string{frontendURL},
 		AllowHeaders: []string{
 			echo.HeaderOrigin,
 			echo.HeaderContentType,
 			echo.HeaderAccept,
 			echo.HeaderAuthorization,
 			echo.HeaderXCSRFToken,
+			"Idempotency-Key",
 		},
 		AllowMethods: []string{
 			http.MethodGet,
 			http.MethodPost,
+			http.MethodPut,
 			http.MethodPatch,
+			http.MethodDelete,
 			http.MethodOptions,
 		},
 		AllowCredentials: true,
 	}))
 
 	e.Use(echomw.BodyLimit("65536B"))
+
 	e.POST("/signup", userController.SignUp, rateLimitMiddleware.Signup)
 	e.POST("/login", userController.Login, rateLimitMiddleware.LoginIP)
 	e.POST("/refresh", userController.Refresh, rateLimitMiddleware.Refresh, csrfMiddleware.Validate)
@@ -70,5 +77,31 @@ func NewRouter(
 	adminGroup.PATCH("/users/:user_id/suspend", adminComponents.Controller.SuspendUser)
 	adminGroup.PATCH("/users/:user_id/resume", adminComponents.Controller.ResumeUser)
 
+	if len(videoComponents) == 1 {
+		registerVideoRoutes(e, videoComponents[0], authMiddleware, rateLimitMiddleware)
+	}
+
 	return e
+}
+
+func registerVideoRoutes(
+	e *echo.Echo,
+	components VideoComponents,
+	auth *middleware.AuthMiddleware,
+	rateLimits *middleware.RateLimitMiddleware,
+) {
+	e.POST("/videos", components.Controller.StartUpload, auth.Authenticate, rateLimits.VideoStart)
+	e.POST("/videos/:video_id/upload-complete", components.Controller.CompleteUpload, auth.Authenticate, rateLimits.VideoComplete)
+	e.GET("/videos", components.Controller.ListReels, auth.OptionalAuthenticate)
+	e.GET("/videos/:video_id", components.Controller.Detail, auth.OptionalAuthenticate)
+
+	e.GET("/me/videos", components.Controller.ListMine, auth.Authenticate)
+	e.GET("/me/videos/:video_id", components.Controller.MineDetail, auth.Authenticate)
+	e.PATCH("/me/videos/:video_id/private", components.Controller.SetPrivate, auth.Authenticate)
+	e.PATCH("/me/videos/:video_id/publish", components.Controller.Republish, auth.Authenticate)
+	e.DELETE("/me/videos/:video_id", components.Controller.Delete, auth.Authenticate)
+
+	e.PUT("/videos/:video_id/saved", components.SavedController.Save, auth.Authenticate)
+	e.DELETE("/videos/:video_id/saved", components.SavedController.Remove, auth.Authenticate)
+	e.GET("/me/saved-videos", components.SavedController.List, auth.Authenticate)
 }

@@ -54,10 +54,14 @@ func (m *userUsecaseMock) ValidateTokenVersion(user *entity.User, tokenVersion u
 }
 
 type rateLimitUsecaseMock struct {
-	allowSignupFunc     func(context.Context, string) (usecase.RateLimitDecision, error)
-	allowLoginIPFunc    func(context.Context, string) (usecase.RateLimitDecision, error)
-	allowLoginEmailFunc func(context.Context, string) (usecase.RateLimitDecision, error)
-	allowRefreshFunc    func(context.Context, string) (usecase.RateLimitDecision, error)
+	allowSignupFunc            func(context.Context, string) (usecase.RateLimitDecision, error)
+	allowLoginIPFunc           func(context.Context, string) (usecase.RateLimitDecision, error)
+	allowLoginEmailFunc        func(context.Context, string) (usecase.RateLimitDecision, error)
+	allowRefreshFunc           func(context.Context, string) (usecase.RateLimitDecision, error)
+	allowVideoStartUserFunc    func(context.Context, uint64) (usecase.RateLimitDecision, error)
+	allowVideoStartIPFunc      func(context.Context, string) (usecase.RateLimitDecision, error)
+	allowVideoCompleteUserFunc func(context.Context, uint64) (usecase.RateLimitDecision, error)
+	allowVideoCompleteIPFunc   func(context.Context, string) (usecase.RateLimitDecision, error)
 }
 
 func (m *rateLimitUsecaseMock) AllowSignup(ctx context.Context, ip string) (usecase.RateLimitDecision, error) {
@@ -83,6 +87,30 @@ func (m *rateLimitUsecaseMock) AllowRefresh(ctx context.Context, token string) (
 		panic("unexpected RateLimitUsecase.AllowRefresh call")
 	}
 	return m.allowRefreshFunc(ctx, token)
+}
+func (m *rateLimitUsecaseMock) AllowVideoStartUser(ctx context.Context, userID uint64) (usecase.RateLimitDecision, error) {
+	if m.allowVideoStartUserFunc == nil {
+		panic("unexpected RateLimitUsecase.AllowVideoStartUser call")
+	}
+	return m.allowVideoStartUserFunc(ctx, userID)
+}
+func (m *rateLimitUsecaseMock) AllowVideoStartIP(ctx context.Context, ip string) (usecase.RateLimitDecision, error) {
+	if m.allowVideoStartIPFunc == nil {
+		panic("unexpected RateLimitUsecase.AllowVideoStartIP call")
+	}
+	return m.allowVideoStartIPFunc(ctx, ip)
+}
+func (m *rateLimitUsecaseMock) AllowVideoCompleteUser(ctx context.Context, userID uint64) (usecase.RateLimitDecision, error) {
+	if m.allowVideoCompleteUserFunc == nil {
+		panic("unexpected RateLimitUsecase.AllowVideoCompleteUser call")
+	}
+	return m.allowVideoCompleteUserFunc(ctx, userID)
+}
+func (m *rateLimitUsecaseMock) AllowVideoCompleteIP(ctx context.Context, ip string) (usecase.RateLimitDecision, error) {
+	if m.allowVideoCompleteIPFunc == nil {
+		panic("unexpected RateLimitUsecase.AllowVideoCompleteIP call")
+	}
+	return m.allowVideoCompleteIPFunc(ctx, ip)
 }
 
 type userValidatorMock struct {

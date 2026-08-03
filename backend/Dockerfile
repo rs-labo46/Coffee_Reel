@@ -1,4 +1,4 @@
-FROM golang:1.26.2
+FROM golang:1.26.2 AS base
 
 WORKDIR /app
 
@@ -7,6 +7,15 @@ RUN go mod download
 
 COPY . .
 
-EXPOSE 8080
+FROM base AS api
 
+EXPOSE 8080
 CMD ["go", "run", "."]
+
+FROM base AS worker
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+CMD ["go", "run", "./cmd/worker"]

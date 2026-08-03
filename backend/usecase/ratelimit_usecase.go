@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/netip"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -24,6 +25,10 @@ type IRateLimitUsecase interface {
 	AllowLoginIP(ctx context.Context, clientIP string) (RateLimitDecision, error)
 	AllowLoginEmail(ctx context.Context, normalizedEmail string) (RateLimitDecision, error)
 	AllowRefresh(ctx context.Context, plainRefreshToken string) (RateLimitDecision, error)
+	AllowVideoStartUser(ctx context.Context, userID uint64) (RateLimitDecision, error)
+	AllowVideoStartIP(ctx context.Context, clientIP string) (RateLimitDecision, error)
+	AllowVideoCompleteUser(ctx context.Context, userID uint64) (RateLimitDecision, error)
+	AllowVideoCompleteIP(ctx context.Context, clientIP string) (RateLimitDecision, error)
 }
 
 type rateLimitUsecase struct {
@@ -50,68 +55,136 @@ const (
 	refreshRate     = 1.0 / 5.0
 	refreshCapacity = 5.0
 	refreshTTL      = 60 * time.Second
+
+	videoStartUserRate     = 1.0 / 60.0
+	videoStartUserCapacity = 3.0
+	videoStartUserTTL      = 360 * time.Second
+
+	videoStartIPRate     = 1.0 / 10.0
+	videoStartIPCapacity = 10.0
+	videoStartIPTTL      = 200 * time.Second
+
+	videoCompleteUserRate     = 1.0
+	videoCompleteUserCapacity = 10.0
+	videoCompleteUserTTL      = 60 * time.Second
+
+	videoCompleteIPRate     = 2.0
+	videoCompleteIPCapacity = 30.0
+	videoCompleteIPTTL      = 60 * time.Second
 )
 
 func NewRateLimitUsecase(rateLimits repository.IRateLimitRepository, tokens ITokenService, rateLimitHMACKey string) (IRateLimitUsecase, error) {
+	if rateLimits == nil || tokens == nil {
+		return nil, fmt.Errorf("rate limit usecase dependency is required")
+	}
 	if len([]byte(rateLimitHMACKey)) < minimumSecretSize {
 		return nil, fmt.Errorf("rate limit HMAC key must be at least 32 bytes")
 	}
-	return &rateLimitUsecase{rateLimits: rateLimits, tokens: tokens, rateLimitHMACKey: []byte(rateLimitHMACKey)}, nil
+
+	return &rateLimitUsecase{
+		rateLimits:       rateLimits,
+		tokens:           tokens,
+		rateLimitHMACKey: []byte(rateLimitHMACKey),
+	}, nil
 }
 
-// Client IPからSignup用Redis Keyを作成する
 func (u *rateLimitUsecase) AllowSignup(ctx context.Context, clientIP string) (RateLimitDecision, error) {
 	ip, err := normalizeClientIP(clientIP)
 	if err != nil {
 		return RateLimitDecision{}, err
 	}
 	return u.allow(ctx, "rl:signup:ip:"+ip, signupRate, signupCapacity, signupTTL)
-
 }
 
-// Client IPからLogin IP用Keyを作成する
 func (u *rateLimitUsecase) AllowLoginIP(ctx context.Context, clientIP string) (RateLimitDecision, error) {
 	ip, err := normalizeClientIP(clientIP)
-
 	if err != nil {
 		return RateLimitDecision{}, err
 	}
-
 	return u.allow(ctx, "rl:login:ip:"+ip, loginIPRate, loginIPCapacity, loginIPTTL)
 }
 
-// 正規化済みEmailを専用鍵でHMAC-SHA-256化する
 func (u *rateLimitUsecase) AllowLoginEmail(ctx context.Context, normalizedEmail string) (RateLimitDecision, error) {
 	if normalizedEmail == "" {
 		return RateLimitDecision{}, fmt.Errorf("normalized email is required")
 	}
-	mac := hmac.New(sha256.New, u.rateLimitHMACKey)
-	mac.Write([]byte(normalizedEmail))
 
+	mac := hmac.New(sha256.New, u.rateLimitHMACKey)
+	_, _ = mac.Write([]byte(normalizedEmail))
 	emailHash := hex.EncodeToString(mac.Sum(nil))
+
 	return u.allow(ctx, "rl:login:email:"+emailHash, loginEmailRate, loginEmailCapacity, loginEmailTTL)
 }
 
-// token.goのRefresh Token HashをKeyに使用する
 func (u *rateLimitUsecase) AllowRefresh(ctx context.Context, plainRefreshToken string) (RateLimitDecision, error) {
 	if plainRefreshToken == "" {
 		return RateLimitDecision{}, entity.ErrRefreshTokenMissing
 	}
 
 	tokenHash := u.tokens.HashRefreshToken(plainRefreshToken)
-
 	return u.allow(ctx, "rl:refresh:token:"+tokenHash, refreshRate, refreshCapacity, refreshTTL)
 }
+
+func (u *rateLimitUsecase) AllowVideoStartUser(ctx context.Context, userID uint64) (RateLimitDecision, error) {
+	key, err := videoUserRateLimitKey("start", userID)
+	if err != nil {
+		return RateLimitDecision{}, err
+	}
+	return u.allow(ctx, key, videoStartUserRate, videoStartUserCapacity, videoStartUserTTL)
+}
+
+func (u *rateLimitUsecase) AllowVideoStartIP(ctx context.Context, clientIP string) (RateLimitDecision, error) {
+	ip, err := normalizeClientIP(clientIP)
+	if err != nil {
+		return RateLimitDecision{}, err
+	}
+	return u.allow(ctx, "rl:video:start:ip:"+ip, videoStartIPRate, videoStartIPCapacity, videoStartIPTTL)
+}
+
+func (u *rateLimitUsecase) AllowVideoCompleteUser(ctx context.Context, userID uint64) (RateLimitDecision, error) {
+	key, err := videoUserRateLimitKey("complete", userID)
+	if err != nil {
+		return RateLimitDecision{}, err
+	}
+	return u.allow(ctx, key, videoCompleteUserRate, videoCompleteUserCapacity, videoCompleteUserTTL)
+}
+
+func (u *rateLimitUsecase) AllowVideoCompleteIP(ctx context.Context, clientIP string) (RateLimitDecision, error) {
+	ip, err := normalizeClientIP(clientIP)
+	if err != nil {
+		return RateLimitDecision{}, err
+	}
+	return u.allow(ctx, "rl:video:complete:ip:"+ip, videoCompleteIPRate, videoCompleteIPCapacity, videoCompleteIPTTL)
+}
+
 func (u *rateLimitUsecase) allow(ctx context.Context, key string, rate, capacity float64, ttl time.Duration) (RateLimitDecision, error) {
-	allowed, remaining, retryAfterMS, err := u.rateLimits.Allow(ctx, key, rate, capacity, rateLimitCost, time.Now().UTC().UnixMilli(), ttl.Milliseconds())
+	allowed, remaining, retryAfterMS, err := u.rateLimits.Allow(
+		ctx,
+		key,
+		rate,
+		capacity,
+		rateLimitCost,
+		time.Now().UTC().UnixMilli(),
+		ttl.Milliseconds(),
+	)
 	if err != nil {
 		return RateLimitDecision{}, err
 	}
 
-	return RateLimitDecision{Allowed: allowed, Remaining: remaining, RetryAfter: time.Duration(retryAfterMS) * time.Millisecond}, nil
+	return RateLimitDecision{
+		Allowed:    allowed,
+		Remaining:  remaining,
+		RetryAfter: time.Duration(retryAfterMS) * time.Millisecond,
+	}, nil
 }
 
-// IPを検証・正規化し、空文字の共通Key生成を防ぐ
+func videoUserRateLimitKey(scope string, userID uint64) (string, error) {
+	if userID == 0 || (scope != "start" && scope != "complete") {
+		return "", entity.ErrInvalidInput
+	}
+	return "rl:video:" + scope + ":user:" + strconv.FormatUint(userID, 10), nil
+}
+
 func normalizeClientIP(clientIP string) (string, error) {
 	clientIP = strings.TrimSpace(clientIP)
 	if clientIP == "" {

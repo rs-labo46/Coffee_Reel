@@ -61,7 +61,7 @@ type adminUserRepository struct {
 }
 
 func NewAdminUserRepository(db *gorm.DB) IAdminUserRepository {
-	return &adminUserRepository{db}
+	return &adminUserRepository{db: db}
 }
 
 func (r *adminUserRepository) ListUsers(ctx context.Context, limit int, cursor *AdminUserCursor) (AdminUserListResult, error) {
@@ -94,22 +94,17 @@ func (r *adminUserRepository) ListUsers(ctx context.Context, limit int, cursor *
 		users = users[:limit]
 	}
 
-	result := AdminUserListResult{
-		Users:   users,
-		HasMore: hasMore,
-	}
+	result := AdminUserListResult{Users: users, HasMore: hasMore}
 	if len(users) > 0 {
 		last := users[len(users)-1]
 		result.LastCreatedAt = last.CreatedAt.UTC()
 		result.LastID = last.ID
 	}
-
 	return result, nil
 }
 
 func (r *adminUserRepository) FindUserDetail(ctx context.Context, userID uint64) (*AdminUserDetail, error) {
 	var detail AdminUserDetail
-
 	if err := r.db.WithContext(ctx).
 		Model(&entity.User{}).
 		Select("id", "name", "email", "status", "created_at", "updated_at").
@@ -121,8 +116,18 @@ func (r *adminUserRepository) FindUserDetail(ctx context.Context, userID uint64)
 		return nil, fmt.Errorf("find admin user detail: %w", err)
 	}
 
-	detail.Videos = make([]AdminUserVideoItem, 0)
+	videos := make([]AdminUserVideoItem, 0)
+	if err := r.db.WithContext(ctx).
+		Model(&entity.Video{}).
+		Select("id", "title", "processing_status", "publish_status", "created_at").
+		Where("user_id = ? AND deleted_at IS NULL", userID).
+		Order("created_at DESC").
+		Order("id DESC").
+		Scan(&videos).Error; err != nil {
+		return nil, fmt.Errorf("list admin user videos: %w", err)
+	}
 
+	detail.Videos = videos
 	return &detail, nil
 }
 
@@ -167,7 +172,7 @@ func (r *adminUserRepository) SuspendUser(
 			return fmt.Errorf("revoke refresh tokens for suspended user: %w", err)
 		}
 
-		auditLog, err := entity.NewAdminAuditLog(
+		userAudit, err := entity.NewAdminAuditLog(
 			adminUserID,
 			entity.AdminAuditTargetUser,
 			user.ID,
@@ -181,8 +186,12 @@ func (r *adminUserRepository) SuspendUser(
 		if err != nil {
 			return err
 		}
-		if err := tx.Create(auditLog).Error; err != nil {
+		if err := tx.Create(userAudit).Error; err != nil {
 			return fmt.Errorf("create user suspension audit log: %w", err)
+		}
+
+		if err := hidePublishedVideosForSuspension(tx, adminUserID, user.ID, reason, requestID, now); err != nil {
+			return err
 		}
 
 		updatedUser = user
@@ -191,8 +200,72 @@ func (r *adminUserRepository) SuspendUser(
 	if err != nil {
 		return nil, err
 	}
-
 	return &updatedUser, nil
+}
+
+func hidePublishedVideosForSuspension(
+	tx *gorm.DB,
+	adminUserID uint64,
+	userID uint64,
+	reason string,
+	requestID string,
+	now time.Time,
+) error {
+	videos := make([]entity.Video, 0)
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where(
+			"user_id = ? AND processing_status = ? AND publish_status = ? AND deleted_at IS NULL",
+			userID,
+			entity.VideoProcessingReady,
+			entity.VideoPublishPublished,
+		).
+		Order("id ASC").
+		Find(&videos).Error; err != nil {
+		return fmt.Errorf("lock published videos for suspended user: %w", err)
+	}
+
+	for index := range videos {
+		video := &videos[index]
+		beforeStatus := video.PublishStatus
+		if err := video.HideByAdmin(now); err != nil {
+			return err
+		}
+
+		result := tx.Model(&entity.Video{}).
+			Where(
+				"id = ? AND processing_status = ? AND publish_status = ? AND deleted_at IS NULL",
+				video.ID,
+				entity.VideoProcessingReady,
+				beforeStatus,
+			).
+			Select("publish_status", "updated_at").
+			Updates(video)
+		if result.Error != nil {
+			return fmt.Errorf("hide suspended user video: %w", result.Error)
+		}
+		if result.RowsAffected != 1 {
+			return entity.ErrVideoStateConflict
+		}
+
+		audit, err := entity.NewAdminAuditLog(
+			adminUserID,
+			entity.AdminAuditTargetVideo,
+			video.ID,
+			entity.AdminAuditActionVideoHideByUserSuspension,
+			string(beforeStatus),
+			string(video.PublishStatus),
+			reason,
+			requestID,
+			now,
+		)
+		if err != nil {
+			return err
+		}
+		if err := tx.Create(audit).Error; err != nil {
+			return fmt.Errorf("create suspended user video audit log: %w", err)
+		}
+	}
+	return nil
 }
 
 func (r *adminUserRepository) ResumeUser(
@@ -254,6 +327,5 @@ func (r *adminUserRepository) ResumeUser(
 	if err != nil {
 		return nil, err
 	}
-
 	return &updatedUser, nil
 }
