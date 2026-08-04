@@ -15,6 +15,7 @@ export default defineConfig({
 
     env: {
       VITE_API_URL: "http://localhost:8080",
+      VITE_VIDEO_POLLING_INTERVAL_MS: "2000",
     },
 
     clearMocks: true,

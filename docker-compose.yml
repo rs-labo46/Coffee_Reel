@@ -197,6 +197,7 @@ services:
     restart: always
     environment:
       VITE_API_URL: "${VITE_API_URL}"
+      VITE_VIDEO_POLLING_INTERVAL_MS: "${VITE_VIDEO_POLLING_INTERVAL_MS}"
       CHOKIDAR_USEPOLLING: "true"
     ports:
       - "${FE_PORT}:3000"

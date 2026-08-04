@@ -17,6 +17,8 @@ const maxTitleLength = 100;
 const maxDescriptionLength = 1000;
 const maxFileSizeBytes = 30_000_000;
 const maxDurationSeconds = 10;
+const maxVideoWidth = 1080;
+const maxVideoHeight = 1920;
 
 const inputClass =
   "mt-2 w-full rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3.5 text-[15px] text-stone-950 outline-none transition placeholder:text-stone-500 hover:border-white/20 focus:border-amber-300/70 focus:ring-4 focus:ring-amber-300/10 disabled:cursor-not-allowed disabled:opacity-60";
@@ -48,6 +50,8 @@ type IdempotencyState = {
   fingerprint: string;
   key: string;
 };
+
+type SubmissionPhase = "idle" | "uploading" | "completing";
 
 // Unicode文字数をBackendと同じ単位で計測
 function countCharacters(value: string): number {
@@ -109,7 +113,7 @@ function readVideoMetadata(objectURL: string): Promise<VideoMetadata> {
   });
 }
 
-// 選択動画が容量、形式、時間、縦横比の条件内か確認
+// 選択動画が容量、形式、時間、解像度、縦横比の条件内か確認
 function validateSelectedVideo(
   file: File,
   contentType: VideoFileContentType | null,
@@ -140,6 +144,10 @@ function validateSelectedVideo(
 
   if (metadata.durationSeconds > maxDurationSeconds) {
     return "動画の再生時間は10秒以下にしてください";
+  }
+
+  if (metadata.width > maxVideoWidth || metadata.height > maxVideoHeight) {
+    return "動画の解像度は1080×1920以下にしてください";
   }
 
   if (
@@ -272,8 +280,16 @@ export default function VideoUploadPage() {
   });
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [requestID, setRequestID] = useState<string>("");
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [submissionPhase, setSubmissionPhase] =
+    useState<SubmissionPhase>("idle");
+  const [pendingCompletionVideoID, setPendingCompletionVideoID] = useState<
+    number | null
+  >(null);
   const [isCancelling, setIsCancelling] = useState<boolean>(false);
+
+  const isSubmitting = submissionPhase !== "idle";
+  const isUploading = submissionPhase === "uploading";
+  const isFormLocked = isSubmitting || pendingCompletionVideoID !== null;
 
   // Preview URL変更時に前のObject URLを破棄
   useEffect(() => {
@@ -366,6 +382,22 @@ export default function VideoUploadPage() {
     }
   }
 
+  // Upload完了通知を送信し自分の投稿画面へ移動
+  async function notifyUploadComplete(videoID: number): Promise<void> {
+    setSubmissionPhase("completing");
+
+    await completeVideoUpload(videoID);
+    setPendingCompletionVideoID(null);
+
+    navigate("/me/videos", {
+      replace: true,
+      state: {
+        uploadCompleted: true,
+        videoID,
+      },
+    });
+  }
+
   // 投稿開始、Storage直接Upload、完了通知を順番に実行
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
@@ -376,10 +408,25 @@ export default function VideoUploadPage() {
       return;
     }
 
-    const validationMessage = validateForm(title, description, selectedVideo);
-
     setErrorMessage("");
     setRequestID("");
+    setIsCancelling(false);
+
+    if (pendingCompletionVideoID !== null) {
+      try {
+        await notifyUploadComplete(pendingCompletionVideoID);
+      } catch (error: unknown) {
+        const result = errorMessageOf(error);
+        setErrorMessage(result.message);
+        setRequestID(result.requestID);
+      } finally {
+        setSubmissionPhase("idle");
+      }
+
+      return;
+    }
+
+    const validationMessage = validateForm(title, description, selectedVideo);
 
     if (validationMessage !== "" || selectedVideo === null) {
       setErrorMessage(validationMessage);
@@ -400,8 +447,7 @@ export default function VideoUploadPage() {
 
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
-    setIsSubmitting(true);
-    setIsCancelling(false);
+    setSubmissionPhase("uploading");
     setProgress({
       loadedBytes: 0,
       totalBytes: selectedVideo.file.size,
@@ -427,15 +473,9 @@ export default function VideoUploadPage() {
         onProgress: setProgress,
       });
 
-      await completeVideoUpload(result.video.id);
-
-      navigate("/me/videos", {
-        replace: true,
-        state: {
-          uploadCompleted: true,
-          videoID: result.video.id,
-        },
-      });
+      setPendingCompletionVideoID(result.video.id);
+      abortControllerRef.current = null;
+      await notifyUploadComplete(result.video.id);
     } catch (error: unknown) {
       const result = errorMessageOf(error);
       setErrorMessage(result.message);
@@ -445,14 +485,14 @@ export default function VideoUploadPage() {
         abortControllerRef.current = null;
       }
 
-      setIsSubmitting(false);
+      setSubmissionPhase("idle");
       setIsCancelling(false);
     }
   }
 
   // 実行中のStorage Uploadを中断
   function handleCancel(): void {
-    if (!isSubmitting || abortControllerRef.current === null) {
+    if (!isUploading || abortControllerRef.current === null) {
       return;
     }
 
@@ -532,7 +572,7 @@ export default function VideoUploadPage() {
                       動画を選択するとPreviewを表示
                     </p>
                     <p className="mt-2 text-xs leading-6 text-stone-500">
-                      MP4 / MOV・最大10秒・最大30MB・9:16
+                      MP4 / MOV・最大10秒・最大30MB・1080×1920以下・9:16
                     </p>
                   </div>
                 </div>
@@ -571,7 +611,7 @@ export default function VideoUploadPage() {
                 type="file"
                 accept=".mp4,.mov,video/mp4,video/quicktime"
                 onChange={handleFileChange}
-                disabled={isSubmitting}
+                disabled={isFormLocked}
                 className="mt-2 block w-full rounded-2xl border border-dashed border-amber-300/30 bg-amber-300/[0.06] px-4 py-4 text-sm font-bold text-stone-300 file:mr-4 file:rounded-full file:border-0 file:bg-amber-300 file:px-4 file:py-2 file:text-xs file:font-black file:text-stone-950 hover:border-amber-300/60 disabled:cursor-not-allowed disabled:opacity-60"
               />
             </div>
@@ -589,7 +629,7 @@ export default function VideoUploadPage() {
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 maxLength={maxTitleLength}
-                disabled={isSubmitting}
+                disabled={isFormLocked}
                 className={inputClass}
                 placeholder="ハンドドリップの蒸らし方"
               />
@@ -610,7 +650,7 @@ export default function VideoUploadPage() {
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
                 maxLength={maxDescriptionLength}
-                disabled={isSubmitting}
+                disabled={isFormLocked}
                 rows={5}
                 className={`${inputClass} resize-y`}
                 placeholder="動画のポイントや使用した器具を入力"
@@ -633,7 +673,7 @@ export default function VideoUploadPage() {
                 onChange={(event) =>
                   setCategory(event.target.value as CategoryCode)
                 }
-                disabled={isSubmitting}
+                disabled={isFormLocked}
                 className={inputClass}
               >
                 {categoryOptions.map((option) => (
@@ -644,7 +684,7 @@ export default function VideoUploadPage() {
               </select>
             </div>
 
-            {isSubmitting && selectedVideo !== null && (
+            {isUploading && selectedVideo !== null && (
               <div className="mt-6">
                 <UploadProgress
                   fileName={selectedVideo.file.name}
@@ -656,7 +696,9 @@ export default function VideoUploadPage() {
             )}
 
             <div className="mt-6 rounded-2xl border border-sky-300/20 bg-sky-400/[0.07] p-4 text-sm leading-6 text-sky-100">
-              Upload完了後、自分の投稿画面へ移動します。
+              {pendingCompletionVideoID === null
+                ? "Upload完了後、自分の投稿画面へ移動します。"
+                : "動画本体のUploadは完了しています。完了通知だけを再送してください。"}
             </div>
 
             <button
@@ -664,7 +706,13 @@ export default function VideoUploadPage() {
               disabled={isSubmitting}
               className="mt-6 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-amber-300 px-6 py-3 text-sm font-black text-stone-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isSubmitting ? "アップロード中" : "動画を投稿"}
+              {submissionPhase === "uploading"
+                ? "アップロード中"
+                : submissionPhase === "completing"
+                  ? "完了通知中"
+                  : pendingCompletionVideoID !== null
+                    ? "完了通知を再送"
+                    : "動画を投稿"}
             </button>
           </section>
         </form>

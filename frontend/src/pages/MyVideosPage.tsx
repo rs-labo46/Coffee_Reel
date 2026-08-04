@@ -18,9 +18,6 @@ import type {
   VideoProcessingStatus,
 } from "../types/video";
 
-const rawPollingIntervalMS = import.meta.env.VITE_VIDEO_POLLING_INTERVAL_MS;
-const videoPollingIntervalMS = readPollingIntervalMS(rawPollingIntervalMS);
-
 const initialMyVideosPromises = new Map<
   number,
   ReturnType<typeof listMyVideos>
@@ -37,22 +34,14 @@ type PendingAction = {
 };
 
 // Frontend設定から投稿状態Polling間隔を取得
-function readPollingIntervalMS(value: string | undefined): number {
+function readPollingIntervalMS(value: string | undefined): number | null {
   if (value === undefined || !/^[1-9][0-9]*$/.test(value)) {
-    throw new Error(
-      "VITE_VIDEO_POLLING_INTERVAL_MS must be a positive integer",
-    );
+    return null;
   }
 
   const intervalMS = Number(value);
 
-  if (!Number.isSafeInteger(intervalMS) || intervalMS <= 0) {
-    throw new Error(
-      "VITE_VIDEO_POLLING_INTERVAL_MS must be a positive integer",
-    );
-  }
-
-  return intervalMS;
+  return Number.isSafeInteger(intervalMS) && intervalMS > 0 ? intervalMS : null;
 }
 
 // React StrictModeの再実行中に初回一覧Requestを共有
@@ -191,6 +180,9 @@ export default function MyVideosPage() {
   const location = useLocation();
   const { user } = useAuth();
   const pollingVideoID = pollingVideoIDOf(location.state);
+  const videoPollingIntervalMS = readPollingIntervalMS(
+    import.meta.env.VITE_VIDEO_POLLING_INTERVAL_MS,
+  );
   const pollingGenerationRef = useRef(0);
   const loadMoreInFlightRef = useRef(false);
 
@@ -252,7 +244,11 @@ export default function MyVideosPage() {
 
   // Upload完了直後のVideoを終端状態まで制御された間隔で再取得
   useEffect(() => {
-    if (pollingVideoID === null) {
+    if (
+      isInitialLoading ||
+      pollingVideoID === null ||
+      videoPollingIntervalMS === null
+    ) {
       return;
     }
 
@@ -374,7 +370,7 @@ export default function MyVideosPage() {
         window.clearTimeout(timerID);
       }
     };
-  }, [pollingVideoID]);
+  }, [isInitialLoading, pollingVideoID, videoPollingIntervalMS]);
 
   // Cursorを使って自分の投稿を追加取得
   async function handleLoadMore(): Promise<void> {
@@ -615,6 +611,16 @@ export default function MyVideosPage() {
             </Link>
           </nav>
         </header>
+
+        {pollingVideoID !== null && videoPollingIntervalMS === null && (
+          <div
+            className="mt-6 rounded-2xl border border-red-400/40 bg-red-950/40 px-4 py-3 text-sm text-red-100"
+            role="alert"
+          >
+            投稿状態の確認間隔が設定されていません。
+            VITE_VIDEO_POLLING_INTERVAL_MSを正の整数で設定してください。
+          </div>
+        )}
 
         {errorMessage !== "" && (
           <div
