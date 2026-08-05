@@ -287,23 +287,48 @@ export default function ReelPage() {
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4">
           <Link
             to="/"
-            className="text-sm font-black tracking-[0.2em] text-amber-300 uppercase"
+            className="text-xs font-black tracking-[0.18em] text-amber-300 uppercase sm:text-sm sm:tracking-[0.2em]"
           >
             Coffee Reel
           </Link>
 
-          <nav className="flex items-center gap-2" aria-label="メインメニュー">
+          <nav
+            className="flex items-center gap-1 sm:gap-2"
+            aria-label="メインメニュー"
+          >
             {isAuthenticated ? (
               <>
                 <Link
+                  to="/me/saved-videos"
+                  aria-label="保存一覧"
+                  title="保存一覧"
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/15 text-stone-200 transition hover:bg-white/[0.06] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-amber-300 sm:flex sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2"
+                >
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-4-6 4V4.5Z" />
+                  </svg>
+                  <span className="hidden text-xs font-black sm:inline">
+                    保存一覧
+                  </span>
+                </Link>
+                <Link
                   to="/me/videos"
-                  className="rounded-full border border-white/15 px-4 py-2 text-xs font-black text-stone-200 transition hover:bg-white/[0.06]"
+                  className="rounded-full border border-white/15 px-3 py-2 text-xs font-black text-stone-200 transition hover:bg-white/[0.06] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-amber-300 sm:px-4"
                 >
                   自分の投稿
                 </Link>
                 <Link
                   to="/videos/upload"
-                  className="rounded-full bg-amber-300 px-4 py-2 text-xs font-black text-stone-950 transition hover:bg-amber-200"
+                  className="rounded-full bg-amber-300 px-3 py-2 text-xs font-black text-stone-950 transition hover:bg-amber-200 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-amber-300 sm:px-4"
                 >
                   投稿
                 </Link>
