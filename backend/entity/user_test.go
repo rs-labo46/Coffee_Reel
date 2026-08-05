@@ -97,9 +97,6 @@ func TestUserJSONDoesNotExposeAuthenticationSecrets(t *testing.T) {
 		}
 	}
 }
-
-//----追加コード----
-
 func TestUserSuspend(t *testing.T) {
 	createdAt := time.Date(2026, 7, 20, 10, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 	now := time.Date(2026, 7, 21, 8, 30, 0, 123, time.FixedZone("JST", 9*60*60))

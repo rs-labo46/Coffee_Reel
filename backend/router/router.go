@@ -10,8 +10,9 @@ import (
 )
 
 type AdminComponents struct {
-	Controller controller.IAdminUserController
-	Middleware *middleware.AdminMiddleware
+	Controller      controller.IAdminUserController
+	Middleware      *middleware.AdminMiddleware
+	VideoController controller.IAdminVideoController
 }
 
 type VideoComponents struct {
@@ -76,6 +77,25 @@ func NewRouter(
 	adminGroup.GET("/users/:user_id", adminComponents.Controller.GetUserDetail)
 	adminGroup.PATCH("/users/:user_id/suspend", adminComponents.Controller.SuspendUser)
 	adminGroup.PATCH("/users/:user_id/resume", adminComponents.Controller.ResumeUser)
+
+	if adminComponents.VideoController != nil {
+		adminGroup.GET(
+			"/videos",
+			adminComponents.VideoController.List,
+		)
+		adminGroup.GET(
+			"/videos/:video_id",
+			adminComponents.VideoController.Detail,
+		)
+		adminGroup.PATCH(
+			"/videos/:video_id/hide",
+			adminComponents.VideoController.Hide,
+		)
+		adminGroup.PATCH(
+			"/videos/:video_id/restore",
+			adminComponents.VideoController.Restore,
+		)
+	}
 
 	if len(videoComponents) == 1 {
 		registerVideoRoutes(e, videoComponents[0], authMiddleware, rateLimitMiddleware)

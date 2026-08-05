@@ -65,6 +65,7 @@ func main() {
 	refreshTokenRepository := repository.NewRefreshTokenRepository(postgresDB)
 	rateLimitRepository := repository.NewRateLimitRepository(redisClient)
 	adminUserRepository := repository.NewAdminUserRepository(postgresDB)
+	adminVideoRepository := repository.NewAdminVideoRepository(postgresDB)
 	videoRepository := repository.NewVideoRepository(postgresDB)
 	savedVideoRepository := repository.NewSavedVideoRepository(postgresDB)
 
@@ -75,6 +76,16 @@ func main() {
 
 	userUsecase := usecase.NewUserUsecase(userRepository, refreshTokenRepository, tokenService)
 	adminUserUsecase := usecase.NewAdminUserUsecase(userRepository, adminUserRepository, tokenService)
+	adminVideoUsecase, err := usecase.NewAdminVideoUsecase(
+		adminVideoRepository,
+		storageRepository,
+		usecase.AdminVideoUsecaseConfig{
+			ReadURLTTL: requiredDurationEnv("STORAGE_READ_URL_TTL"),
+		},
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
 	rateLimitUsecase, err := usecase.NewRateLimitUsecase(rateLimitRepository, tokenService, requiredSecretEnv("RATE_LIMIT_HMAC_KEY"))
 	if err != nil {
 		log.Fatal(err)
@@ -100,6 +111,7 @@ func main() {
 
 	userValidator := validator.NewUserValidator()
 	adminUserValidator := validator.NewAdminUserValidator(userValidator)
+	adminVideoValidator := validator.NewAdminVideoValidator()
 	videoValidator, err := validator.NewVideoValidator(validator.VideoValidatorConfig{
 		IdempotencyKeyMaxBytes: requiredIntEnv("VIDEO_IDEMPOTENCY_KEY_MAX_BYTES", 1),
 	})
@@ -117,12 +129,14 @@ func main() {
 		},
 	)
 	adminUserController := controller.NewAdminUserController(adminUserUsecase, adminUserValidator)
+	adminVideoController := controller.NewAdminVideoController(adminVideoUsecase, adminVideoValidator)
 	videoController := controller.NewVideoController(videoUsecase, videoValidator)
 	savedVideoController := controller.NewSavedVideoController(savedVideoUsecase, videoValidator)
 
 	authMiddleware := middleware.NewAuthMiddleware(userUsecase, tokenService)
 	csrfMiddleware := middleware.NewCSRFMiddleware(tokenService)
 	adminMiddleware := middleware.NewAdminMiddleware()
+
 	rateLimitMiddleware := middleware.NewRateLimitMiddleware(rateLimitUsecase)
 
 	e := router.NewRouter(
@@ -132,8 +146,9 @@ func main() {
 		rateLimitMiddleware,
 		requiredEnv("FE_URL"),
 		router.AdminComponents{
-			Controller: adminUserController,
-			Middleware: adminMiddleware,
+			Controller:      adminUserController,
+			VideoController: adminVideoController,
+			Middleware:      adminMiddleware,
 		},
 		router.VideoComponents{
 			Controller:      videoController,

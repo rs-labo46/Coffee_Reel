@@ -1,4 +1,3 @@
-// ---追加---
 package validator
 
 import (
