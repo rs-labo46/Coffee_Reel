@@ -5,20 +5,28 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiClientError } from "../api/client";
 import { signUp } from "../api/user";
+import { useAuth } from "../auth/useAuth";
 import SignupPage from "./SignupPage";
 
 vi.mock("../api/user", () => ({
   signUp: vi.fn(),
 }));
 
+vi.mock("../auth/useAuth", () => ({
+  useAuth: vi.fn(),
+}));
+
 const signUpMock = vi.mocked(signUp);
+const useAuthMock = vi.mocked(useAuth);
+const loginMock = vi.fn();
+const logoutMock = vi.fn();
 
 function renderSignupPage() {
   render(
     <MemoryRouter initialEntries={["/signup"]}>
       <Routes>
         <Route path="/signup" element={<SignupPage />} />
-        <Route path="/login" element={<p>ログイン遷移先</p>} />
+        <Route path="/" element={<p>トップ遷移先</p>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -40,10 +48,21 @@ async function enterValidSignupInput() {
 describe("SignupPage", () => {
   beforeEach(() => {
     signUpMock.mockReset();
+    loginMock.mockReset();
+    logoutMock.mockReset();
+    loginMock.mockResolvedValue(undefined);
+    useAuthMock.mockReturnValue({
+      user: null,
+      accessToken: null,
+      isAuthenticated: false,
+      isLoading: false,
+      login: loginMock,
+      logout: logoutMock,
+    });
     renderSignupPage();
   });
 
-  it("入力内容を送信し、成功後にLogin画面へ遷移する", async () => {
+  it("入力内容を送信し、自動ログイン後にトップ画面へ遷移する", async () => {
     signUpMock.mockResolvedValue({
       data: {
         id: 1,
@@ -63,7 +82,11 @@ describe("SignupPage", () => {
       email: "coffee@example.com",
       password: "password123",
     });
-    expect(await screen.findByText("ログイン遷移先")).toBeInTheDocument();
+    expect(loginMock).toHaveBeenCalledWith({
+      email: "coffee@example.com",
+      password: "password123",
+    });
+    expect(await screen.findByText("トップ遷移先")).toBeInTheDocument();
   });
 
   it("送信中は登録ボタンを無効化し、二重送信を防ぐ", async () => {
@@ -98,7 +121,7 @@ describe("SignupPage", () => {
     await act(async () => {
       resolveRequest?.();
     });
-    expect(await screen.findByText("ログイン遷移先")).toBeInTheDocument();
+    expect(await screen.findByText("トップ遷移先")).toBeInTheDocument();
   });
 
   it("APIエラーを画面へ表示する", async () => {
@@ -117,6 +140,7 @@ describe("SignupPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "このメールアドレスは既に登録されています",
     );
+    expect(loginMock).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "登録する" })).toBeEnabled();
   });
 

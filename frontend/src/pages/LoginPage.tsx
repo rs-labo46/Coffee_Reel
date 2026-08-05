@@ -170,40 +170,40 @@ export default function LoginPage() {
         </section>
 
         <section
-          className="relative mx-auto w-full max-w-[520px] rounded-[1.75rem] border border-white/70 bg-[#f7f0e7] p-4 text-left text-[#2a1a12] shadow-[0_24px_70px_rgba(0,0,0,0.34)] sm:rounded-[2.25rem] sm:p-7 lg:p-9"
+          className="relative mx-auto w-full max-w-[520px] overflow-hidden rounded-[1.75rem] border border-white/20 bg-white/[0.09] p-4 text-left text-stone-100 shadow-[0_28px_80px_rgba(0,0,0,0.44)] ring-1 ring-inset ring-white/10 backdrop-blur-2xl sm:rounded-[2.25rem] sm:p-7 lg:p-9"
           aria-labelledby="login-title"
         >
           <div
             aria-hidden="true"
-            className="absolute top-0 right-8 h-1 w-20 rounded-b-full bg-amber-500 sm:right-10 sm:w-24"
+            className="absolute top-0 right-8 h-1 w-20 rounded-b-full bg-gradient-to-r from-amber-200/80 to-amber-500/80 shadow-[0_0_24px_rgba(251,191,36,0.45)] sm:right-10 sm:w-24"
           />
 
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-[10px] font-black tracking-[0.22em] text-amber-800 uppercase sm:text-xs">
+              <p className="text-[10px] font-black tracking-[0.22em] text-amber-200 uppercase sm:text-xs">
                 Welcome back
               </p>
 
               <h2
                 id="login-title"
-                className="mt-1.5 text-2xl font-black tracking-[-0.03em] text-stone-950 sm:mt-3 sm:text-4xl"
+                className="mt-1.5 text-2xl font-black tracking-[-0.03em] text-white drop-shadow-sm sm:mt-3 sm:text-4xl"
               >
                 ログイン
               </h2>
             </div>
 
-            <span className="rounded-full border border-stone-300 bg-white/70 px-2.5 py-1 text-[11px] font-bold text-stone-600 sm:px-3 sm:py-1.5 sm:text-xs">
+            <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-[11px] font-bold text-stone-200 shadow-sm backdrop-blur-md sm:px-3 sm:py-1.5 sm:text-xs">
               会員
             </span>
           </div>
 
-          <p className="mt-2 text-xs leading-5 text-stone-600 sm:mt-4 sm:text-sm sm:leading-7">
+          <p className="mt-2 text-xs leading-5 text-stone-300 sm:mt-4 sm:text-sm sm:leading-7">
             登録したメールアドレスとパスワードを入力してください。
           </p>
 
           {locationState?.registrationCompleted === true && (
             <div
-              className="mt-4 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-2.5 text-xs font-bold leading-5 text-emerald-800 sm:rounded-2xl sm:text-sm"
+              className="mt-4 rounded-xl border border-emerald-300/30 bg-emerald-400/10 px-3.5 py-2.5 text-xs font-bold leading-5 text-emerald-100 shadow-lg shadow-emerald-950/10 backdrop-blur-md sm:rounded-2xl sm:text-sm"
               role="status"
             >
               会員登録が完了しました。登録した情報でログインしてください。
@@ -219,7 +219,7 @@ export default function LoginPage() {
             <div>
               <label
                 htmlFor="email"
-                className="text-xs font-black text-stone-800 sm:text-sm"
+                className="text-xs font-black text-stone-100 sm:text-sm"
               >
                 メールアドレス
               </label>
@@ -242,7 +242,7 @@ export default function LoginPage() {
             <div>
               <label
                 htmlFor="password"
-                className="text-xs font-black text-stone-800 sm:text-sm"
+                className="text-xs font-black text-stone-100 sm:text-sm"
               >
                 パスワード
               </label>
@@ -265,7 +265,7 @@ export default function LoginPage() {
             {errorMessage !== "" && (
               <div
                 id="login-error"
-                className="rounded-2xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800"
+                className="rounded-2xl border border-red-300/30 bg-red-400/10 px-4 py-3 text-sm text-red-100 shadow-lg shadow-red-950/10 backdrop-blur-md"
                 role="alert"
               >
                 <div className="flex gap-3">
@@ -293,7 +293,7 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              className="group flex min-h-12 w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-stone-950 px-5 py-3 text-sm font-black text-white shadow-lg shadow-stone-950/20 transition hover:-translate-y-0.5 hover:bg-amber-600 hover:shadow-amber-700/20 focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:bg-stone-950 sm:min-h-13 sm:rounded-2xl sm:py-3.5"
+              className="group flex min-h-12 w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-amber-100/30 bg-gradient-to-r from-amber-300/95 to-amber-500/95 px-5 py-3 text-sm font-black text-stone-950 shadow-[0_14px_34px_rgba(217,119,6,0.28)] backdrop-blur-md transition hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_18px_42px_rgba(217,119,6,0.34)] focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-amber-300 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:brightness-100 sm:min-h-13 sm:rounded-2xl sm:py-3.5"
               disabled={isSubmitting}
             >
               {isSubmitting ? (
@@ -343,19 +343,19 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-4 flex items-center gap-3 text-[11px] text-stone-500 sm:mt-6 sm:text-xs">
-            <span className="h-px flex-1 bg-stone-300" />
+          <div className="mt-4 flex items-center gap-3 text-[11px] text-stone-400 sm:mt-6 sm:text-xs">
+            <span className="h-px flex-1 bg-white/15" />
 
             <span className="shrink-0 whitespace-nowrap">
               アカウントをお持ちでない方
             </span>
 
-            <span className="h-px flex-1 bg-stone-300" />
+            <span className="h-px flex-1 bg-white/15" />
           </div>
 
           <Link
             to="/signup"
-            className="mt-3 flex min-h-11 w-full items-center justify-center whitespace-nowrap rounded-xl border border-stone-300 bg-white/60 px-5 py-2.5 text-sm font-black text-stone-800 transition hover:border-amber-700 hover:bg-white focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-amber-700 sm:mt-4 sm:min-h-12 sm:rounded-2xl sm:py-3"
+            className="mt-3 flex min-h-11 w-full items-center justify-center whitespace-nowrap rounded-xl border border-white/20 bg-white/[0.08] px-5 py-2.5 text-sm font-black text-white shadow-sm backdrop-blur-md transition hover:border-amber-200/50 hover:bg-white/[0.14] focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-amber-300 sm:mt-4 sm:min-h-12 sm:rounded-2xl sm:py-3"
           >
             会員登録へ進む
           </Link>
