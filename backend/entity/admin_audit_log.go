@@ -19,6 +19,8 @@ const (
 	AdminAuditActionUserSuspend               AdminAuditAction = "user_suspend"
 	AdminAuditActionUserResume                AdminAuditAction = "user_resume"
 	AdminAuditActionVideoHideByUserSuspension AdminAuditAction = "video_hide_by_user_suspension"
+	AdminAuditActionVideoHide                 AdminAuditAction = "video_hide"
+	AdminAuditActionVideoRestore              AdminAuditAction = "video_restore"
 )
 
 type AdminAuditLog struct {
@@ -96,6 +98,15 @@ func isValidAdminAuditTransition(
 		return targetType == AdminAuditTargetVideo &&
 			beforeStatus == "published" &&
 			afterStatus == "hidden"
+	case AdminAuditActionVideoHide:
+		return targetType == AdminAuditTargetVideo &&
+			beforeStatus == string(VideoPublishPublished) &&
+			afterStatus == string(VideoPublishHidden)
+
+	case AdminAuditActionVideoRestore:
+		return targetType == AdminAuditTargetVideo &&
+			beforeStatus == string(VideoPublishHidden) &&
+			afterStatus == string(VideoPublishPublished)
 	default:
 		return false
 	}
