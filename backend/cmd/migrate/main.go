@@ -46,6 +46,12 @@ func main() {
 	if err := migrate.MigrateSavedVideos(postgresDB); err != nil {
 		log.Fatal(err)
 	}
+	if err := migrate.MigrateVideoLikes(postgresDB); err != nil {
+		log.Fatal(err)
+	}
+	if err := migrate.MigrateVideoSearch(postgresDB); err != nil {
+		log.Fatal(err)
+	}
 	if err := migrate.MigrateIdempotencyRecords(postgresDB); err != nil {
 		log.Fatal(err)
 	}

@@ -17,7 +17,7 @@ type IVideoRepository interface {
 	CreateWithIdempotency(ctx context.Context, video *entity.Video, record *entity.IdempotencyRecord) (VideoCreateResult, error)
 	CompleteUpload(ctx context.Context, userID, videoID uint64, now time.Time) (*entity.Video, error)
 	FindPublicByID(ctx context.Context, videoID uint64, viewerUserID *uint64) (*PublicVideoItem, error)
-	ListPublic(ctx context.Context, limit int, cursor *VideoCursor, viewerUserID *uint64) (PublicVideoPage, error)
+	ListPublic(ctx context.Context, input PublicVideoListInput) (PublicVideoPage, error)
 	FindOwnedByID(ctx context.Context, userID, videoID uint64) (*OwnedVideoDetail, error)
 	ListOwned(ctx context.Context, userID uint64, limit int, cursor *VideoCursor) (OwnedVideoPage, error)
 	SetPrivateByOwner(ctx context.Context, userID, videoID uint64, now time.Time) (*entity.Video, error)
@@ -51,14 +51,18 @@ type PublicVideoItem struct {
 	VideoObjectKey     string
 	ThumbnailObjectKey string
 	CreatedAt          time.Time
+	LikeCount          int64
+	IsLiked            bool
 	IsSaved            bool
+	Similarity         float32
 }
 
 type PublicVideoPage struct {
-	Items         []PublicVideoItem
-	HasMore       bool
-	LastCreatedAt time.Time
-	LastID        uint64
+	Items          []PublicVideoItem
+	HasMore        bool
+	LastCreatedAt  time.Time
+	LastID         uint64
+	LastSimilarity float32
 }
 
 type OwnedVideoItem struct {
@@ -103,12 +107,46 @@ type ProcessingFailureInput struct {
 	Now                   time.Time
 }
 
+type PublicVideoSearchMode string
+
+const (
+	PublicVideoSearchAll     PublicVideoSearchMode = "all"
+	PublicVideoSearchMatched PublicVideoSearchMode = "matched"
+	PublicVideoSearchSimilar PublicVideoSearchMode = "similar"
+)
+
+type PublicVideoCursor struct {
+	ResultType PublicVideoSearchMode
+	Similarity float32
+	CreatedAt  time.Time
+	ID         uint64
+	FilterHash string
+}
+
+type PublicVideoListInput struct {
+	Title        string
+	Category     *entity.CategoryCode
+	Limit        int
+	Cursor       *PublicVideoCursor
+	ViewerUserID *uint64
+	SearchMode   PublicVideoSearchMode
+}
+
 type videoRepository struct {
 	db *gorm.DB
 }
 
 func NewVideoRepository(db *gorm.DB) IVideoRepository {
 	return &videoRepository{db}
+}
+
+func (m PublicVideoSearchMode) IsValid() bool {
+	switch m {
+	case PublicVideoSearchAll, PublicVideoSearchMatched, PublicVideoSearchSimilar:
+		return true
+	default:
+		return false
+	}
 }
 
 func (r *videoRepository) CreateWithIdempotency(ctx context.Context, video *entity.Video, record *entity.IdempotencyRecord) (VideoCreateResult, error) {
@@ -233,57 +271,221 @@ func (r *videoRepository) CompleteUpload(ctx context.Context, userID, videoID ui
 	return &output, nil
 }
 func (r *videoRepository) FindPublicByID(ctx context.Context, videoID uint64, viewerUserID *uint64) (*PublicVideoItem, error) {
+	if videoID == 0 || (viewerUserID != nil && *viewerUserID == 0) {
+		return nil, entity.ErrInvalidInput
+	}
+
 	viewerID := uint64(0)
 	if viewerUserID != nil {
 		viewerID = *viewerUserID
 	}
+
 	var item PublicVideoItem
-	err := r.publicQuery(ctx, viewerID).Where("videos.id = ?", videoID).Take(&item).Error
+	err := r.publicQuery(ctx, viewerID).
+		Where("videos.id = ?", videoID).
+		Take(&item).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, entity.ErrVideoNotFound
 		}
 		return nil, fmt.Errorf("find public video: %w", err)
 	}
+
+	item.CreatedAt = item.CreatedAt.UTC()
 	return &item, nil
 }
 
-func (r *videoRepository) ListPublic(ctx context.Context, limit int, cursor *VideoCursor, viewerUserID *uint64) (PublicVideoPage, error) {
+func (r *videoRepository) ListPublic(ctx context.Context, input PublicVideoListInput) (PublicVideoPage, error) {
+	if err := validatePublicVideoListInput(input); err != nil {
+		return PublicVideoPage{}, err
+	}
+
 	viewerID := uint64(0)
-	if viewerUserID != nil {
-		viewerID = *viewerUserID
+	if input.ViewerUserID != nil {
+		viewerID = *input.ViewerUserID
 	}
-	items := make([]PublicVideoItem, 0, limit+1)
-	query := r.publicQuery(ctx, viewerID)
-	if cursor != nil {
-		query = query.Where("videos.created_at < ? OR (videos.created_at = ? AND videos.id < ?)", cursor.CreatedAt.UTC(), cursor.CreatedAt.UTC(), cursor.ID)
+
+	items := make([]PublicVideoItem, 0, input.Limit+1)
+	var query *gorm.DB
+
+	if input.SearchMode == PublicVideoSearchSimilar {
+		query = r.publicSimilarQuery(ctx, viewerID, input.Title).
+			Where("lower(?) <% lower(videos.title)", input.Title)
+	} else {
+		query = r.publicQuery(ctx, viewerID)
 	}
-	if err := query.Order("videos.created_at DESC").Order("videos.id DESC").Limit(limit + 1).Scan(&items).Error; err != nil {
+
+	if input.Category != nil {
+		query = query.Where("videos.category = ?", *input.Category)
+	}
+
+	if input.SearchMode == PublicVideoSearchMatched && input.Title != "" {
+		query = query.Where(
+			"LOWER(videos.title) LIKE ? ESCAPE '\\'",
+			publicTitlePattern(input.Title),
+		)
+	}
+
+	if input.Cursor != nil {
+		if input.SearchMode == PublicVideoSearchSimilar {
+			query = query.Where(
+				"(word_similarity(lower(?), lower(videos.title)), videos.created_at, videos.id) < (?, ?, ?)",
+				input.Title,
+				input.Cursor.Similarity,
+				input.Cursor.CreatedAt.UTC(),
+				input.Cursor.ID,
+			)
+		} else {
+			query = query.Where(
+				"videos.created_at < ? OR (videos.created_at = ? AND videos.id < ?)",
+				input.Cursor.CreatedAt.UTC(),
+				input.Cursor.CreatedAt.UTC(),
+				input.Cursor.ID,
+			)
+		}
+	}
+
+	if input.SearchMode == PublicVideoSearchSimilar {
+		query = query.Order("similarity DESC")
+	}
+
+	if err := query.
+		Order("videos.created_at DESC").
+		Order("videos.id DESC").
+		Limit(input.Limit + 1).
+		Scan(&items).Error; err != nil {
 		return PublicVideoPage{}, fmt.Errorf("list public videos: %w", err)
 	}
-	hasMore := len(items) > limit
+
+	hasMore := len(items) > input.Limit
 	if hasMore {
-		items = items[:limit]
+		items = items[:input.Limit]
 	}
-	page := PublicVideoPage{Items: items, HasMore: hasMore}
+
+	for i := range items {
+		items[i].CreatedAt = items[i].CreatedAt.UTC()
+	}
+
+	page := PublicVideoPage{
+		Items:   items,
+		HasMore: hasMore,
+	}
 	if len(items) > 0 {
 		last := items[len(items)-1]
-		page.LastCreatedAt = last.CreatedAt.UTC()
+		page.LastCreatedAt = last.CreatedAt
 		page.LastID = last.ID
+		page.LastSimilarity = last.Similarity
 	}
+
 	return page, nil
 }
+
+func validatePublicVideoListInput(input PublicVideoListInput) error {
+	if input.Limit < 1 || input.Limit > 100 || !input.SearchMode.IsValid() {
+		return entity.ErrInvalidInput
+	}
+	if input.ViewerUserID != nil && *input.ViewerUserID == 0 {
+		return entity.ErrInvalidInput
+	}
+	if input.Category != nil && !input.Category.IsValid() {
+		return entity.ErrInvalidInput
+	}
+
+	switch input.SearchMode {
+	case PublicVideoSearchAll:
+		if input.Title != "" || input.Category != nil {
+			return entity.ErrInvalidInput
+		}
+	case PublicVideoSearchMatched:
+		if input.Title == "" && input.Category == nil {
+			return entity.ErrInvalidInput
+		}
+	case PublicVideoSearchSimilar:
+		if input.Title == "" {
+			return entity.ErrInvalidInput
+		}
+	}
+
+	if input.Cursor == nil {
+		return nil
+	}
+	if input.Cursor.ResultType != input.SearchMode ||
+		input.Cursor.CreatedAt.IsZero() ||
+		input.Cursor.ID == 0 ||
+		strings.TrimSpace(input.Cursor.FilterHash) == "" {
+		return entity.ErrCursorInvalid
+	}
+	if input.SearchMode == PublicVideoSearchSimilar {
+		if input.Cursor.Similarity < 0.6 || input.Cursor.Similarity > 1 {
+			return entity.ErrCursorInvalid
+		}
+	} else if input.Cursor.Similarity != 0 {
+		return entity.ErrCursorInvalid
+	}
+
+	return nil
+}
+
 func (r *videoRepository) publicQuery(ctx context.Context, viewerID uint64) *gorm.DB {
 	return r.db.WithContext(ctx).
 		Table("videos").
 		Select(`videos.id, videos.user_id, users.name AS author_name, videos.category, videos.title, videos.description,
 			video_output_metas.video_object_key, video_output_metas.thumbnail_object_key, videos.created_at,
+			COALESCE(video_like_counts.like_count, 0) AS like_count,
+			CASE WHEN ? = 0 THEN FALSE ELSE EXISTS (
+				SELECT 1 FROM video_likes WHERE video_likes.user_id = ? AND video_likes.video_id = videos.id
+			) END AS is_liked,
 			CASE WHEN ? = 0 THEN FALSE ELSE EXISTS (
 				SELECT 1 FROM saved_videos WHERE saved_videos.user_id = ? AND saved_videos.video_id = videos.id
-			) END AS is_saved`, viewerID, viewerID).
+			) END AS is_saved`, viewerID, viewerID, viewerID, viewerID).
 		Joins("JOIN users ON users.id = videos.user_id").
 		Joins("JOIN video_output_metas ON video_output_metas.video_id = videos.id").
-		Where("videos.processing_status = ? AND videos.publish_status = ? AND videos.deleted_at IS NULL", entity.VideoProcessingReady, entity.VideoPublishPublished)
+		Joins(`LEFT JOIN (
+			SELECT video_id, COUNT(*) AS like_count
+			FROM video_likes
+			GROUP BY video_id
+		) AS video_like_counts ON video_like_counts.video_id = videos.id`).
+		Where(
+			"videos.processing_status = ? AND videos.publish_status = ? AND videos.deleted_at IS NULL",
+			entity.VideoProcessingReady,
+			entity.VideoPublishPublished,
+		)
+}
+
+func (r *videoRepository) publicSimilarQuery(ctx context.Context, viewerID uint64, title string) *gorm.DB {
+	return r.db.WithContext(ctx).
+		Table("videos").
+		Select(`videos.id, videos.user_id, users.name AS author_name, videos.category, videos.title, videos.description,
+			video_output_metas.video_object_key, video_output_metas.thumbnail_object_key, videos.created_at,
+			COALESCE(video_like_counts.like_count, 0) AS like_count,
+			CASE WHEN ? = 0 THEN FALSE ELSE EXISTS (
+				SELECT 1 FROM video_likes WHERE video_likes.user_id = ? AND video_likes.video_id = videos.id
+			) END AS is_liked,
+			CASE WHEN ? = 0 THEN FALSE ELSE EXISTS (
+				SELECT 1 FROM saved_videos WHERE saved_videos.user_id = ? AND saved_videos.video_id = videos.id
+			) END AS is_saved,
+			word_similarity(lower(?), lower(videos.title)) AS similarity`, viewerID, viewerID, viewerID, viewerID, title).
+		Joins("JOIN users ON users.id = videos.user_id").
+		Joins("JOIN video_output_metas ON video_output_metas.video_id = videos.id").
+		Joins(`LEFT JOIN (
+			SELECT video_id, COUNT(*) AS like_count
+			FROM video_likes
+			GROUP BY video_id
+		) AS video_like_counts ON video_like_counts.video_id = videos.id`).
+		Where(
+			"videos.processing_status = ? AND videos.publish_status = ? AND videos.deleted_at IS NULL",
+			entity.VideoProcessingReady,
+			entity.VideoPublishPublished,
+		)
+}
+
+func publicTitlePattern(title string) string {
+	escaped := strings.NewReplacer(
+		`\`, `\\`,
+		`%`, `\%`,
+		`_`, `\_`,
+	).Replace(strings.ToLower(title))
+	return "%" + escaped + "%"
 }
 
 func (r *videoRepository) FindOwnedByID(ctx context.Context, userID, videoID uint64) (*OwnedVideoDetail, error) {
