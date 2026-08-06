@@ -1,22 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 
+import { listAdminVideos } from "../api/admin_video";
 import { ApiClientError } from "../api/client";
-import { listAdminUsers } from "../api/admin_user";
-import type { AdminUserListItem } from "../types/admin_user";
+import VideoStatusBadge from "../components/VideoStatusBadge";
+
+import type { CategoryCode } from "../types/video";
+import type { AdminVideoListItem } from "../types/admin_video";
 
 const pageLimit = 20;
 
-let initialUsersPromise: ReturnType<typeof listAdminUsers> | null = null;
+let initialVideosPromise: ReturnType<typeof listAdminVideos> | null = null;
 
-function requestInitialUsers(): ReturnType<typeof listAdminUsers> {
-  if (initialUsersPromise === null) {
-    initialUsersPromise = listAdminUsers(null, pageLimit).finally(() => {
-      initialUsersPromise = null;
+function requestInitialVideos(): ReturnType<typeof listAdminVideos> {
+  if (initialVideosPromise === null) {
+    initialVideosPromise = listAdminVideos(null, pageLimit).finally(() => {
+      initialVideosPromise = null;
     });
   }
 
-  return initialUsersPromise;
+  return initialVideosPromise;
 }
 
 function formatDate(value: string): string {
@@ -32,8 +35,23 @@ function formatDate(value: string): string {
   }).format(date);
 }
 
-export default function AdminUsersPage() {
-  const [items, setItems] = useState<AdminUserListItem[]>([]);
+function categoryLabel(category: CategoryCode): string {
+  switch (category) {
+    case "brewing":
+      return "抽出";
+    case "roasting":
+      return "焙煎";
+    case "latte_art":
+      return "ラテアート";
+    case "beans":
+      return "コーヒー豆";
+    case "equipment":
+      return "器具";
+  }
+}
+
+export default function AdminVideosPage() {
+  const [items, setItems] = useState<AdminVideoListItem[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -43,7 +61,7 @@ export default function AdminUsersPage() {
   const isLoadingRef = useRef(true);
   const lastSuccessfulCursorRef = useRef<string | null | undefined>(undefined);
 
-  const loadUsers = useCallback(
+  const loadVideos = useCallback(
     async (cursor: string | null, replace: boolean): Promise<void> => {
       if (isLoadingRef.current) {
         return;
@@ -66,7 +84,7 @@ export default function AdminUsersPage() {
       }
 
       try {
-        const response = await listAdminUsers(cursor, pageLimit);
+        const response = await listAdminVideos(cursor, pageLimit);
 
         setItems((currentItems) =>
           replace ? response.items : [...currentItems, ...response.items],
@@ -79,7 +97,7 @@ export default function AdminUsersPage() {
           setErrorMessage(error.message);
           setRequestId(error.requestId);
         } else {
-          setErrorMessage("ユーザー一覧の取得に失敗しました");
+          setErrorMessage("投稿一覧の取得に失敗しました");
         }
       } finally {
         isLoadingRef.current = false;
@@ -92,7 +110,7 @@ export default function AdminUsersPage() {
   useEffect(() => {
     let isActive = true;
 
-    requestInitialUsers()
+    requestInitialVideos()
       .then((response) => {
         if (!isActive) {
           return;
@@ -112,7 +130,7 @@ export default function AdminUsersPage() {
           setErrorMessage(error.message);
           setRequestId(error.requestId);
         } else {
-          setErrorMessage("ユーザー一覧の取得に失敗しました");
+          setErrorMessage("投稿一覧の取得に失敗しました");
         }
       })
       .finally(() => {
@@ -134,7 +152,7 @@ export default function AdminUsersPage() {
       return;
     }
 
-    void loadUsers(nextCursor, false);
+    void loadVideos(nextCursor, false);
   }
 
   return (
@@ -143,24 +161,24 @@ export default function AdminUsersPage() {
         <header className="flex flex-col gap-5 border-b border-white/10 pb-7 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-black tracking-[0.24em] text-amber-300 uppercase">
-              Admin
+              Coffee Reel Admin
             </p>
             <h1 className="mt-3 text-3xl font-black tracking-[-0.04em] text-white sm:text-5xl">
-              ユーザー管理
+              投稿管理
             </h1>
           </div>
 
           <nav className="flex flex-wrap gap-3" aria-label="管理者メニュー">
             <Link
               to="/admin/users"
-              aria-current="page"
-              className="rounded-full border border-amber-300/50 bg-amber-300/10 px-4 py-2 text-sm font-black text-amber-200"
+              className="rounded-full border border-white/15 px-4 py-2 text-sm font-black text-stone-200 transition hover:border-white/30 hover:bg-white/[0.06]"
             >
               ユーザー管理
             </Link>
             <Link
               to="/admin/videos"
-              className="rounded-full border border-white/15 px-4 py-2 text-sm font-black text-stone-200 transition hover:border-white/30 hover:bg-white/[0.06]"
+              aria-current="page"
+              className="rounded-full border border-amber-300/50 bg-amber-300/10 px-4 py-2 text-sm font-black text-amber-200"
             >
               投稿管理
             </Link>
@@ -195,13 +213,13 @@ export default function AdminUsersPage() {
             >
               <div className="flex items-center gap-3 text-sm font-bold text-stone-300">
                 <span className="h-5 w-5 animate-spin rounded-full border-2 border-amber-300 border-t-transparent" />
-                ユーザー一覧を取得しています
+                投稿一覧を取得しています
               </div>
             </div>
           ) : items.length === 0 ? (
             <div className="rounded-[2rem] border border-white/10 bg-white/[0.04] px-6 py-16 text-center">
               <p className="text-lg font-black text-white">
-                一般ユーザーは登録されていません
+                管理対象の投稿はありません
               </p>
             </div>
           ) : (
@@ -209,34 +227,46 @@ export default function AdminUsersPage() {
               {items.map((item) => (
                 <article
                   key={item.id}
-                  className="grid gap-5 rounded-[2rem] border border-white/10 bg-white/[0.05] p-5 shadow-xl shadow-black/10 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:p-6"
+                  className="grid gap-5 rounded-[2rem] border border-white/10 bg-white/[0.05] p-5 shadow-xl shadow-black/10 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:p-6"
                 >
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-3">
-                      <h2 className="break-words text-xl font-black text-white">
-                        {item.name}
-                      </h2>
+                      <VideoStatusBadge
+                        processingStatus={item.processing_status}
+                        publishStatus={item.publish_status}
+                      />
                       <span
                         className={`rounded-full px-3 py-1 text-xs font-black ${
-                          item.status === "active"
+                          item.author.status === "active"
                             ? "bg-emerald-400/15 text-emerald-200"
                             : "bg-red-400/15 text-red-200"
                         }`}
                       >
-                        {item.status === "active" ? "利用中" : "利用停止中"}
+                        投稿者:{" "}
+                        {item.author.status === "active"
+                          ? "利用中"
+                          : "利用停止中"}
                       </span>
                     </div>
 
-                    <p className="mt-3 break-all text-sm font-bold text-stone-300">
-                      {item.email}
+                    <h2 className="mt-4 break-words text-xl font-black text-white sm:text-2xl">
+                      {item.title}
+                    </h2>
+                    <p className="mt-2 break-words text-sm leading-7 text-stone-300">
+                      {item.description === ""
+                        ? "説明はありません"
+                        : item.description}
                     </p>
-                    <p className="mt-2 text-xs text-stone-500">
-                      登録日時: {formatDate(item.created_at)}
-                    </p>
+
+                    <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs font-bold text-stone-500">
+                      <span>投稿者: {item.author.name}</span>
+                      <span>カテゴリー: {categoryLabel(item.category)}</span>
+                      <span>投稿日時: {formatDate(item.created_at)}</span>
+                    </div>
                   </div>
 
                   <Link
-                    to={`/admin/users/${item.id}`}
+                    to={`/admin/videos/${item.id}`}
                     className="inline-flex min-h-11 items-center justify-center rounded-full border border-amber-300/40 px-5 py-2 text-sm font-black text-amber-200 transition hover:border-amber-300 hover:bg-amber-300/10"
                   >
                     詳細を確認

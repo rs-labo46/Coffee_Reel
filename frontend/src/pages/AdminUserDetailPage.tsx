@@ -244,12 +244,20 @@ export default function AdminUserDetailPage() {
             </h1>
           </div>
 
-          <Link
-            to="/admin/users"
-            className="inline-flex min-h-11 items-center justify-center rounded-full border border-white/15 px-5 py-2 text-sm font-black text-stone-200 transition hover:border-white/30 hover:bg-white/[0.06]"
-          >
-            一覧へ戻る
-          </Link>
+          <nav className="flex flex-wrap gap-3" aria-label="管理者メニュー">
+            <Link
+              to="/admin/users"
+              className="inline-flex min-h-11 items-center justify-center rounded-full border border-amber-300/50 bg-amber-300/10 px-5 py-2 text-sm font-black text-amber-200"
+            >
+              一覧へ戻る
+            </Link>
+            <Link
+              to="/admin/videos"
+              className="inline-flex min-h-11 items-center justify-center rounded-full border border-white/15 px-5 py-2 text-sm font-black text-stone-200 transition hover:border-white/30 hover:bg-white/[0.06]"
+            >
+              投稿管理
+            </Link>
+          </nav>
         </header>
 
         {errorMessage !== "" && (

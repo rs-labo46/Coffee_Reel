@@ -97,6 +97,10 @@ describe("AdminUsersPage", () => {
       "href",
       "/admin/users/10",
     );
+    expect(screen.getByRole("link", { name: "投稿管理" })).toHaveAttribute(
+      "href",
+      "/admin/videos",
+    );
   });
 
   it("ユーザーが0件なら空状態を表示する", async () => {

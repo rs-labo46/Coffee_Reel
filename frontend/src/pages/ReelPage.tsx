@@ -62,8 +62,11 @@ function errorViewOf(
 // 公開リール、Active動画、次Cursor、保存状態を管理
 export default function ReelPage() {
   const navigate = useNavigate();
-  const { isAuthenticated, isLoading: isAuthLoading, user } = useAuth();
+  const { isAuthenticated, isLoading: isAuthLoading, logout, user } = useAuth();
   const visibilityRatiosRef = useRef<Map<number, number>>(new Map());
+  // ---追加---
+  const logoutInFlightRef = useRef(false);
+  // ---追加---
   const loadMoreInFlightRef = useRef(false);
   const reelListRef = useRef<HTMLElement | null>(null);
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
@@ -75,6 +78,9 @@ export default function ReelPage() {
   const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
   const [savingVideoIDs, setSavingVideoIDs] = useState<Set<number>>(new Set());
+  // ---追加---
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  // ---追加---
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [requestID, setRequestID] = useState<string>("");
 
@@ -281,6 +287,32 @@ export default function ReelPage() {
     }
   }
 
+  // ---追加---
+  // Headerからログアウトし、認証情報を破棄してLogin画面へ移動
+  async function handleLogout(): Promise<void> {
+    if (logoutInFlightRef.current) {
+      return;
+    }
+
+    logoutInFlightRef.current = true;
+    setIsLoggingOut(true);
+    setErrorMessage("");
+    setRequestID("");
+
+    try {
+      await logout();
+      navigate("/login", { replace: true });
+    } catch (error: unknown) {
+      const errorView = errorViewOf(error, "ログアウトできませんでした");
+      setErrorMessage(errorView.message);
+      setRequestID(errorView.requestID);
+    } finally {
+      logoutInFlightRef.current = false;
+      setIsLoggingOut(false);
+    }
+  }
+  // ---追加---
+
   return (
     <main className="min-h-dvh bg-[#100b08] text-stone-100">
       <header className="sticky top-0 z-30 border-b border-white/10 bg-[#100b08]/90 px-4 py-3 backdrop-blur-xl sm:px-6">
@@ -293,7 +325,7 @@ export default function ReelPage() {
           </Link>
 
           <nav
-            className="flex items-center gap-1 sm:gap-2"
+            className="flex flex-wrap items-center justify-end gap-1 sm:gap-2"
             aria-label="メインメニュー"
           >
             {isAuthenticated ? (
@@ -326,12 +358,35 @@ export default function ReelPage() {
                 >
                   自分の投稿
                 </Link>
+                {/* ---追加--- */}
+                {user?.role === "admin" && (
+                  <Link
+                    to="/admin/users"
+                    aria-label="管理画面"
+                    title="管理画面"
+                    className="rounded-full border border-amber-300/40 px-2.5 py-2 text-xs font-black text-amber-200 transition hover:border-amber-300 hover:bg-amber-300/10 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-amber-300 sm:px-4"
+                  >
+                    <span className="sm:hidden">管理</span>
+                    <span className="hidden sm:inline">管理画面</span>
+                  </Link>
+                )}
+                {/* ---追加--- */}
                 <Link
                   to="/videos/upload"
                   className="rounded-full bg-amber-300 px-3 py-2 text-xs font-black text-stone-950 transition hover:bg-amber-200 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-amber-300 sm:px-4"
                 >
                   投稿
                 </Link>
+                {/* ---追加--- */}
+                <button
+                  type="button"
+                  onClick={() => void handleLogout()}
+                  disabled={isLoggingOut}
+                  className="rounded-full border border-red-300/30 px-3 py-2 text-xs font-black text-red-100 transition hover:border-red-300/60 hover:bg-red-400/10 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-red-300 disabled:cursor-not-allowed disabled:opacity-60 sm:px-4"
+                >
+                  {isLoggingOut ? "ログアウト中" : "ログアウト"}
+                </button>
+                {/* ---追加--- */}
               </>
             ) : (
               <>

@@ -6,11 +6,14 @@ import NotFoundPage from "../pages/NotFoundPage";
 import AdminRoute from "../auth/AdminRoute";
 import AdminUsersPage from "../pages/AdminUsersPage";
 import AdminUserDetailPage from "../pages/AdminUserDetailPage";
+
 import VideoUploadPage from "../pages/VideoUploadPage";
 import MyVideosPage from "../pages/MyVideosPage";
 import SavedVideosPage from "../pages/SavedVideosPage";
 import VideoDetailPage from "../pages/VideoDetailPage";
 import ReelPage from "../pages/ReelPage";
+import AdminVideosPage from "../pages/AdminVideosPage";
+import AdminVideoDetailPage from "../pages/AdminVideoDetailPage";
 
 export default function AppRouter() {
   return (
@@ -30,6 +33,11 @@ export default function AppRouter() {
       <Route element={<AdminRoute />}>
         <Route path="/admin/users" element={<AdminUsersPage />} />
         <Route path="/admin/users/:user_id" element={<AdminUserDetailPage />} />
+        <Route path="/admin/videos" element={<AdminVideosPage />} />
+        <Route
+          path="/admin/videos/:video_id"
+          element={<AdminVideoDetailPage />}
+        />
       </Route>
 
       <Route path="*" element={<NotFoundPage />} />

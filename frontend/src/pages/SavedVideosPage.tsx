@@ -268,37 +268,30 @@ export default function SavedVideosPage() {
           </section>
         ) : (
           <section
-            className="mt-6 grid grid-cols-3 gap-px overflow-hidden bg-white/10 sm:grid-cols-4 lg:grid-cols-5"
+            className="mt-8 grid gap-5 lg:grid-cols-2"
             aria-label="保存した動画一覧"
           >
-            {videos.map((video) => (
-              <Link
-                key={video.id}
-                to={`/videos/${video.id}`}
-                aria-label={`${video.title}を見る`}
-                className="group relative aspect-[3/4] overflow-hidden bg-stone-950"
-              >
-                {video.thumbnail_url !== "" ? (
-                  <img
-                    src={video.thumbnail_url}
-                    alt=""
-                    loading="lazy"
-                    className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-                  />
-                ) : (
-                  <div className="grid h-full w-full place-items-center bg-[#19110d] text-xs font-bold text-stone-500">
-                    準備中
-                  </div>
-                )}
+            {videos.map((video) => {
+              const isRemoving = removingVideoIDs.has(video.id);
 
-                <span
-                  aria-hidden="true"
-                  className="absolute top-2 right-2 grid h-7 w-7 place-items-center rounded-lg bg-black/45 text-white backdrop-blur-sm"
-                >
-                  ▶
-                </span>
-              </Link>
-            ))}
+              return (
+                <VideoCard
+                  key={video.id}
+                  video={video}
+                  to={`/videos/${video.id}`}
+                  action={
+                    <button
+                      type="button"
+                      onClick={() => void handleRemoveSaved(video.id)}
+                      disabled={isRemoving}
+                      className="inline-flex min-h-10 items-center justify-center rounded-full border border-red-300/30 px-4 py-2 text-xs font-black text-red-100 transition hover:bg-red-300/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isRemoving ? "解除中" : "保存を解除"}
+                    </button>
+                  }
+                />
+              );
+            })}
           </section>
         )}
 

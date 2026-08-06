@@ -45,6 +45,14 @@ vi.mock("../pages/AdminUserDetailPage", () => ({
   default: () => <p>AdminUserDetailPage</p>,
 }));
 
+vi.mock("../pages/AdminVideosPage", () => ({
+  default: () => <p>AdminVideosPage</p>,
+}));
+
+vi.mock("../pages/AdminVideoDetailPage", () => ({
+  default: () => <p>AdminVideoDetailPage</p>,
+}));
+
 vi.mock("../auth/useAuth", () => ({
   useAuth: vi.fn(),
 }));
@@ -137,6 +145,22 @@ describe("AppRouter", () => {
   it("/admin/users/:user_idへAdminUserDetailPageを接続する", () => {
     renderRoute("/admin/users/10", "admin");
     expect(screen.getByText("AdminUserDetailPage")).toBeInTheDocument();
+  });
+
+  it("/admin/videosへAdminVideosPageを接続する", () => {
+    renderRoute("/admin/videos", "admin");
+    expect(screen.getByText("AdminVideosPage")).toBeInTheDocument();
+  });
+
+  it("/admin/videos/:video_idへAdminVideoDetailPageを接続する", () => {
+    renderRoute("/admin/videos/10", "admin");
+    expect(screen.getByText("AdminVideoDetailPage")).toBeInTheDocument();
+  });
+
+  it("一般ユーザーは管理者投稿画面を表示できない", () => {
+    renderRoute("/admin/videos", "user");
+    expect(screen.getByText("ReelPage")).toBeInTheDocument();
+    expect(screen.queryByText("AdminVideosPage")).not.toBeInTheDocument();
   });
 
   it("存在しないURLへNotFoundPageを接続する", () => {
