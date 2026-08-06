@@ -239,7 +239,7 @@ func (r *adminVideoRepository) Hide(ctx context.Context, adminUserID uint64, vid
 				beforeStatus,
 			).
 			Select("publish_status", "updated_at").
-			Updates(&video)
+			UpdateColumns(&video)
 
 		if result.Error != nil {
 			return fmt.Errorf("save admin hidden video: %w", result.Error)
@@ -325,7 +325,7 @@ func (r *adminVideoRepository) Restore(ctx context.Context, adminUserID uint64, 
 				beforeStatus,
 			).
 			Select("publish_status", "updated_at").
-			Updates(&video)
+			UpdateColumns(&video)
 
 		if result.Error != nil {
 			return fmt.Errorf("save admin restored video: %w", result.Error)

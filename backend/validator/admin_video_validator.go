@@ -140,10 +140,7 @@ func (v *adminVideoValidator) ValidateListQuery(rawLimit string, rawCursor strin
 			entity.ErrCursorInvalid
 	}
 
-	_, offset := cursor.CreatedAt.Zone()
-
 	if cursor.CreatedAt.IsZero() ||
-		offset != 0 ||
 		cursor.ID == 0 ||
 		cursor.ID > math.MaxInt64 {
 		return usecase.AdminVideoListInput{},
