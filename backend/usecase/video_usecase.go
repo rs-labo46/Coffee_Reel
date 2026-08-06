@@ -20,7 +20,7 @@ import (
 type IVideoUsecase interface {
 	StartUpload(ctx context.Context, actor *entity.User, input StartUploadInput, idempotencyKey string) (StartUploadResult, error)
 	CompleteUpload(ctx context.Context, actor *entity.User, videoID uint64) (VideoStateResult, error)
-	ListReels(ctx context.Context, viewer *entity.User, input VideoListInput) (PublicVideoListResult, error)
+	ListReels(ctx context.Context, viewer *entity.User, input PublicVideoListInput) (PublicVideoListResult, error)
 	GetDetail(ctx context.Context, viewer *entity.User, videoID uint64) (PublicVideoResult, error)
 	ListMine(ctx context.Context, actor *entity.User, input VideoListInput) (OwnedVideoListResult, error)
 	GetMine(ctx context.Context, actor *entity.User, videoID uint64) (OwnedVideoDetailResult, error)
@@ -91,6 +91,37 @@ type VideoListInput struct {
 	Limit  int
 	Cursor *VideoCursor
 }
+type PublicSearchResultType string
+
+const (
+	PublicSearchAll     PublicSearchResultType = "all"
+	PublicSearchMatched PublicSearchResultType = "matched"
+	PublicSearchSimilar PublicSearchResultType = "similar"
+)
+
+func (r PublicSearchResultType) IsValid() bool {
+	switch r {
+	case PublicSearchAll, PublicSearchMatched, PublicSearchSimilar:
+		return true
+	default:
+		return false
+	}
+}
+
+type PublicVideoCursor struct {
+	ResultType PublicSearchResultType `json:"result_type"`
+	Similarity float32                `json:"similarity"`
+	CreatedAt  time.Time              `json:"created_at"`
+	ID         uint64                 `json:"id"`
+	FilterHash string                 `json:"filter_hash"`
+}
+
+type PublicVideoListInput struct {
+	Title    string
+	Category *entity.CategoryCode
+	Limit    int
+	Cursor   *PublicVideoCursor
+}
 
 type PublicVideoResult struct {
 	ID          uint64
@@ -102,11 +133,14 @@ type PublicVideoResult struct {
 	CreatedAt   time.Time
 	Video       ReadInfo
 	Thumbnail   ReadInfo
+	LikeCount   int64
+	IsLiked     bool
 	IsSaved     bool
 }
 
 type PublicVideoListResult struct {
 	Items      []PublicVideoResult
+	ResultType PublicSearchResultType
 	NextCursor *string
 	HasMore    bool
 }
@@ -325,18 +359,39 @@ func (u *videoUsecase) CompleteUpload(ctx context.Context, actor *entity.User, v
 	return videoStateResult(completed), nil
 }
 
-func (u *videoUsecase) ListReels(ctx context.Context, viewer *entity.User, input VideoListInput) (PublicVideoListResult, error) {
+func (u *videoUsecase) ListReels(ctx context.Context, viewer *entity.User, input PublicVideoListInput) (PublicVideoListResult, error) {
 	viewerID, err := optionalViewerID(viewer)
 	if err != nil {
 		return PublicVideoListResult{}, err
 	}
-	if err := validateVideoListInput(input); err != nil {
+	if err := validatePublicVideoListInput(input); err != nil {
 		return PublicVideoListResult{}, err
 	}
 
-	page, err := u.videos.ListPublic(ctx, input.Limit, repositoryVideoCursor(input.Cursor), viewerID)
+	filterHash, err := publicVideoFilterHash(input.Title, input.Category)
 	if err != nil {
 		return PublicVideoListResult{}, err
+	}
+
+	resultType, err := publicSearchResultType(input, filterHash)
+	if err != nil {
+		return PublicVideoListResult{}, err
+	}
+
+	page, err := u.videos.ListPublic(ctx, repositoryPublicVideoListInput(input, viewerID, filterHash, resultType))
+	if err != nil {
+		return PublicVideoListResult{}, err
+	}
+
+	if input.Cursor == nil &&
+		resultType == PublicSearchMatched &&
+		len(page.Items) == 0 &&
+		input.Title != "" {
+		resultType = PublicSearchSimilar
+		page, err = u.videos.ListPublic(ctx, repositoryPublicVideoListInput(input, viewerID, filterHash, resultType))
+		if err != nil {
+			return PublicVideoListResult{}, err
+		}
 	}
 
 	items := make([]PublicVideoResult, 0, len(page.Items))
@@ -348,9 +403,23 @@ func (u *videoUsecase) ListReels(ctx context.Context, viewer *entity.User, input
 		items = append(items, result)
 	}
 
-	output := PublicVideoListResult{Items: items, HasMore: page.HasMore}
+	output := PublicVideoListResult{
+		Items:      items,
+		ResultType: resultType,
+		HasMore:    page.HasMore,
+	}
 	if page.HasMore && len(items) > 0 {
-		cursor, err := encodeVideoCursor(VideoCursor{CreatedAt: page.LastCreatedAt.UTC(), ID: page.LastID})
+		similarity := float32(0)
+		if resultType == PublicSearchSimilar {
+			similarity = page.LastSimilarity
+		}
+		cursor, err := encodePublicVideoCursor(PublicVideoCursor{
+			ResultType: resultType,
+			Similarity: similarity,
+			CreatedAt:  page.LastCreatedAt.UTC(),
+			ID:         page.LastID,
+			FilterHash: filterHash,
+		})
 		if err != nil {
 			return PublicVideoListResult{}, err
 		}
@@ -574,6 +643,102 @@ func validateStartUploadInput(input StartUploadInput, idempotencyKey string) err
 	return nil
 }
 
+func validatePublicVideoListInput(input PublicVideoListInput) error {
+	if input.Limit < 1 || input.Limit > 100 {
+		return entity.ErrInvalidInput
+	}
+	if input.Category != nil && !input.Category.IsValid() {
+		return entity.ErrInvalidInput
+	}
+	if input.Cursor != nil {
+		if !input.Cursor.ResultType.IsValid() ||
+			input.Cursor.CreatedAt.IsZero() ||
+			input.Cursor.ID == 0 ||
+			len(input.Cursor.FilterHash) != sha256.Size*2 {
+			return entity.ErrCursorInvalid
+		}
+	}
+	return nil
+}
+
+func publicSearchResultType(input PublicVideoListInput, filterHash string) (PublicSearchResultType, error) {
+	if input.Cursor != nil {
+		if input.Cursor.FilterHash != filterHash {
+			return "", entity.ErrCursorInvalid
+		}
+		switch input.Cursor.ResultType {
+		case PublicSearchAll:
+			if input.Title != "" || input.Category != nil {
+				return "", entity.ErrCursorInvalid
+			}
+		case PublicSearchMatched:
+			if input.Title == "" && input.Category == nil {
+				return "", entity.ErrCursorInvalid
+			}
+		case PublicSearchSimilar:
+			if input.Title == "" {
+				return "", entity.ErrCursorInvalid
+			}
+		default:
+			return "", entity.ErrCursorInvalid
+		}
+		return input.Cursor.ResultType, nil
+	}
+
+	if input.Title == "" && input.Category == nil {
+		return PublicSearchAll, nil
+	}
+	return PublicSearchMatched, nil
+}
+
+func publicVideoFilterHash(title string, category *entity.CategoryCode) (string, error) {
+	type filterPayload struct {
+		Title    string `json:"title"`
+		Category string `json:"category"`
+	}
+
+	categoryValue := ""
+	if category != nil {
+		categoryValue = string(*category)
+	}
+	payload, err := json.Marshal(filterPayload{
+		Title:    title,
+		Category: categoryValue,
+	})
+	if err != nil {
+		return "", fmt.Errorf("encode public video filter: %w", err)
+	}
+	sum := sha256.Sum256(payload)
+	return hex.EncodeToString(sum[:]), nil
+}
+
+func repositoryPublicVideoListInput(
+	input PublicVideoListInput,
+	viewerID *uint64,
+	filterHash string,
+	resultType PublicSearchResultType,
+) repository.PublicVideoListInput {
+	var cursor *repository.PublicVideoCursor
+	if input.Cursor != nil {
+		cursor = &repository.PublicVideoCursor{
+			ResultType: repository.PublicVideoSearchMode(input.Cursor.ResultType),
+			Similarity: input.Cursor.Similarity,
+			CreatedAt:  input.Cursor.CreatedAt.UTC(),
+			ID:         input.Cursor.ID,
+			FilterHash: filterHash,
+		}
+	}
+
+	return repository.PublicVideoListInput{
+		Title:        input.Title,
+		Category:     input.Category,
+		Limit:        input.Limit,
+		Cursor:       cursor,
+		ViewerUserID: viewerID,
+		SearchMode:   repository.PublicVideoSearchMode(resultType),
+	}
+}
+
 func validateVideoListInput(input VideoListInput) error {
 	if input.Limit < 1 || input.Limit > 100 {
 		return entity.ErrInvalidInput
@@ -632,6 +797,20 @@ func encodeVideoCursor(cursor VideoCursor) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(payload), nil
 }
 
+func encodePublicVideoCursor(cursor PublicVideoCursor) (string, error) {
+	payload, err := json.Marshal(PublicVideoCursor{
+		ResultType: cursor.ResultType,
+		Similarity: cursor.Similarity,
+		CreatedAt:  cursor.CreatedAt.UTC(),
+		ID:         cursor.ID,
+		FilterHash: cursor.FilterHash,
+	})
+	if err != nil {
+		return "", fmt.Errorf("encode public video cursor: %w", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(payload), nil
+}
+
 func buildPublicVideoResult(ctx context.Context, storage repository.IObjectStorageRepository, readURLTTL time.Duration, item repository.PublicVideoItem) (PublicVideoResult, error) {
 	videoTarget, err := storage.CreateReadURL(ctx, item.VideoObjectKey, readURLTTL)
 	if err != nil {
@@ -652,6 +831,8 @@ func buildPublicVideoResult(ctx context.Context, storage repository.IObjectStora
 		CreatedAt:   item.CreatedAt.UTC(),
 		Video:       readInfoFromRepository(videoTarget),
 		Thumbnail:   readInfoFromRepository(thumbnailTarget),
+		LikeCount:   item.LikeCount,
+		IsLiked:     item.IsLiked,
 		IsSaved:     item.IsSaved,
 	}, nil
 }
