@@ -37,7 +37,7 @@ func (m *AuthMiddleware) Authenticate(next echo.HandlerFunc) echo.HandlerFunc {
 			return writeMiddlewareError(c, http.StatusUnauthorized, "unauthorized", "認証情報が無効です")
 		}
 
-		claims, err := m.tokens.ParseAccessToken(tokenString, time.Now().UTC())
+		claims, err := m.tokens.ParseAccessToken(tokenString, time.Now())
 		if err != nil {
 			return writeMiddlewareError(c, http.StatusUnauthorized, "unauthorized", "認証情報が無効です")
 		}

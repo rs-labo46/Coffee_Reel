@@ -120,8 +120,8 @@ func (a *adminVideoController) List(c echo.Context) error {
 			Category:         item.Category,
 			ProcessingStatus: item.ProcessingStatus,
 			PublishStatus:    item.PublishStatus,
-			CreatedAt:        item.CreatedAt.UTC(),
-			UpdatedAt:        item.UpdatedAt.UTC(),
+			CreatedAt:        item.CreatedAt,
+			UpdatedAt:        item.UpdatedAt,
 		})
 	}
 

@@ -97,7 +97,7 @@ func TestUserControllerSignUpRejectsMalformedJSONBeforeValidation(t *testing.T) 
 }
 
 func TestUserControllerLoginSuccessSetsSecureCookieContractWithoutReturningRefreshSecrets(t *testing.T) {
-	expiresAt := time.Now().UTC().Add(7 * 24 * time.Hour).Truncate(time.Second)
+	expiresAt := time.Now().Add(7 * 24 * time.Hour).Truncate(time.Second)
 	validator := &userValidatorMock{validateLoginFunc: func(email, password string) (string, string, error) {
 		if email != " USER@EXAMPLE.COM " || password != " password " {
 			t.Fatalf("ValidateLogin(%q, %q)", email, password)
@@ -198,7 +198,7 @@ func TestUserControllerLoginRateLimitStorageFailureReturnsGeneric503(t *testing.
 }
 
 func TestUserControllerRefreshSuccessRotatesBothCookies(t *testing.T) {
-	expiresAt := time.Now().UTC().Add(7 * 24 * time.Hour).Truncate(time.Second)
+	expiresAt := time.Now().Add(7 * 24 * time.Hour).Truncate(time.Second)
 	users := &userUsecaseMock{refreshFunc: func(_ context.Context, token string) (usecase.AuthTokens, error) {
 		if token != "old-refresh" {
 			t.Fatalf("Refresh token = %q", token)
@@ -325,7 +325,7 @@ func TestUserControllerMeRequiresMiddlewareUserAndReturnsSafeResponse(t *testing
 
 	t.Run("current user", func(t *testing.T) {
 		c, rec := newControllerContext(http.MethodGet, "/me", "")
-		c.Set(userContextKey, &entity.User{ID: 1, Name: "Alice", Email: "alice@example.com", PasswordHash: "hash", Role: entity.RoleAdmin, Status: entity.StatusActive, TokenVersion: 4, CreatedAt: time.Now().UTC()})
+		c.Set(userContextKey, &entity.User{ID: 1, Name: "Alice", Email: "alice@example.com", PasswordHash: "hash", Role: entity.RoleAdmin, Status: entity.StatusActive, TokenVersion: 4, CreatedAt: time.Now()})
 		if err := controller.Me(c); err != nil {
 			t.Fatalf("Me() error = %v", err)
 		}

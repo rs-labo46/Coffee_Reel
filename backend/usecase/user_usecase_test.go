@@ -11,7 +11,7 @@ import (
 
 func TestUserUsecaseSignUpCreatesOnlyActiveGeneralUser(t *testing.T) {
 	ctx := context.Background()
-	before := time.Now().UTC()
+	before := time.Now()
 	var created *entity.User
 
 	users := &userRepositoryMock{
@@ -37,7 +37,7 @@ func TestUserUsecaseSignUpCreatesOnlyActiveGeneralUser(t *testing.T) {
 	}
 
 	got, err := NewUserUsecase(users, &refreshTokenRepositoryMock{}, tokens).SignUp(ctx, "Alice", "user@example.com", "  password  ")
-	after := time.Now().UTC()
+	after := time.Now()
 	if err != nil {
 		t.Fatalf("SignUp() error = %v", err)
 	}
@@ -124,7 +124,7 @@ func TestUserUsecaseSignUpStopsAtTheFailingBoundary(t *testing.T) {
 func TestUserUsecaseLoginCreatesNewFamilyAndPersistsOnlyRefreshHash(t *testing.T) {
 	ctx := context.Background()
 	user := &entity.User{ID: 7, PasswordHash: "stored-hash", Role: entity.RoleAdmin, Status: entity.StatusActive, TokenVersion: 3}
-	before := time.Now().UTC()
+	before := time.Now()
 	var generatedAt time.Time
 	var saved *entity.RefreshToken
 
@@ -165,7 +165,7 @@ func TestUserUsecaseLoginCreatesNewFamilyAndPersistsOnlyRefreshHash(t *testing.T
 	}
 
 	result, err := NewUserUsecase(users, refreshTokens, tokens).Login(ctx, "admin@example.com", "password")
-	after := time.Now().UTC()
+	after := time.Now()
 	if err != nil {
 		t.Fatalf("Login() error = %v", err)
 	}
@@ -285,7 +285,7 @@ func TestUserUsecaseLoginPropagatesTokenAndPersistenceFailures(t *testing.T) {
 }
 
 func TestUserUsecaseRefreshRotatesWithinTheSameFamily(t *testing.T) {
-	nowBefore := time.Now().UTC()
+	nowBefore := time.Now()
 	current := &entity.RefreshToken{ID: 10, UserID: 7, TokenHash: "current-hash", FamilyID: "family", ExpiresAt: nowBefore.Add(time.Hour)}
 	user := &entity.User{ID: 7, Role: entity.RoleUser, Status: entity.StatusActive, TokenVersion: 2}
 	var rotateAt time.Time
@@ -336,7 +336,7 @@ func TestUserUsecaseRefreshRotatesWithinTheSameFamily(t *testing.T) {
 	}
 
 	result, err := NewUserUsecase(users, refreshTokens, tokens).Refresh(context.Background(), "plain-current")
-	nowAfter := time.Now().UTC()
+	nowAfter := time.Now()
 	if err != nil {
 		t.Fatalf("Refresh() error = %v", err)
 	}
@@ -353,7 +353,7 @@ func TestUserUsecaseRefreshRotatesWithinTheSameFamily(t *testing.T) {
 }
 
 func TestUserUsecaseRefreshRejectsInvalidTokenStatesBeforeRotation(t *testing.T) {
-	now := time.Now().UTC()
+	now := time.Now()
 	revokedAt := now.Add(-time.Minute)
 	usedAt := now.Add(-time.Minute)
 	revokeCalled := false
@@ -431,7 +431,7 @@ func TestUserUsecaseRefreshRejectsInvalidTokenStatesBeforeRotation(t *testing.T)
 }
 
 func TestUserUsecaseRefreshRejectsSuspendedUserAndPropagatesRotateRace(t *testing.T) {
-	now := time.Now().UTC()
+	now := time.Now()
 	current := &entity.RefreshToken{UserID: 1, FamilyID: "family", ExpiresAt: now.Add(time.Hour)}
 	baseTokens := func() *tokenServiceMock {
 		return &tokenServiceMock{

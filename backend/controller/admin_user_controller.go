@@ -92,7 +92,7 @@ func (a *adminUserController) ListUsers(c echo.Context) error {
 			Name:      item.Name,
 			Email:     item.Email,
 			Status:    item.Status,
-			CreatedAt: item.CreatedAt.UTC(),
+			CreatedAt: item.CreatedAt,
 		})
 	}
 

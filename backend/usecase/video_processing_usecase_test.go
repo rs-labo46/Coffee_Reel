@@ -19,7 +19,7 @@ func validVideoProcessingConfig() VideoProcessingUsecaseConfig {
 }
 
 func processingClaim(attempt int, sourceMeta *entity.SourceVideoMeta) *repository.ProcessingClaim {
-	now := time.Now().UTC()
+	now := time.Now()
 	started := now.Add(-time.Second)
 	return &repository.ProcessingClaim{
 		Job:        &entity.VideoProcessingJob{ID: 31, VideoID: 22, Status: entity.VideoJobRunning, AttemptCount: attempt, MaxAttempts: 4, StartedAt: &started, AvailableAt: now, CreatedAt: now, UpdatedAt: now},

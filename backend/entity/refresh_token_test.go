@@ -85,7 +85,7 @@ func TestRefreshTokenRevokeIsIdempotent(t *testing.T) {
 }
 
 func TestRefreshTokenJSONExposesNothing(t *testing.T) {
-	now := time.Now().UTC()
+	now := time.Now()
 	replacedByID := uint64(2)
 	token := RefreshToken{
 		ID:           1,

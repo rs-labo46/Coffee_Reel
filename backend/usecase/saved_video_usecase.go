@@ -45,7 +45,7 @@ func (u *savedVideoUsecase) Save(ctx context.Context, actor *entity.User, videoI
 		return entity.ErrInvalidInput
 	}
 
-	return u.saved.Save(ctx, actor.ID, videoID, time.Now().UTC())
+	return u.saved.Save(ctx, actor.ID, videoID, time.Now())
 }
 
 func (u *savedVideoUsecase) Remove(ctx context.Context, actor *entity.User, videoID uint64) error {

@@ -170,7 +170,7 @@ func (r *objectStorageRepository) CreateUploadURL(ctx context.Context, objectKey
 		return UploadTarget{}, entity.ErrInvalidInput
 	}
 
-	issuedAt := time.Now().UTC()
+	issuedAt := time.Now()
 	result, err := r.presigner.PresignPutObject(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(r.bucket),
 		Key:         aws.String(objectKey),
@@ -312,7 +312,7 @@ func (r *objectStorageRepository) CreateReadURL(ctx context.Context, objectKey s
 		return ReadTarget{}, entity.ErrInvalidInput
 	}
 
-	issuedAt := time.Now().UTC()
+	issuedAt := time.Now()
 	result, err := r.presigner.PresignGetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(r.bucket),
 		Key:    aws.String(objectKey),

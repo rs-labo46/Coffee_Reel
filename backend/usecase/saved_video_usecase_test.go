@@ -37,14 +37,14 @@ func TestNewSavedVideoUsecaseRejectsInvalidConfiguration(t *testing.T) {
 }
 
 func TestSavedVideoUsecaseSaveValidatesActorAndForwardsUTC(t *testing.T) {
-	before := time.Now().UTC()
+	before := time.Now()
 	called := false
 	saved := &savedVideoRepositoryMock{saveFunc: func(_ context.Context, userID, videoID uint64, now time.Time) error {
 		called = true
 		if userID != 4 || videoID != 9 {
 			t.Fatalf("Save(%d,%d)", userID, videoID)
 		}
-		if now.Location() != time.UTC || now.Before(before) || now.After(time.Now().UTC()) {
+		if now.Location() != time.UTC || now.Before(before) || now.After(time.Now()) {
 			t.Fatalf("now=%s", now)
 		}
 		return nil
@@ -131,7 +131,7 @@ func TestSavedVideoUsecaseListBuildsReadURLsAndSavedCursor(t *testing.T) {
 		if ttl != 10*time.Minute {
 			t.Fatalf("ttl=%s", ttl)
 		}
-		return repository.ReadTarget{URL: "https://read.example/" + key, ExpiresAt: time.Now().UTC().Add(ttl)}, nil
+		return repository.ReadTarget{URL: "https://read.example/" + key, ExpiresAt: time.Now().Add(ttl)}, nil
 	}}
 	uc, _ := NewSavedVideoUsecase(saved, storage, SavedVideoUsecaseConfig{ReadURLTTL: 10 * time.Minute})
 	result, err := uc.List(context.Background(), activeVideoUser(3), VideoListInput{Limit: 2, Cursor: inputCursor})
@@ -170,7 +170,7 @@ func TestSavedVideoUsecaseListReturnsNoPartialItemsWhenReadURLFails(t *testing.T
 		if strings.Contains(key, "videos/2/output") {
 			return repository.ReadTarget{}, entity.ErrStorageUnavailable
 		}
-		return repository.ReadTarget{URL: "https://read.example", ExpiresAt: time.Now().UTC()}, nil
+		return repository.ReadTarget{URL: "https://read.example", ExpiresAt: time.Now()}, nil
 	}}
 	uc, _ := NewSavedVideoUsecase(saved, storage, SavedVideoUsecaseConfig{ReadURLTTL: time.Minute})
 	result, err := uc.List(context.Background(), activeVideoUser(1), VideoListInput{Limit: 10})

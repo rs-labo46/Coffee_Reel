@@ -33,7 +33,7 @@ func TestNewAdminAuditLog(t *testing.T) {
 }
 
 func TestNewAdminAuditLogAcceptsDefinedTransitions(t *testing.T) {
-	now := time.Now().UTC()
+	now := time.Now()
 	tests := []struct {
 		name         string
 		targetType   AdminAuditTargetType
@@ -56,7 +56,7 @@ func TestNewAdminAuditLogAcceptsDefinedTransitions(t *testing.T) {
 }
 
 func TestNewAdminAuditLogRejectsInvalidValues(t *testing.T) {
-	now := time.Now().UTC()
+	now := time.Now()
 	validReason := "reason"
 	tooLongReason := strings.Repeat("あ", 501)
 

@@ -84,7 +84,7 @@ func TestVideoUsecaseStartUploadGeneratesServerManagedSourceObjectKey(t *testing
 			if ttl <= 0 || ttl > 15*time.Minute {
 				t.Fatalf("ttl = %s, want positive and at most 15m", ttl)
 			}
-			return repository.UploadTarget{Method: "PUT", URL: "https://upload.example", ContentType: contentType, ExpiresAt: time.Now().UTC().Add(ttl)}, nil
+			return repository.UploadTarget{Method: "PUT", URL: "https://upload.example", ContentType: contentType, ExpiresAt: time.Now().Add(ttl)}, nil
 		},
 	}
 	uc, err := NewVideoUsecase(videos, storage, validVideoUsecaseConfig())
@@ -115,7 +115,7 @@ func TestVideoUsecaseStartUploadGeneratesServerManagedSourceObjectKey(t *testing
 }
 
 func TestVideoUsecaseStartUploadReusesExistingUploadingVideoWithoutExtendingDeadline(t *testing.T) {
-	now := time.Now().UTC()
+	now := time.Now()
 	existing := &entity.Video{
 		ID: 9, UserID: 3, OriginalObjectKey: "videos/9/source/existing.mp4",
 		UploadExpiresAt: now.Add(4 * time.Minute), ProcessingStatus: entity.VideoProcessingUploading,
@@ -130,7 +130,7 @@ func TestVideoUsecaseStartUploadReusesExistingUploadingVideoWithoutExtendingDead
 			t.Fatalf("objectKey = %q, want existing key %q", key, existing.OriginalObjectKey)
 		}
 		gotTTL = ttl
-		return repository.UploadTarget{Method: "PUT", URL: "https://upload.example", ContentType: contentType, ExpiresAt: time.Now().UTC().Add(ttl)}, nil
+		return repository.UploadTarget{Method: "PUT", URL: "https://upload.example", ContentType: contentType, ExpiresAt: time.Now().Add(ttl)}, nil
 	}}
 	uc, _ := NewVideoUsecase(videos, storage, validVideoUsecaseConfig())
 
@@ -174,7 +174,7 @@ func TestVideoUsecaseStartUploadPropagatesIdempotencyConflictAndDoesNotPresign(t
 }
 
 func TestVideoUsecaseCompleteUploadRejectsExpiredBeforeStorageInspection(t *testing.T) {
-	now := time.Now().UTC()
+	now := time.Now()
 	expired := &entity.Video{
 		ID: 12, UserID: 5, OriginalObjectKey: "videos/source/a.mp4",
 		UploadExpiresAt: now.Add(-time.Minute), ProcessingStatus: entity.VideoProcessingUploading,
@@ -218,7 +218,7 @@ func TestVideoUsecaseCompleteUploadIsIdempotentAfterUploadCompleted(t *testing.T
 	}
 	for _, status := range statuses {
 		t.Run(string(status), func(t *testing.T) {
-			video := &entity.Video{ID: 7, UserID: 2, ProcessingStatus: status, PublishStatus: entity.VideoPublishPrivate, UpdatedAt: time.Now().UTC()}
+			video := &entity.Video{ID: 7, UserID: 2, ProcessingStatus: status, PublishStatus: entity.VideoPublishPrivate, UpdatedAt: time.Now()}
 			videos := &videoRepositoryMock{findOwnedByIDFunc: func(context.Context, uint64, uint64) (*repository.OwnedVideoDetail, error) {
 				return &repository.OwnedVideoDetail{Video: video}, nil
 			}}
@@ -236,7 +236,7 @@ func TestVideoUsecaseCompleteUploadIsIdempotentAfterUploadCompleted(t *testing.T
 }
 
 func TestVideoUsecaseCompleteUploadRejectsMissingOrInvalidStoredObject(t *testing.T) {
-	now := time.Now().UTC()
+	now := time.Now()
 	video := &entity.Video{ID: 7, UserID: 2, OriginalObjectKey: "videos/7/source/x.mp4", UploadExpiresAt: now.Add(time.Minute), ProcessingStatus: entity.VideoProcessingUploading, PublishStatus: entity.VideoPublishPrivate}
 
 	tests := []struct {
@@ -291,7 +291,7 @@ func TestVideoUsecaseListReelsBuildsReadURLsAndOpaqueCursor(t *testing.T) {
 		if ttl != 10*time.Minute {
 			t.Fatalf("ttl = %s", ttl)
 		}
-		return repository.ReadTarget{URL: "https://read.example/" + key, ExpiresAt: time.Now().UTC().Add(ttl)}, nil
+		return repository.ReadTarget{URL: "https://read.example/" + key, ExpiresAt: time.Now().Add(ttl)}, nil
 	}}
 	uc, _ := NewVideoUsecase(videos, storage, validVideoUsecaseConfig())
 
@@ -320,7 +320,7 @@ func TestVideoUsecaseListReelsBuildsReadURLsAndOpaqueCursor(t *testing.T) {
 }
 
 func TestVideoUsecaseGetMineDoesNotIssueReadURLForHiddenVideo(t *testing.T) {
-	video := &entity.Video{ID: 8, UserID: 2, ProcessingStatus: entity.VideoProcessingReady, PublishStatus: entity.VideoPublishHidden, UploadExpiresAt: time.Now().UTC(), CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+	video := &entity.Video{ID: 8, UserID: 2, ProcessingStatus: entity.VideoProcessingReady, PublishStatus: entity.VideoPublishHidden, UploadExpiresAt: time.Now(), CreatedAt: time.Now(), UpdatedAt: time.Now()}
 	videos := &videoRepositoryMock{findOwnedByIDFunc: func(context.Context, uint64, uint64) (*repository.OwnedVideoDetail, error) {
 		return &repository.OwnedVideoDetail{Video: video, OutputMeta: &entity.OutputVideoMeta{VideoObjectKey: "videos/8/output/a.mp4", ThumbnailObjectKey: "videos/8/thumbnail/a.jpg"}}, nil
 	}}

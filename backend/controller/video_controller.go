@@ -324,8 +324,8 @@ func (v *videoController) ListMine(c echo.Context) error {
 			ProcessingStatus: item.ProcessingStatus,
 			PublishStatus:    item.PublishStatus,
 			ThumbnailURL:     thumbnailURL,
-			CreatedAt:        item.CreatedAt.UTC(),
-			UpdatedAt:        item.UpdatedAt.UTC(),
+			CreatedAt:        item.CreatedAt,
+			UpdatedAt:        item.UpdatedAt,
 		})
 	}
 

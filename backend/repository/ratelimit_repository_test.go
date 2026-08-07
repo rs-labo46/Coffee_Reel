@@ -15,7 +15,7 @@ func TestRateLimitRepositoryIntegrationTokenConsumptionRefillAndTTL(t *testing.T
 	repository := NewRateLimitRepository(client)
 	ctx := context.Background()
 	key := prefix + "bucket"
-	now := time.Now().UTC().UnixMilli()
+	now := time.Now().UnixMilli()
 
 	for i := 0; i < 3; i++ {
 		allowed, remaining, retryAfter, err := repository.Allow(ctx, key, 0.1, 3, 1, now, 60000)
@@ -64,7 +64,7 @@ func TestRateLimitRepositoryIntegrationConcurrentRequestsNeverExceedCapacity(t *
 	repository := NewRateLimitRepository(client)
 	ctx := context.Background()
 	key := prefix + "concurrent"
-	now := time.Now().UTC().UnixMilli()
+	now := time.Now().UnixMilli()
 	var allowedCount atomic.Int64
 	var wg sync.WaitGroup
 	start := make(chan struct{})
@@ -100,7 +100,7 @@ func TestRateLimitRepositoryIntegrationRejectsInvalidArgumentsBeforeRedis(t *tes
 	client, prefix := openRedisIntegrationClient(t)
 	repository := NewRateLimitRepository(client)
 	ctx := context.Background()
-	now := time.Now().UTC().UnixMilli()
+	now := time.Now().UnixMilli()
 
 	tests := []struct {
 		name     string

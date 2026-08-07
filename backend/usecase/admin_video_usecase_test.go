@@ -323,7 +323,7 @@ func TestAdminVideoUsecaseGetIssuesReadURLsForPublishedAndHidden(t *testing.T) {
 					calledKeys = append(calledKeys, objectKey)
 					return repository.ReadTarget{
 						URL:       "https://storage.example/" + objectKey,
-						ExpiresAt: time.Now().UTC().Add(ttl),
+						ExpiresAt: time.Now().Add(ttl),
 					}, nil
 				},
 			}
@@ -439,7 +439,7 @@ func TestAdminVideoUsecaseGetRejectsMissingOutputMeta(t *testing.T) {
 }
 
 func TestAdminVideoUsecaseHideNormalizesAuditInput(t *testing.T) {
-	before := time.Now().UTC()
+	before := time.Now()
 	updatedAt := before.Add(time.Minute)
 
 	videos := &adminVideoRepositoryMock{
@@ -457,7 +457,7 @@ func TestAdminVideoUsecaseHideNormalizesAuditInput(t *testing.T) {
 			if reason != "規約違反" || requestID != "request-hide" {
 				t.Fatalf("reason=%q requestID=%q", reason, requestID)
 			}
-			assertTimeNear(t, now, before, time.Now().UTC())
+			assertTimeNear(t, now, before, time.Now())
 			return &repository.AdminVideoState{
 				VideoID:          10,
 				ProcessingStatus: entity.VideoProcessingReady,
@@ -562,7 +562,7 @@ func TestAdminVideoUsecaseGetPropagatesStorageFailureWithoutObjectKey(t *testing
 }
 
 func TestAdminVideoUsecaseRestoreNormalizesAuditInput(t *testing.T) {
-	before := time.Now().UTC()
+	before := time.Now()
 	updatedAt := before.Add(time.Minute)
 
 	videos := &adminVideoRepositoryMock{
@@ -580,7 +580,7 @@ func TestAdminVideoUsecaseRestoreNormalizesAuditInput(t *testing.T) {
 			if reason != "再確認済み" || requestID != "request-restore" {
 				t.Fatalf("reason=%q requestID=%q", reason, requestID)
 			}
-			assertTimeNear(t, now, before, time.Now().UTC())
+			assertTimeNear(t, now, before, time.Now())
 			return &repository.AdminVideoState{
 				VideoID:          10,
 				ProcessingStatus: entity.VideoProcessingReady,

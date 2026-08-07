@@ -21,7 +21,7 @@ func TestNewVideoLike(t *testing.T) {
 }
 
 func TestNewVideoLikeRejectsInvalidInput(t *testing.T) {
-	now := time.Now().UTC()
+	now := time.Now()
 	for _, tt := range []struct {
 		name    string
 		userID  uint64

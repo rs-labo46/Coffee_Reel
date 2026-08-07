@@ -76,7 +76,7 @@ func NewVideoProcessingUsecase(
 }
 
 func (u *videoProcessingUsecase) ProcessNext(ctx context.Context) (bool, error) {
-	claim, err := u.jobs.ClaimNext(ctx, time.Now().UTC())
+	claim, err := u.jobs.ClaimNext(ctx, time.Now())
 	if err != nil {
 		return false, err
 	}
@@ -114,9 +114,9 @@ func (u *videoProcessingUsecase) ProcessNext(ctx context.Context) (bool, error) 
 		if err != nil {
 			return true, u.recordFailure(ctx, claim, classifyProcessingError(err), "", "")
 		}
-		if err := u.videos.RecordSourceValidation(ctx, claim.Video.ID, probed, time.Now().UTC()); err != nil {
+		if err := u.videos.RecordSourceValidation(ctx, claim.Video.ID, probed, time.Now()); err != nil {
 			if errors.Is(err, entity.ErrVideoNotFound) {
-				return true, u.jobs.Cancel(ctx, claim.Job.ID, time.Now().UTC())
+				return true, u.jobs.Cancel(ctx, claim.Job.ID, time.Now())
 			}
 			return true, u.recordFailure(ctx, claim, classifyProcessingError(err), "", "")
 		}
@@ -156,9 +156,9 @@ func (u *videoProcessingUsecase) ProcessNext(ctx context.Context) (bool, error) 
 	if err := u.videos.CompleteProcessing(ctx, repository.ProcessingCompletionInput{
 		JobID:      claim.Job.ID,
 		OutputMeta: outputMeta,
-		Now:        time.Now().UTC(),
+		Now:        time.Now(),
 	}); err != nil {
-		cleanupErr := u.createRollbackCleanup(ctx, claim.Video.ID, videoObjectKey, thumbnailObjectKey, time.Now().UTC())
+		cleanupErr := u.createRollbackCleanup(ctx, claim.Video.ID, videoObjectKey, thumbnailObjectKey, time.Now())
 		if cleanupErr != nil {
 			return true, errors.Join(err, cleanupErr)
 		}
@@ -200,7 +200,7 @@ func (u *videoProcessingUsecase) recordFailure(ctx context.Context, claim *repos
 		return entity.ErrProcessingJobConflict
 	}
 
-	now := time.Now().UTC()
+	now := time.Now()
 	message := normalizeProcessingFailureMessage(failure.Message)
 
 	if failure.Retryable && claim.Job.AttemptCount < claim.Job.MaxAttempts {

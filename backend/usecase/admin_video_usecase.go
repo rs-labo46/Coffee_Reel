@@ -156,8 +156,8 @@ func (u *adminVideoUsecase) List(ctx context.Context, actor *entity.User, input 
 			Category:         item.Category,
 			ProcessingStatus: item.ProcessingStatus,
 			PublishStatus:    item.PublishStatus,
-			CreatedAt:        item.CreatedAt.UTC(),
-			UpdatedAt:        item.UpdatedAt.UTC(),
+			CreatedAt:        item.CreatedAt,
+			UpdatedAt:        item.UpdatedAt,
 		})
 	}
 
@@ -293,7 +293,7 @@ func (u *adminVideoUsecase) Hide(ctx context.Context, actor *entity.User, videoI
 		videoID,
 		reason,
 		requestID,
-		time.Now().UTC(),
+		time.Now(),
 	)
 	if err != nil {
 		return AdminVideoStateResult{}, err
@@ -327,7 +327,7 @@ func (u *adminVideoUsecase) Restore(ctx context.Context, actor *entity.User, vid
 		videoID,
 		reason,
 		requestID,
-		time.Now().UTC(),
+		time.Now(),
 	)
 	if err != nil {
 		return AdminVideoStateResult{}, err

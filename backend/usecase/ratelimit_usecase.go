@@ -164,7 +164,7 @@ func (u *rateLimitUsecase) allow(ctx context.Context, key string, rate, capacity
 		rate,
 		capacity,
 		rateLimitCost,
-		time.Now().UTC().UnixMilli(),
+		time.Now().UnixMilli(),
 		ttl.Milliseconds(),
 	)
 	if err != nil {

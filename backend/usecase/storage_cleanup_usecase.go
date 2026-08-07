@@ -69,7 +69,7 @@ func NewStorageCleanupUsecase(
 }
 
 func (u *storageCleanupUsecase) ProcessNext(ctx context.Context) (bool, error) {
-	job, err := u.jobs.ClaimNext(ctx, time.Now().UTC())
+	job, err := u.jobs.ClaimNext(ctx, time.Now())
 	if err != nil {
 		return false, err
 	}
@@ -86,7 +86,7 @@ func (u *storageCleanupUsecase) ProcessNext(ctx context.Context) (bool, error) {
 	if err := u.storage.Delete(deleteCtx, job.ObjectKey); err != nil && !errors.Is(err, entity.ErrObjectNotFound) {
 		return true, u.recordDeleteFailure(ctx, job, err)
 	}
-	if err := u.jobs.MarkSucceeded(ctx, job.ID, time.Now().UTC()); err != nil {
+	if err := u.jobs.MarkSucceeded(ctx, job.ID, time.Now()); err != nil {
 		return true, err
 	}
 
@@ -166,7 +166,7 @@ func (u *storageCleanupUsecase) recordDeleteFailure(ctx context.Context, job *en
 		return entity.ErrCleanupJobConflict
 	}
 
-	now := time.Now().UTC()
+	now := time.Now()
 	code, message, retryable := classifyCleanupError(err)
 
 	if retryable && job.AttemptCount < job.MaxAttempts {

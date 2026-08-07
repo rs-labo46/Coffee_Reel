@@ -21,7 +21,7 @@ func validStorageCleanupConfig() StorageCleanupUsecaseConfig {
 }
 
 func runningCleanupJob(attempt int) *entity.StorageCleanupJob {
-	now := time.Now().UTC()
+	now := time.Now()
 	started := now.Add(-time.Second)
 	return &entity.StorageCleanupJob{
 		ID: 41, ObjectKey: "videos/22/output/file.mp4", AssetType: entity.StorageAssetProcessed,
@@ -285,7 +285,7 @@ func TestStorageCleanupUsecaseDetectOrphanObjectsRegistersOnlyOldUnreferencedObj
 }
 
 func TestStorageCleanupUsecaseDetectOrphanObjectsRejectsBrokenPagination(t *testing.T) {
-	now := time.Now().UTC()
+	now := time.Now()
 	tests := []struct {
 		name string
 		list func(context.Context, *string, int32) (repository.ManagedObjectPage, error)
@@ -319,7 +319,7 @@ func TestStorageCleanupUsecaseDetectOrphanObjectsRejectsBrokenPagination(t *test
 }
 
 func TestStorageCleanupUsecaseDetectOrphanObjectsReturnsPartialCountOnLaterError(t *testing.T) {
-	now := time.Now().UTC()
+	now := time.Now()
 	old := now.Add(-2 * time.Hour)
 	next := "next"
 	calls := 0

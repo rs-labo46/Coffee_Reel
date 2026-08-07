@@ -241,7 +241,7 @@ func (u *videoUsecase) StartUpload(ctx context.Context, actor *entity.User, inpu
 		return StartUploadResult{}, err
 	}
 
-	now := time.Now().UTC()
+	now := time.Now()
 	objectKey, err := buildSourceObjectKey(u.managedPrefix, sourceExtension(input.ContentType))
 	if err != nil {
 		return StartUploadResult{}, err
@@ -281,7 +281,7 @@ func (u *videoUsecase) StartUpload(ctx context.Context, actor *entity.User, inpu
 		return StartUploadResult{}, entity.ErrVideoStateConflict
 	}
 
-	issuedAt := time.Now().UTC()
+	issuedAt := time.Now()
 	remaining := current.UploadExpiresAt.UTC().Sub(issuedAt)
 	if remaining <= 0 {
 		return StartUploadResult{}, entity.ErrUploadExpired
@@ -335,7 +335,7 @@ func (u *videoUsecase) CompleteUpload(ctx context.Context, actor *entity.User, v
 		return VideoStateResult{}, entity.ErrVideoStateConflict
 	}
 
-	now := time.Now().UTC()
+	now := time.Now()
 	if !now.Before(video.UploadExpiresAt.UTC()) {
 		return VideoStateResult{}, entity.ErrUploadExpired
 	}
@@ -351,7 +351,7 @@ func (u *videoUsecase) CompleteUpload(ctx context.Context, actor *entity.User, v
 		return VideoStateResult{}, entity.ErrVideoSourceInvalid
 	}
 
-	completed, err := u.videos.CompleteUpload(ctx, actor.ID, video.ID, time.Now().UTC())
+	completed, err := u.videos.CompleteUpload(ctx, actor.ID, video.ID, time.Now())
 	if err != nil {
 		return VideoStateResult{}, err
 	}
@@ -472,8 +472,8 @@ func (u *videoUsecase) ListMine(ctx context.Context, actor *entity.User, input V
 			ProcessingStatus: item.ProcessingStatus,
 			PublishStatus:    item.PublishStatus,
 			UploadExpiresAt:  item.UploadExpiresAt.UTC(),
-			CreatedAt:        item.CreatedAt.UTC(),
-			UpdatedAt:        item.UpdatedAt.UTC(),
+			CreatedAt:        item.CreatedAt,
+			UpdatedAt:        item.UpdatedAt,
 		}
 
 		if item.ProcessingStatus == entity.VideoProcessingReady &&
@@ -601,7 +601,7 @@ func (u *videoUsecase) SetPrivate(ctx context.Context, actor *entity.User, video
 		return VideoStateResult{}, entity.ErrInvalidInput
 	}
 
-	video, err := u.videos.SetPrivateByOwner(ctx, actor.ID, videoID, time.Now().UTC())
+	video, err := u.videos.SetPrivateByOwner(ctx, actor.ID, videoID, time.Now())
 	if err != nil {
 		return VideoStateResult{}, err
 	}
@@ -616,7 +616,7 @@ func (u *videoUsecase) Republish(ctx context.Context, actor *entity.User, videoI
 		return VideoStateResult{}, entity.ErrInvalidInput
 	}
 
-	video, err := u.videos.RepublishByOwner(ctx, actor.ID, videoID, time.Now().UTC())
+	video, err := u.videos.RepublishByOwner(ctx, actor.ID, videoID, time.Now())
 	if err != nil {
 		return VideoStateResult{}, err
 	}
@@ -630,7 +630,7 @@ func (u *videoUsecase) Delete(ctx context.Context, actor *entity.User, videoID u
 	if videoID == 0 {
 		return entity.ErrInvalidInput
 	}
-	return u.videos.DeleteByOwner(ctx, actor.ID, videoID, time.Now().UTC())
+	return u.videos.DeleteByOwner(ctx, actor.ID, videoID, time.Now())
 }
 
 func validateStartUploadInput(input StartUploadInput, idempotencyKey string) error {
@@ -828,7 +828,7 @@ func buildPublicVideoResult(ctx context.Context, storage repository.IObjectStora
 		Category:    item.Category,
 		Title:       item.Title,
 		Description: item.Description,
-		CreatedAt:   item.CreatedAt.UTC(),
+		CreatedAt:   item.CreatedAt,
 		Video:       readInfoFromRepository(videoTarget),
 		Thumbnail:   readInfoFromRepository(thumbnailTarget),
 		LikeCount:   item.LikeCount,

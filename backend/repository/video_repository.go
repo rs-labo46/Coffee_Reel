@@ -291,7 +291,7 @@ func (r *videoRepository) FindPublicByID(ctx context.Context, videoID uint64, vi
 		return nil, fmt.Errorf("find public video: %w", err)
 	}
 
-	item.CreatedAt = item.CreatedAt.UTC()
+	item.CreatedAt = item.CreatedAt
 	return &item, nil
 }
 

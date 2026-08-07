@@ -44,13 +44,13 @@ func TestBearerToken(t *testing.T) {
 func TestAuthMiddlewareSuccessUsesCurrentDatabaseUserAndTokenVersion(t *testing.T) {
 	dbUser := &entity.User{ID: 10, Name: "current", Role: entity.RoleUser, Status: entity.StatusActive, TokenVersion: 4}
 	claims := usecase.AccessTokenClaims{UserID: 10, Role: entity.RoleAdmin, TokenVersion: 4}
-	before := time.Now().UTC()
+	before := time.Now()
 
 	tokens := &tokenServiceMock{parseAccessTokenFunc: func(token string, now time.Time) (usecase.AccessTokenClaims, error) {
 		if token != "access-token" {
 			t.Fatalf("ParseAccessToken token = %q", token)
 		}
-		if now.Before(before) || now.After(time.Now().UTC().Add(time.Second)) {
+		if now.Before(before) || now.After(time.Now().Add(time.Second)) {
 			t.Fatalf("ParseAccessToken now = %s", now)
 		}
 		return claims, nil

@@ -160,7 +160,7 @@ func TestAdminUserUsecaseRejectsNonAdminActor(t *testing.T) {
 }
 
 func TestAdminUserUsecaseSuspendUser(t *testing.T) {
-	before := time.Now().UTC()
+	before := time.Now()
 	repositoryMock := &adminUserRepositoryMock{suspendUserFunc: func(_ context.Context, adminID, targetID uint64, reason, requestID string, now time.Time) (*entity.User, error) {
 		if adminID != 9 || targetID != 3 || reason != "reason" || requestID != "request-1" {
 			t.Fatalf("inputs = %d %d %q %q", adminID, targetID, reason, requestID)
@@ -574,7 +574,7 @@ func TestAdminUserUsecaseGetUserDetail(t *testing.T) {
 }
 
 func TestAdminUserUsecaseResumeUser(t *testing.T) {
-	before := time.Now().UTC()
+	before := time.Now()
 
 	repositoryMock := &adminUserRepositoryMock{
 		resumeUserFunc: func(

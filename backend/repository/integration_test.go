@@ -61,7 +61,7 @@ func openPostgresIntegrationDB(t *testing.T) *gorm.DB {
 	testSQL.SetMaxIdleConns(20)
 
 	db, err := gorm.Open(postgres.New(postgres.Config{Conn: testSQL}), &gorm.Config{
-		NowFunc: func() time.Time { return time.Now().UTC() },
+		NowFunc: func() time.Time { return time.Now() },
 	})
 	if err != nil {
 		_ = testSQL.Close()

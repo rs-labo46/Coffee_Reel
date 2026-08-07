@@ -149,7 +149,7 @@ func (s *tokenService) ParseAccessToken(tokenString string, now time.Time) (Acce
 
 	now = now.UTC()
 
-	if claims.IssuedAt == nil || claims.ExpiresAt == nil || claims.IssuedAt.Time.After(now) || !now.Before(claims.ExpiresAt.Time) || !claims.IssuedAt.Time.Before(claims.ExpiresAt.Time) {
+	if claims.IssuedAt == nil || claims.ExpiresAt == nil || claims.IssuedAt.Time.After(now) || now.Compare(claims.ExpiresAt.Time) >= 0 || claims.IssuedAt.Time.Compare(claims.ExpiresAt.Time) >= 0 {
 		return AccessTokenClaims{}, entity.ErrUnauthorized
 	}
 

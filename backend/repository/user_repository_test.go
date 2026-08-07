@@ -14,7 +14,7 @@ import (
 )
 
 func newIntegrationUser(email string) *entity.User {
-	now := time.Now().UTC().Truncate(time.Microsecond)
+	now := time.Now().Truncate(time.Microsecond)
 	return &entity.User{
 		Name:         "Integration User",
 		Email:        email,
@@ -55,7 +55,7 @@ func TestUserRepositoryIntegrationCreateFindAndUpdate(t *testing.T) {
 	originalName := byID.Name
 	originalEmail := byID.Email
 	originalHash := byID.PasswordHash
-	updatedAt := time.Now().UTC().Add(time.Minute).Truncate(time.Microsecond)
+	updatedAt := time.Now().Add(time.Minute).Truncate(time.Microsecond)
 	byID.Name = "must not be updated"
 	byID.Email = "must-not-change@example.com"
 	byID.PasswordHash = "must-not-change"

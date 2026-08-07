@@ -58,7 +58,7 @@ func (u *userUsecase) SignUp(ctx context.Context, name, email, password string) 
 		return nil, err
 	}
 
-	now := time.Now().UTC()
+	now := time.Now()
 
 	user := &entity.User{Name: name, Email: email, PasswordHash: passwordHash, Role: entity.RoleUser, Status: entity.StatusActive, TokenVersion: 0, CreatedAt: now, UpdatedAt: now}
 
@@ -91,7 +91,7 @@ func (u *userUsecase) Login(ctx context.Context, email, password string) (LoginR
 	if err != nil {
 		return LoginResult{}, err
 	}
-	authTokens, refreshToken, err := u.issueTokens(user, familyID, time.Now().UTC())
+	authTokens, refreshToken, err := u.issueTokens(user, familyID, time.Now())
 
 	if err != nil {
 		return LoginResult{}, err
@@ -119,7 +119,7 @@ func (u *userUsecase) Refresh(ctx context.Context, plainRefreshToken string) (Au
 		return AuthTokens{}, err
 	}
 
-	now := time.Now().UTC()
+	now := time.Now()
 
 	switch {
 	case currentToken.IsExpired(now):
@@ -172,7 +172,7 @@ func (u *userUsecase) Logout(ctx context.Context, plainRefreshToken string) erro
 		return err
 	}
 
-	return u.refreshTokens.RevokeFamily(ctx, storedToken.FamilyID, time.Now().UTC())
+	return u.refreshTokens.RevokeFamily(ctx, storedToken.FamilyID, time.Now())
 }
 
 // 認証済みUserをDBから取得し、現在もactiveであることを確認する。

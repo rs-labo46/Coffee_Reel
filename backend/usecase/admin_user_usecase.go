@@ -93,7 +93,7 @@ func (u *adminUserUsecase) CreateAdmin(ctx context.Context, name, email, passwor
 		return nil, false, err
 	}
 
-	now := time.Now().UTC()
+	now := time.Now()
 	admin := &entity.User{
 		Name:         name,
 		Email:        email,
@@ -206,7 +206,7 @@ func (u *adminUserUsecase) SuspendUser(ctx context.Context, actor *entity.User, 
 		return AdminUserStatusResult{}, err
 	}
 
-	user, err := u.adminUsers.SuspendUser(ctx, actor.ID, targetUserID, reason, requestID, time.Now().UTC())
+	user, err := u.adminUsers.SuspendUser(ctx, actor.ID, targetUserID, reason, requestID, time.Now())
 	if err != nil {
 		return AdminUserStatusResult{}, err
 	}
@@ -219,7 +219,7 @@ func (u *adminUserUsecase) ResumeUser(ctx context.Context, actor *entity.User, t
 		return AdminUserStatusResult{}, err
 	}
 
-	user, err := u.adminUsers.ResumeUser(ctx, actor.ID, targetUserID, reason, requestID, time.Now().UTC())
+	user, err := u.adminUsers.ResumeUser(ctx, actor.ID, targetUserID, reason, requestID, time.Now())
 	if err != nil {
 		return AdminUserStatusResult{}, err
 	}

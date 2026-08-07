@@ -84,7 +84,7 @@ func (w *Worker) Run(ctx context.Context) {
 	go func() {
 		defer group.Done()
 		w.runPeriodic(ctx, "upload_expiry", w.config.UploadExpiryInterval, func(ctx context.Context) error {
-			_, err := w.processing.ExpireUploads(ctx, time.Now().UTC(), w.config.UploadExpiryLimit)
+			_, err := w.processing.ExpireUploads(ctx, time.Now(), w.config.UploadExpiryLimit)
 			return err
 		})
 	}()
@@ -93,7 +93,7 @@ func (w *Worker) Run(ctx context.Context) {
 	go func() {
 		defer group.Done()
 		w.runPeriodic(ctx, "processing_recovery", w.config.ProcessingRecoveryInterval, func(ctx context.Context) error {
-			_, err := w.processing.RecoverTimedOutJobs(ctx, time.Now().UTC(), w.config.ProcessingRecoveryLimit)
+			_, err := w.processing.RecoverTimedOutJobs(ctx, time.Now(), w.config.ProcessingRecoveryLimit)
 			return err
 		})
 	}()
@@ -102,7 +102,7 @@ func (w *Worker) Run(ctx context.Context) {
 	go func() {
 		defer group.Done()
 		w.runPeriodic(ctx, "cleanup_recovery", w.config.CleanupRecoveryInterval, func(ctx context.Context) error {
-			_, err := w.cleanup.RecoverTimedOutJobs(ctx, time.Now().UTC(), w.config.CleanupRecoveryLimit)
+			_, err := w.cleanup.RecoverTimedOutJobs(ctx, time.Now(), w.config.CleanupRecoveryLimit)
 			return err
 		})
 	}()
@@ -111,7 +111,7 @@ func (w *Worker) Run(ctx context.Context) {
 	go func() {
 		defer group.Done()
 		w.runPeriodic(ctx, "orphan_detection", w.config.OrphanDetectionInterval, func(ctx context.Context) error {
-			_, err := w.cleanup.DetectOrphanObjects(ctx, time.Now().UTC())
+			_, err := w.cleanup.DetectOrphanObjects(ctx, time.Now())
 			return err
 		})
 	}()
@@ -120,7 +120,7 @@ func (w *Worker) Run(ctx context.Context) {
 	go func() {
 		defer group.Done()
 		w.runPeriodic(ctx, "idempotency_cleanup", w.config.IdempotencyCleanupInterval, func(ctx context.Context) error {
-			_, err := w.processing.DeleteExpiredIdempotencyRecords(ctx, time.Now().UTC(), w.config.IdempotencyCleanupLimit)
+			_, err := w.processing.DeleteExpiredIdempotencyRecords(ctx, time.Now(), w.config.IdempotencyCleanupLimit)
 			return err
 		})
 	}()

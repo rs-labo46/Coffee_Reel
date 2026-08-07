@@ -28,7 +28,7 @@ func newIntegrationRefreshToken(userID uint64, hash, family string, expiresAt ti
 		TokenHash: hash,
 		FamilyID:  family,
 		ExpiresAt: expiresAt.UTC().Truncate(time.Microsecond),
-		CreatedAt: time.Now().UTC().Truncate(time.Microsecond),
+		CreatedAt: time.Now().Truncate(time.Microsecond),
 	}
 }
 
@@ -85,7 +85,7 @@ func TestRefreshTokenRepositoryIntegrationRotateSuccess(t *testing.T) {
 	if err := repository.Create(context.Background(), current); err != nil {
 		t.Fatalf("Create(current) error = %v", err)
 	}
-	now := time.Now().UTC().Truncate(time.Microsecond)
+	now := time.Now().Truncate(time.Microsecond)
 	next := newIntegrationRefreshToken(999, "next-hash", "wrong-family", now.Add(time.Hour))
 
 	if err := repository.Rotate(context.Background(), current.TokenHash, next, now); err != nil {
@@ -126,7 +126,7 @@ func TestRefreshTokenRepositoryIntegrationRotateRejectsExpiredAndRevokedWithoutC
 			users := NewUserRepository(db)
 			repository := NewRefreshTokenRepository(db)
 			user := createIntegrationUser(t, users, tt.name+"@example.com")
-			now := time.Now().UTC().Truncate(time.Microsecond)
+			now := time.Now().Truncate(time.Microsecond)
 			current := newIntegrationRefreshToken(user.ID, "current-"+tt.name, "family", now.Add(time.Hour))
 			tt.configure(current, now)
 			if err := repository.Create(context.Background(), current); err != nil {
@@ -154,7 +154,7 @@ func TestRefreshTokenRepositoryIntegrationRotateRollbackKeepsOldTokenUnused(t *t
 	}
 	next := newIntegrationRefreshToken(user.ID, "same-hash", "family", time.Now().Add(time.Hour))
 
-	if err := repository.Rotate(context.Background(), current.TokenHash, next, time.Now().UTC()); err == nil {
+	if err := repository.Rotate(context.Background(), current.TokenHash, next, time.Now()); err == nil {
 		t.Fatal("Rotate() succeeded despite duplicate next token hash")
 	}
 	stored, err := repository.FindByTokenHash(context.Background(), current.TokenHash)
@@ -171,7 +171,7 @@ func TestRefreshTokenRepositoryIntegrationReuseRevokesFamilyAndInvalidatesAccess
 	users := NewUserRepository(db)
 	repository := NewRefreshTokenRepository(db)
 	user := createIntegrationUser(t, users, "reuse@example.com")
-	now := time.Now().UTC().Truncate(time.Microsecond)
+	now := time.Now().Truncate(time.Microsecond)
 	current := newIntegrationRefreshToken(user.ID, "current-reuse", "family-reuse", now.Add(time.Hour))
 	if err := repository.Create(context.Background(), current); err != nil {
 		t.Fatalf("Create(current) error = %v", err)
@@ -225,7 +225,7 @@ func TestRefreshTokenRepositoryIntegrationConcurrentRotateHasOneSuccessAndOneReu
 			defer wg.Done()
 			<-start
 			next := newIntegrationRefreshToken(user.ID, fmt.Sprintf("next-concurrent-%d", index), "family-concurrent", time.Now().Add(time.Hour))
-			results <- repository.Rotate(context.Background(), current.TokenHash, next, time.Now().UTC())
+			results <- repository.Rotate(context.Background(), current.TokenHash, next, time.Now())
 		}(i)
 	}
 	close(start)
@@ -262,7 +262,7 @@ func TestRefreshTokenRepositoryIntegrationRevocationAndExpirationCleanup(t *test
 	repository := NewRefreshTokenRepository(db)
 	userA := createIntegrationUser(t, users, "family-a@example.com")
 	userB := createIntegrationUser(t, users, "family-b@example.com")
-	now := time.Now().UTC().Truncate(time.Microsecond)
+	now := time.Now().Truncate(time.Microsecond)
 
 	tokens := []*entity.RefreshToken{
 		newIntegrationRefreshToken(userA.ID, "a-1", "family-a", now.Add(time.Hour)),
@@ -315,7 +315,7 @@ func TestRefreshTokenRepositoryIntegrationRollbackRestoresFamilyWhenUserUpdateFa
 	users := NewUserRepository(db)
 	repository := NewRefreshTokenRepository(db)
 	user := createIntegrationUser(t, users, "forced-rollback@example.com")
-	now := time.Now().UTC().Truncate(time.Microsecond)
+	now := time.Now().Truncate(time.Microsecond)
 	current := newIntegrationRefreshToken(user.ID, "rollback-family-1", "rollback-family", now.Add(time.Hour))
 	sibling := newIntegrationRefreshToken(user.ID, "rollback-family-2", "rollback-family", now.Add(time.Hour))
 	for _, token := range []*entity.RefreshToken{current, sibling} {

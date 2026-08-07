@@ -35,7 +35,7 @@ func (u *videoLikeUsecase) Like(ctx context.Context, actor *entity.User, videoID
 		return VideoLikeResult{}, entity.ErrInvalidInput
 	}
 
-	state, err := u.likes.Like(ctx, actor.ID, videoID, time.Now().UTC())
+	state, err := u.likes.Like(ctx, actor.ID, videoID, time.Now())
 	if err != nil {
 		return VideoLikeResult{}, err
 	}
