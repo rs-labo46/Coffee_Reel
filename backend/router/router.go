@@ -18,6 +18,7 @@ type AdminComponents struct {
 type VideoComponents struct {
 	Controller      controller.IVideoController
 	SavedController controller.ISavedVideoController
+	LikeController  controller.IVideoLikeController
 }
 
 func NewRouter(
@@ -114,6 +115,11 @@ func registerVideoRoutes(
 	e.POST("/videos/:video_id/upload-complete", components.Controller.CompleteUpload, auth.Authenticate, rateLimits.VideoComplete)
 	e.GET("/videos", components.Controller.ListReels, auth.OptionalAuthenticate)
 	e.GET("/videos/:video_id", components.Controller.Detail, auth.OptionalAuthenticate)
+
+	if components.LikeController != nil {
+		e.PUT("/videos/:video_id/like", components.LikeController.Like, auth.Authenticate)
+		e.DELETE("/videos/:video_id/like", components.LikeController.Unlike, auth.Authenticate)
+	}
 
 	e.GET("/me/videos", components.Controller.ListMine, auth.Authenticate)
 	e.GET("/me/videos/:video_id", components.Controller.MineDetail, auth.Authenticate)

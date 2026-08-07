@@ -91,9 +91,10 @@ type publicVideoResponse struct {
 }
 
 type publicVideoListResponse struct {
-	Items      []publicVideoResponse `json:"items"`
-	NextCursor *string               `json:"next_cursor"`
-	HasMore    bool                  `json:"has_more"`
+	Items      []publicVideoResponse          `json:"items"`
+	ResultType usecase.PublicSearchResultType `json:"result_type,omitempty"`
+	NextCursor *string                        `json:"next_cursor"`
+	HasMore    bool                           `json:"has_more"`
 }
 
 type ownedVideoResponse struct {
@@ -111,6 +112,12 @@ type ownedVideoListResponse struct {
 	Items      []ownedVideoResponse `json:"items"`
 	NextCursor *string              `json:"next_cursor"`
 	HasMore    bool                 `json:"has_more"`
+}
+type publicVideoListRequest struct {
+	Title    string `query:"title"`
+	Category string `query:"category"`
+	Limit    string `query:"limit"`
+	Cursor   string `query:"cursor"`
 }
 
 type ownedVideoDetailResponse struct {
@@ -229,25 +236,21 @@ func (v *videoController) ListReels(c echo.Context) error {
 		return writeVideoError(c, err)
 	}
 
+	var req publicVideoListRequest
+	if err := c.Bind(&req); err != nil {
+		return writeVideoError(c, entity.ErrInvalidInput)
+	}
 	query := c.QueryParams()
-
-	var rawTitle *string
-	if query.Has("title") {
-		value := query.Get("title")
-		rawTitle = &value
-	}
-
-	var rawCategory *string
-	if query.Has("category") {
-		value := query.Get("category")
-		rawCategory = &value
-	}
+	_, titleSpecified := query["title"]
+	_, categorySpecified := query["category"]
 
 	input, err := v.validator.ValidatePublicListQuery(
-		rawTitle,
-		rawCategory,
-		query.Get("limit"),
-		query.Get("cursor"),
+		req.Title,
+		titleSpecified,
+		req.Category,
+		categorySpecified,
+		req.Limit,
+		req.Cursor,
 	)
 	if err != nil {
 		return writeVideoError(c, err)

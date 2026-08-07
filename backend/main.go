@@ -67,6 +67,7 @@ func main() {
 	adminUserRepository := repository.NewAdminUserRepository(postgresDB)
 	adminVideoRepository := repository.NewAdminVideoRepository(postgresDB)
 	videoRepository := repository.NewVideoRepository(postgresDB)
+	videoLikeRepository := repository.NewVideoLikeRepository(postgresDB)
 	savedVideoRepository := repository.NewSavedVideoRepository(postgresDB)
 
 	tokenService, err := usecase.NewTokenService(requiredSecretEnv("JWT_SECRET"), requiredSecretEnv("REFRESH_TOKEN_HMAC_KEY"))
@@ -102,6 +103,8 @@ func main() {
 		log.Fatal(err)
 	}
 
+	videoLikeUsecase := usecase.NewVideoLikeUsecase(videoLikeRepository)
+
 	savedVideoUsecase, err := usecase.NewSavedVideoUsecase(savedVideoRepository, storageRepository, usecase.SavedVideoUsecaseConfig{
 		ReadURLTTL: requiredDurationEnv("STORAGE_READ_URL_TTL"),
 	})
@@ -131,6 +134,7 @@ func main() {
 	adminUserController := controller.NewAdminUserController(adminUserUsecase, adminUserValidator)
 	adminVideoController := controller.NewAdminVideoController(adminVideoUsecase, adminVideoValidator)
 	videoController := controller.NewVideoController(videoUsecase, videoValidator)
+	videoLikeController := controller.NewVideoLikeController(videoLikeUsecase, videoValidator)
 	savedVideoController := controller.NewSavedVideoController(savedVideoUsecase, videoValidator)
 
 	authMiddleware := middleware.NewAuthMiddleware(userUsecase, tokenService)
@@ -153,6 +157,7 @@ func main() {
 		router.VideoComponents{
 			Controller:      videoController,
 			SavedController: savedVideoController,
+			LikeController:  videoLikeController,
 		},
 	)
 
