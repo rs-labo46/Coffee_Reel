@@ -98,7 +98,6 @@ func (u *storageCleanupUsecase) RecoverTimedOutJobs(ctx context.Context, now tim
 		return 0, entity.ErrInvalidInput
 	}
 
-	now = now
 	return u.jobs.RecoverTimedOut(ctx, repository.StorageCleanupRecoveryInput{
 		TimeoutBefore: now.Add(-u.timeout),
 		Now:           now,
@@ -112,7 +111,6 @@ func (u *storageCleanupUsecase) DetectOrphanObjects(ctx context.Context, now tim
 		return 0, entity.ErrInvalidInput
 	}
 
-	now = now
 	cutoff := now.Add(-u.orphanMinAge)
 	registered := 0
 	var cursor *string

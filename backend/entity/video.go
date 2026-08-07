@@ -85,8 +85,6 @@ func NewVideo(userID uint64, category CategoryCode, title, description, original
 	title = strings.TrimSpace(title)
 	description = strings.TrimSpace(description)
 	originalObjectKey = strings.TrimSpace(originalObjectKey)
-	now = now
-	uploadExpiresAt = uploadExpiresAt
 
 	if userID == 0 || !category.IsValid() || now.IsZero() || !uploadExpiresAt.After(now) {
 		return nil, ErrInvalidInput
@@ -128,7 +126,7 @@ func (v *Video) CompleteUpload(now time.Time) error {
 	if now.IsZero() {
 		return ErrInvalidInput
 	}
-	now = now
+
 	if v == nil || v.IsDeleted() {
 		return ErrVideoStateConflict
 	}
@@ -147,7 +145,7 @@ func (v *Video) ExpireUpload(now time.Time) error {
 	if now.IsZero() {
 		return ErrInvalidInput
 	}
-	now = now
+
 	if v == nil || v.IsDeleted() || v.ProcessingStatus != VideoProcessingUploading || v.PublishStatus != VideoPublishPrivate {
 		return ErrVideoStateConflict
 	}
@@ -181,7 +179,7 @@ func (v *Video) RecordSourceValidation(meta SourceVideoMeta, now time.Time) erro
 	if err := meta.Validate(); err != nil {
 		return err
 	}
-	now = now
+
 	meta.VideoID = v.ID
 	meta.CreatedAt = now
 	v.SourceMeta = &meta
@@ -199,7 +197,7 @@ func (v *Video) CompleteProcessing(meta OutputVideoMeta, ownerActive bool, now t
 	if err := meta.Validate(); err != nil {
 		return err
 	}
-	now = now
+
 	meta.VideoID = v.ID
 	meta.CreatedAt = now
 	v.OutputMeta = &meta

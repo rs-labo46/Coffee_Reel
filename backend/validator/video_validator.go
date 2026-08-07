@@ -38,6 +38,16 @@ type IVideoValidator interface {
 
 	ValidateIdempotencyKey(idempotencyKey string) (string, error)
 	ValidateVideoID(rawVideoID string) (uint64, error)
+
+	ValidatePublicListQuery(
+		rawTitle string,
+		titleSpecified bool,
+		rawCategory string,
+		categorySpecified bool,
+		rawLimit string,
+		rawCursor string,
+	) (usecase.PublicVideoListInput, error)
+
 	ValidateListQuery(
 		rawLimit,
 		rawCursor string,
@@ -136,19 +146,116 @@ func (v *videoValidator) ValidateVideoID(rawVideoID string) (uint64, error) {
 	return videoID, nil
 }
 
-func (v *videoValidator) ValidateListQuery(rawLimit, rawCursor string) (usecase.VideoListInput, error) {
-	limit := defaultVideoListLimit
+func (v *videoValidator) ValidatePublicListQuery(
+	rawTitle string,
+	titleSpecified bool,
+	rawCategory string,
+	categorySpecified bool,
+	rawLimit string,
+	rawCursor string,
+) (usecase.PublicVideoListInput, error) {
+	input := usecase.PublicVideoListInput{}
 
-	if rawLimit != "" {
-		parsedLimit, err := strconv.Atoi(rawLimit)
-		if err != nil ||
-			parsedLimit < 1 ||
-			parsedLimit > maxVideoListLimit {
-			return usecase.VideoListInput{},
-				entity.ErrInvalidInput
+	if titleSpecified {
+		if !utf8.ValidString(rawTitle) {
+			return usecase.PublicVideoListInput{}, entity.ErrInvalidInput
 		}
+		input.Title = strings.TrimSpace(rawTitle)
+		length := utf8.RuneCountInString(input.Title)
+		if length < 1 || length > maxVideoTitleLength {
+			return usecase.PublicVideoListInput{}, entity.ErrInvalidInput
+		}
+	}
 
-		limit = parsedLimit
+	if categorySpecified {
+		if !utf8.ValidString(rawCategory) {
+			return usecase.PublicVideoListInput{}, entity.ErrInvalidInput
+		}
+		category := entity.CategoryCode(rawCategory)
+		if !category.IsValid() {
+			return usecase.PublicVideoListInput{}, entity.ErrInvalidInput
+		}
+		input.Category = &category
+	}
+
+	limit, err := validateVideoListLimit(rawLimit)
+	if err != nil {
+		return usecase.PublicVideoListInput{}, err
+	}
+	input.Limit = limit
+
+	if rawCursor == "" {
+		return input, nil
+	}
+
+	decoded, err := base64.RawURLEncoding.DecodeString(rawCursor)
+	if err != nil {
+		return usecase.PublicVideoListInput{}, entity.ErrInvalidInput
+	}
+
+	decoder := json.NewDecoder(bytes.NewReader(decoded))
+	decoder.DisallowUnknownFields()
+
+	var cursor usecase.PublicVideoCursor
+	if err := decoder.Decode(&cursor); err != nil {
+		return usecase.PublicVideoListInput{}, entity.ErrInvalidInput
+	}
+	if err := ensureJSONEOF(decoder); err != nil {
+		return usecase.PublicVideoListInput{}, entity.ErrInvalidInput
+	}
+
+	_, offset := cursor.CreatedAt.Zone()
+	if !cursor.ResultType.IsValid() ||
+		cursor.CreatedAt.IsZero() ||
+		offset != 0 ||
+		cursor.ID == 0 ||
+		cursor.ID > math.MaxInt64 ||
+		!isLowerHexSHA256(cursor.FilterHash) {
+		return usecase.PublicVideoListInput{}, entity.ErrInvalidInput
+	}
+
+	if cursor.ResultType == usecase.PublicSearchSimilar {
+		if cursor.Similarity < 0.6 || cursor.Similarity > 1 {
+			return usecase.PublicVideoListInput{}, entity.ErrInvalidInput
+		}
+	} else if cursor.Similarity != 0 {
+		return usecase.PublicVideoListInput{}, entity.ErrInvalidInput
+	}
+
+	cursor.CreatedAt = cursor.CreatedAt
+	input.Cursor = &cursor
+	return input, nil
+}
+
+func validateVideoListLimit(rawLimit string) (int, error) {
+	limit := defaultVideoListLimit
+	if rawLimit == "" {
+		return limit, nil
+	}
+
+	parsedLimit, err := strconv.Atoi(rawLimit)
+	if err != nil || parsedLimit < 1 || parsedLimit > maxVideoListLimit {
+		return 0, entity.ErrInvalidInput
+	}
+	return parsedLimit, nil
+}
+
+func isLowerHexSHA256(value string) bool {
+	if len(value) != 64 {
+		return false
+	}
+	for _, r := range value {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
+			return false
+		}
+	}
+	return true
+}
+
+func (v *videoValidator) ValidateListQuery(rawLimit, rawCursor string) (usecase.VideoListInput, error) {
+	limit, err := validateVideoListLimit(rawLimit)
+	if err != nil {
+		return usecase.VideoListInput{}, err
 	}
 
 	input := usecase.VideoListInput{

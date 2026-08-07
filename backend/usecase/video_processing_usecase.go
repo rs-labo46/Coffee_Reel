@@ -179,7 +179,7 @@ func (u *videoProcessingUsecase) RecoverTimedOutJobs(ctx context.Context, now ti
 	if now.IsZero() || limit < 1 {
 		return 0, entity.ErrInvalidInput
 	}
-	now = now
+
 	return u.jobs.RecoverTimedOut(ctx, repository.ProcessingRecoveryInput{
 		TimeoutBefore: now.Add(-videoProcessingTimeout),
 		Now:           now,

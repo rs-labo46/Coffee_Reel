@@ -42,7 +42,6 @@ func (r *savedVideoRepository) Save(ctx context.Context, userID, videoID uint64,
 	if userID == 0 || videoID == 0 || now.IsZero() {
 		return entity.ErrInvalidInput
 	}
-	now = now
 
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var video entity.Video

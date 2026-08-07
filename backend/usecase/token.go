@@ -107,8 +107,6 @@ func (s *tokenService) GenerateAccessToken(userID uint64, role entity.UserRole, 
 		return "", fmt.Errorf("invalid user role")
 	}
 
-	now = now
-
 	claims := accessTokenClaims{
 		Role:         role,
 		TokenVersion: tokenVersion,
@@ -146,8 +144,6 @@ func (s *tokenService) ParseAccessToken(tokenString string, now time.Time) (Acce
 	if err := jwt.SigningMethodHS256.Verify(parts[0]+"."+parts[1], signature, s.jwtSecret); err != nil {
 		return AccessTokenClaims{}, entity.ErrUnauthorized
 	}
-
-	now = now
 
 	if claims.IssuedAt == nil || claims.ExpiresAt == nil || claims.IssuedAt.Time.After(now) || now.Compare(claims.ExpiresAt.Time) >= 0 || claims.IssuedAt.Time.Compare(claims.ExpiresAt.Time) >= 0 {
 		return AccessTokenClaims{}, entity.ErrUnauthorized

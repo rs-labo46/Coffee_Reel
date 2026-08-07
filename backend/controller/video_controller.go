@@ -229,9 +229,25 @@ func (v *videoController) ListReels(c echo.Context) error {
 		return writeVideoError(c, err)
 	}
 
-	input, err := v.validator.ValidateListQuery(
-		c.QueryParam("limit"),
-		c.QueryParam("cursor"),
+	query := c.QueryParams()
+
+	var rawTitle *string
+	if query.Has("title") {
+		value := query.Get("title")
+		rawTitle = &value
+	}
+
+	var rawCategory *string
+	if query.Has("category") {
+		value := query.Get("category")
+		rawCategory = &value
+	}
+
+	input, err := v.validator.ValidatePublicListQuery(
+		rawTitle,
+		rawCategory,
+		query.Get("limit"),
+		query.Get("cursor"),
 	)
 	if err != nil {
 		return writeVideoError(c, err)

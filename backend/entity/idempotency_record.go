@@ -25,8 +25,7 @@ func NewIdempotencyRecord(userID uint64, keyHash, requestHash string, expiresAt,
 	if userID == 0 || !isLowerHex64(keyHash) || !isLowerHex64(requestHash) || now.IsZero() || expiresAt.IsZero() {
 		return nil, ErrInvalidInput
 	}
-	now = now
-	expiresAt = expiresAt
+
 	if !expiresAt.After(now) {
 		return nil, ErrInvalidInput
 	}

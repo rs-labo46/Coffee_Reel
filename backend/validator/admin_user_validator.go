@@ -96,8 +96,9 @@ func (v *adminUserValidator) ValidateUserListQuery(rawLimit, rawCursor string) (
 		return usecase.AdminUserListInput{}, entity.ErrInvalidInput
 	}
 
-	_, offset := cursor.CreatedAt.Zone()
-	if cursor.CreatedAt.IsZero() || offset != 0 || cursor.ID == 0 || cursor.ID > math.MaxInt64 {
+	if cursor.CreatedAt.IsZero() ||
+		cursor.ID == 0 ||
+		cursor.ID > math.MaxInt64 {
 		return usecase.AdminUserListInput{}, entity.ErrInvalidInput
 	}
 

@@ -732,7 +732,6 @@ func isConstraintViolation(err error, constraint string) bool {
 }
 
 func ptrTime(value time.Time) *time.Time {
-	value = value
 	return &value
 }
 

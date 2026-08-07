@@ -67,7 +67,6 @@ func (r *refreshTokenRepository) Rotate(ctx context.Context, tokenHash string, n
 		return fmt.Errorf("next refresh token is required")
 	}
 
-	now = now
 	reused := false
 
 	if err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
