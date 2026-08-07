@@ -7,7 +7,7 @@ import (
 )
 
 func TestNewAdminAuditLogAcceptsAdminVideoTransitions(t *testing.T) {
-	now := time.Date(2026, 8, 6, 1, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 8, 6, 1, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 
 	tests := []struct {
 		name         string
@@ -59,7 +59,7 @@ func TestNewAdminAuditLogAcceptsAdminVideoTransitions(t *testing.T) {
 }
 
 func TestNewAdminAuditLogRejectsInvalidAdminVideoTransitions(t *testing.T) {
-	now := time.Date(2026, 8, 6, 1, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 8, 6, 1, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 
 	tests := []struct {
 		name         string

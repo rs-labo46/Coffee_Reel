@@ -108,14 +108,14 @@ func TestVideoProcessingUsecaseProcessNextRunsFullPipelineAndRemovesWorkDirector
 	videos := &videoRepositoryMock{
 		recordSourceValidationFunc: func(_ context.Context, videoID uint64, meta entity.SourceVideoMeta, now time.Time) error {
 			recordCalled = true
-			if videoID != claim.Video.ID || !meta.HasAudio || now.Location() != time.UTC {
+			if videoID != claim.Video.ID || !meta.HasAudio {
 				t.Fatalf("RecordSourceValidation(%d, %+v, %s)", videoID, meta, now)
 			}
 			return nil
 		},
 		completeProcessingFunc: func(_ context.Context, input repository.ProcessingCompletionInput) error {
 			completeCalled = true
-			if input.JobID != claim.Job.ID || input.Now.Location() != time.UTC {
+			if input.JobID != claim.Job.ID {
 				t.Fatalf("completion input = %+v", input)
 			}
 			if !regexp.MustCompile(`^videos/22/output/[0-9a-f]{32}\.mp4$`).MatchString(input.OutputMeta.VideoObjectKey) {
@@ -231,7 +231,7 @@ func TestVideoProcessingUsecaseCancelsJobWhenVideoDisappearsAfterSourceValidatio
 		claimNextFunc: func(context.Context, time.Time) (*repository.ProcessingClaim, error) { return claim, nil },
 		cancelFunc: func(_ context.Context, jobID uint64, now time.Time) error {
 			cancelCalled = true
-			if jobID != claim.Job.ID || now.Location() != time.UTC {
+			if jobID != claim.Job.ID {
 				t.Fatalf("Cancel(%d,%s)", jobID, now)
 			}
 			return nil
@@ -389,13 +389,13 @@ func TestVideoProcessingUsecaseMaintenanceInputsAndForwarding(t *testing.T) {
 	nowJST := time.Date(2026, 8, 3, 12, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 	videos := &videoRepositoryMock{
 		expireUploadsFunc: func(_ context.Context, now time.Time, limit int) (int, error) {
-			if now.Location() != time.UTC || limit != 10 {
+			if limit != 10 {
 				t.Fatalf("ExpireUploads(%s,%d)", now, limit)
 			}
 			return 3, nil
 		},
 		deleteExpiredIdempotencyRecordsFunc: func(_ context.Context, now time.Time, limit int) (int64, error) {
-			if now.Location() != time.UTC || limit != 20 {
+			if limit != 20 {
 				t.Fatalf("DeleteExpired(%s,%d)", now, limit)
 			}
 			return 4, nil

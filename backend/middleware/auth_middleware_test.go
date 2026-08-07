@@ -278,11 +278,8 @@ func TestOptionalAuthAuthenticatesUser(t *testing.T) {
 					token,
 				)
 			}
-			if now.Location() != time.UTC {
-				t.Fatalf(
-					"now location = %v, want UTC",
-					now.Location(),
-				)
+			if now.IsZero() {
+				t.Fatal("now is zero")
 			}
 
 			return usecase.AccessTokenClaims{

@@ -396,6 +396,224 @@ func TestVideoValidatorValidateVideoID(t *testing.T) {
 	}
 }
 
+func TestVideoValidatorValidatePublicListQueryTitle(t *testing.T) {
+	validator := newVideoValidatorForTest(t, 128)
+
+	tests := []struct {
+		name           string
+		rawTitle       string
+		titleSpecified bool
+		wantTitle      string
+		wantError      bool
+	}{
+		{name: "unspecified", titleSpecified: false},
+		{name: "one rune", rawTitle: "珈", titleSpecified: true, wantTitle: "珈"},
+		{name: "trimmed", rawTitle: "  latte  ", titleSpecified: true, wantTitle: "latte"},
+		{name: "one hundred runes", rawTitle: strings.Repeat("珈", 100), titleSpecified: true, wantTitle: strings.Repeat("珈", 100)},
+		{name: "empty specified", rawTitle: "", titleSpecified: true, wantError: true},
+		{name: "spaces only", rawTitle: " \t\n ", titleSpecified: true, wantError: true},
+		{name: "one hundred one runes", rawTitle: strings.Repeat("珈", 101), titleSpecified: true, wantError: true},
+		{name: "invalid utf8", rawTitle: string([]byte{0xff}), titleSpecified: true, wantError: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input, err := validator.ValidatePublicListQuery(
+				tt.rawTitle,
+				tt.titleSpecified,
+				"",
+				false,
+				"",
+				"",
+			)
+			if tt.wantError {
+				if !errors.Is(err, entity.ErrInvalidInput) {
+					t.Fatalf("error = %v, want ErrInvalidInput", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error = %v", err)
+			}
+			if input.Title != tt.wantTitle {
+				t.Fatalf("Title = %q, want %q", input.Title, tt.wantTitle)
+			}
+			if input.Limit != defaultVideoListLimit {
+				t.Fatalf("Limit = %d, want %d", input.Limit, defaultVideoListLimit)
+			}
+		})
+	}
+}
+
+func TestVideoValidatorValidatePublicListQueryCategory(t *testing.T) {
+	validator := newVideoValidatorForTest(t, 128)
+
+	validCategories := []entity.CategoryCode{
+		entity.CategoryBrewing,
+		entity.CategoryRoasting,
+		entity.CategoryLatteArt,
+		entity.CategoryBeans,
+		entity.CategoryEquipment,
+	}
+	for _, category := range validCategories {
+		t.Run(string(category), func(t *testing.T) {
+			input, err := validator.ValidatePublicListQuery(
+				"",
+				false,
+				string(category),
+				true,
+				"",
+				"",
+			)
+			if err != nil {
+				t.Fatalf("ValidatePublicListQuery() error = %v", err)
+			}
+			if input.Category == nil || *input.Category != category {
+				t.Fatalf("Category = %#v, want %q", input.Category, category)
+			}
+		})
+	}
+
+	for _, category := range []string{"", "Brewing", " brewing ", "unknown", string([]byte{0xff})} {
+		t.Run("invalid_"+base64.RawURLEncoding.EncodeToString([]byte(category)), func(t *testing.T) {
+			_, err := validator.ValidatePublicListQuery("", false, category, true, "", "")
+			if !errors.Is(err, entity.ErrInvalidInput) {
+				t.Fatalf("category %q error = %v, want ErrInvalidInput", category, err)
+			}
+		})
+	}
+}
+
+func TestVideoValidatorValidatePublicListQueryLimit(t *testing.T) {
+	validator := newVideoValidatorForTest(t, 128)
+
+	for _, tt := range []struct {
+		raw  string
+		want int
+	}{
+		{raw: "", want: 20},
+		{raw: "1", want: 1},
+		{raw: "100", want: 100},
+	} {
+		t.Run("valid_"+tt.raw, func(t *testing.T) {
+			input, err := validator.ValidatePublicListQuery("", false, "", false, tt.raw, "")
+			if err != nil {
+				t.Fatalf("ValidatePublicListQuery() error = %v", err)
+			}
+			if input.Limit != tt.want {
+				t.Fatalf("Limit = %d, want %d", input.Limit, tt.want)
+			}
+		})
+	}
+
+	for _, raw := range []string{"0", "-1", "101", "abc", "1.5", " 20", "20 "} {
+		t.Run("invalid_"+base64.RawURLEncoding.EncodeToString([]byte(raw)), func(t *testing.T) {
+			_, err := validator.ValidatePublicListQuery("", false, "", false, raw, "")
+			if !errors.Is(err, entity.ErrInvalidInput) {
+				t.Fatalf("limit %q error = %v, want ErrInvalidInput", raw, err)
+			}
+		})
+	}
+}
+
+func TestVideoValidatorValidatePublicListQueryDecodesCursor(t *testing.T) {
+	validator := newVideoValidatorForTest(t, 128)
+	createdAt := time.Date(2026, 8, 5, 18, 30, 0, 0, time.FixedZone("JST", 9*60*60))
+
+	tests := []usecase.PublicVideoCursor{
+		{
+			ResultType: usecase.PublicSearchAll,
+			Similarity: 0,
+			CreatedAt:  createdAt,
+			ID:         10,
+			FilterHash: strings.Repeat("a", 64),
+		},
+		{
+			ResultType: usecase.PublicSearchMatched,
+			Similarity: 0,
+			CreatedAt:  createdAt,
+			ID:         11,
+			FilterHash: strings.Repeat("b", 64),
+		},
+		{
+			ResultType: usecase.PublicSearchSimilar,
+			Similarity: 0.6,
+			CreatedAt:  createdAt,
+			ID:         12,
+			FilterHash: strings.Repeat("c", 64),
+		},
+		{
+			ResultType: usecase.PublicSearchSimilar,
+			Similarity: 1,
+			CreatedAt:  createdAt,
+			ID:         13,
+			FilterHash: strings.Repeat("d", 64),
+		},
+	}
+
+	for _, cursor := range tests {
+		t.Run(string(cursor.ResultType), func(t *testing.T) {
+			payload, err := json.Marshal(cursor)
+			if err != nil {
+				t.Fatal(err)
+			}
+			encoded := base64.RawURLEncoding.EncodeToString(payload)
+
+			input, err := validator.ValidatePublicListQuery("", false, "", false, "20", encoded)
+			if err != nil {
+				t.Fatalf("ValidatePublicListQuery() error = %v", err)
+			}
+			if input.Cursor == nil {
+				t.Fatal("Cursor = nil")
+			}
+			if input.Cursor.ResultType != cursor.ResultType ||
+				input.Cursor.Similarity != cursor.Similarity ||
+				input.Cursor.ID != cursor.ID ||
+				input.Cursor.FilterHash != cursor.FilterHash ||
+				!input.Cursor.CreatedAt.Equal(cursor.CreatedAt) {
+				t.Fatalf("Cursor = %#v, want %#v", input.Cursor, cursor)
+			}
+		})
+	}
+}
+
+func TestVideoValidatorValidatePublicListQueryRejectsInvalidCursor(t *testing.T) {
+	validator := newVideoValidatorForTest(t, 128)
+	validDate := "2026-08-05T18:30:00+09:00"
+	validHash := strings.Repeat("a", 64)
+
+	tests := []struct {
+		name   string
+		cursor string
+	}{
+		{name: "invalid base64", cursor: "not-base64"},
+		{name: "padded base64", cursor: base64.RawURLEncoding.EncodeToString([]byte(`{"result_type":"all","similarity":0,"created_at":"2026-08-05T18:30:00+09:00","id":1,"filter_hash":"`+validHash+`"}`)) + "="},
+		{name: "not json", cursor: encodeRawCursor(`not-json`)},
+		{name: "unknown field", cursor: encodeRawCursor(`{"result_type":"all","similarity":0,"created_at":"` + validDate + `","id":1,"filter_hash":"` + validHash + `","extra":true}`)},
+		{name: "invalid result type", cursor: encodeRawCursor(`{"result_type":"unknown","similarity":0,"created_at":"` + validDate + `","id":1,"filter_hash":"` + validHash + `"}`)},
+		{name: "zero id", cursor: encodeRawCursor(`{"result_type":"all","similarity":0,"created_at":"` + validDate + `","id":0,"filter_hash":"` + validHash + `"}`)},
+		{name: "id above max int64", cursor: encodeRawCursor(`{"result_type":"all","similarity":0,"created_at":"` + validDate + `","id":9223372036854775808,"filter_hash":"` + validHash + `"}`)},
+		{name: "short hash", cursor: encodeRawCursor(`{"result_type":"all","similarity":0,"created_at":"` + validDate + `","id":1,"filter_hash":"abc"}`)},
+		{name: "upper case hash", cursor: encodeRawCursor(`{"result_type":"all","similarity":0,"created_at":"` + validDate + `","id":1,"filter_hash":"` + strings.Repeat("A", 64) + `"}`)},
+		{name: "matched nonzero similarity", cursor: encodeRawCursor(`{"result_type":"matched","similarity":0.7,"created_at":"` + validDate + `","id":1,"filter_hash":"` + validHash + `"}`)},
+		{name: "similar below threshold", cursor: encodeRawCursor(`{"result_type":"similar","similarity":0.59,"created_at":"` + validDate + `","id":1,"filter_hash":"` + validHash + `"}`)},
+		{name: "similar above one", cursor: encodeRawCursor(`{"result_type":"similar","similarity":1.01,"created_at":"` + validDate + `","id":1,"filter_hash":"` + validHash + `"}`)},
+		{name: "second json object", cursor: encodeRawCursor(`{"result_type":"all","similarity":0,"created_at":"` + validDate + `","id":1,"filter_hash":"` + validHash + `"}{}`)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input, err := validator.ValidatePublicListQuery("", false, "", false, "20", tt.cursor)
+			if !errors.Is(err, entity.ErrInvalidInput) {
+				t.Fatalf("error = %v, want ErrInvalidInput", err)
+			}
+			if input != (usecase.PublicVideoListInput{}) {
+				t.Fatalf("input = %#v, want zero value", input)
+			}
+		})
+	}
+}
+
 func TestVideoValidatorValidateListQueryDefaultsAndLimitBoundaries(t *testing.T) {
 	validator := newVideoValidatorForTest(t, 128)
 
@@ -443,7 +661,7 @@ func TestVideoValidatorValidateListQueryDecodesValidCursor(t *testing.T) {
 	validator := newVideoValidatorForTest(t, 128)
 
 	cursor := usecase.VideoCursor{
-		CreatedAt: time.Date(2026, 8, 4, 0, 0, 0, 123, time.UTC),
+		CreatedAt: time.Date(2026, 8, 4, 9, 0, 0, 123, time.FixedZone("JST", 9*60*60)),
 		ID:        math.MaxInt64,
 	}
 	payload, err := json.Marshal(cursor)
@@ -468,27 +686,6 @@ func TestVideoValidatorValidateListQueryDecodesValidCursor(t *testing.T) {
 	if !input.Cursor.CreatedAt.Equal(cursor.CreatedAt) {
 		t.Fatalf("CreatedAt = %v, want %v", input.Cursor.CreatedAt, cursor.CreatedAt)
 	}
-	if input.Cursor.CreatedAt.Location() != time.UTC {
-		t.Fatalf("CreatedAt.Location = %v, want UTC", input.Cursor.CreatedAt.Location())
-	}
-}
-
-func TestVideoValidatorValidateListQueryNormalizesZeroOffsetCursorToUTC(t *testing.T) {
-	validator := newVideoValidatorForTest(t, 128)
-	encoded := base64.RawURLEncoding.EncodeToString([]byte(
-		`{"created_at":"2026-08-04T00:00:00+00:00","id":1}`,
-	))
-
-	input, err := validator.ValidateListQuery("20", encoded)
-	if err != nil {
-		t.Fatalf("ValidateListQuery() error = %v", err)
-	}
-	if input.Cursor == nil {
-		t.Fatal("Cursor = nil")
-	}
-	if input.Cursor.CreatedAt.Location() != time.UTC {
-		t.Fatalf("CreatedAt.Location = %v, want UTC", input.Cursor.CreatedAt.Location())
-	}
 }
 
 func TestVideoValidatorRejectsInvalidCursor(t *testing.T) {
@@ -499,19 +696,17 @@ func TestVideoValidatorRejectsInvalidCursor(t *testing.T) {
 		cursor string
 	}{
 		{name: "invalid base64", cursor: "not-base64"},
-		{name: "padded base64", cursor: base64.URLEncoding.EncodeToString([]byte(`{"created_at":"2026-08-04T00:00:00Z","id":1}`))},
+		{name: "padded base64", cursor: base64.RawURLEncoding.EncodeToString([]byte(`{"created_at":"2026-08-04T09:00:00+09:00","id":1}`)) + "="},
 		{name: "not json", cursor: encodeRawCursor(`not-json`)},
-		{name: "unknown field", cursor: encodeRawCursor(`{"created_at":"2026-08-04T00:00:00Z","id":1,"extra":true}`)},
+		{name: "unknown field", cursor: encodeRawCursor(`{"created_at":"2026-08-04T09:00:00+09:00","id":1,"extra":true}`)},
 		{name: "missing created at", cursor: encodeRawCursor(`{"id":1}`)},
-		{name: "missing id", cursor: encodeRawCursor(`{"created_at":"2026-08-04T00:00:00Z"}`)},
-		{name: "zero created at", cursor: encodeRawCursor(`{"created_at":"0001-01-01T00:00:00Z","id":1}`)},
-		{name: "non utc", cursor: encodeRawCursor(`{"created_at":"2026-08-04T09:00:00+09:00","id":1}`)},
-		{name: "zero id", cursor: encodeRawCursor(`{"created_at":"2026-08-04T00:00:00Z","id":0}`)},
-		{name: "id above max int64", cursor: encodeRawCursor(`{"created_at":"2026-08-04T00:00:00Z","id":9223372036854775808}`)},
-		{name: "wrong id type", cursor: encodeRawCursor(`{"created_at":"2026-08-04T00:00:00Z","id":"1"}`)},
+		{name: "missing id", cursor: encodeRawCursor(`{"created_at":"2026-08-04T09:00:00+09:00"}`)},
+		{name: "zero id", cursor: encodeRawCursor(`{"created_at":"2026-08-04T09:00:00+09:00","id":0}`)},
+		{name: "id above max int64", cursor: encodeRawCursor(`{"created_at":"2026-08-04T09:00:00+09:00","id":9223372036854775808}`)},
+		{name: "wrong id type", cursor: encodeRawCursor(`{"created_at":"2026-08-04T09:00:00+09:00","id":"1"}`)},
 		{name: "wrong date type", cursor: encodeRawCursor(`{"created_at":1,"id":1}`)},
-		{name: "second json object", cursor: encodeRawCursor(`{"created_at":"2026-08-04T00:00:00Z","id":1}{"created_at":"2026-08-03T00:00:00Z","id":2}`)},
-		{name: "trailing null", cursor: encodeRawCursor(`{"created_at":"2026-08-04T00:00:00Z","id":1} null`)},
+		{name: "second json object", cursor: encodeRawCursor(`{"created_at":"2026-08-04T09:00:00+09:00","id":1}{"created_at":"2026-08-03T09:00:00+09:00","id":2}`)},
+		{name: "trailing null", cursor: encodeRawCursor(`{"created_at":"2026-08-04T09:00:00+09:00","id":1} null`)},
 	}
 
 	for _, tt := range tests {

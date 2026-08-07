@@ -276,46 +276,274 @@ func TestVideoUsecaseCompleteUploadRejectsMissingOrInvalidStoredObject(t *testin
 	}
 }
 
-func TestVideoUsecaseListReelsBuildsReadURLsAndOpaqueCursor(t *testing.T) {
-	createdAt := time.Date(2026, 8, 3, 1, 2, 3, 0, time.FixedZone("JST", 9*60*60))
-	videos := &videoRepositoryMock{listPublicFunc: func(_ context.Context, limit int, cursor *repository.VideoCursor, viewerID *uint64) (repository.PublicVideoPage, error) {
-		if limit != 20 || cursor != nil || viewerID != nil {
-			t.Fatalf("ListPublic(limit=%d, cursor=%v, viewerID=%v)", limit, cursor, viewerID)
+func TestVideoUsecaseListReelsAllBuildsReadURLsStateAndCursor(t *testing.T) {
+	createdAt := time.Date(2026, 8, 8, 9, 0, 0, 0, time.FixedZone("JST", 9*60*60))
+	videos := &videoRepositoryMock{listPublicFunc: func(_ context.Context, input repository.PublicVideoListInput) (repository.PublicVideoPage, error) {
+		if input.Limit != 2 || input.Cursor != nil || input.ViewerUserID != nil || input.SearchMode != repository.PublicVideoSearchAll {
+			t.Fatalf("ListPublic input = %#v", input)
+		}
+		if input.Title != "" || input.Category != nil {
+			t.Fatalf("unexpected filters: %#v", input)
 		}
 		return repository.PublicVideoPage{
-			Items:   []repository.PublicVideoItem{{ID: 11, UserID: 4, AuthorName: "author", Category: entity.CategoryBrewing, Title: "title", VideoObjectKey: "videos/11/output/a.mp4", ThumbnailObjectKey: "videos/11/thumbnail/a.jpg", CreatedAt: createdAt}},
+			Items: []repository.PublicVideoItem{{
+				ID: 11, UserID: 4, AuthorName: "author", Category: entity.CategoryBrewing,
+				Title: "title", Description: "description",
+				VideoObjectKey: "videos/11/output/a.mp4", ThumbnailObjectKey: "videos/11/thumbnail/a.jpg",
+				CreatedAt: createdAt, LikeCount: 3, IsLiked: false, IsSaved: false,
+			}},
 			HasMore: true, LastCreatedAt: createdAt, LastID: 11,
 		}, nil
 	}}
 	storage := &objectStorageRepositoryMock{createReadURLFunc: func(_ context.Context, key string, ttl time.Duration) (repository.ReadTarget, error) {
 		if ttl != 10*time.Minute {
-			t.Fatalf("ttl = %s", ttl)
+			t.Fatalf("ttl = %s, want 10m", ttl)
 		}
 		return repository.ReadTarget{URL: "https://read.example/" + key, ExpiresAt: time.Now().Add(ttl)}, nil
 	}}
 	uc, _ := NewVideoUsecase(videos, storage, validVideoUsecaseConfig())
 
-	result, err := uc.ListReels(context.Background(), nil, VideoListInput{Limit: 20})
+	result, err := uc.ListReels(context.Background(), nil, PublicVideoListInput{Limit: 2})
 	if err != nil {
 		t.Fatalf("ListReels() error = %v", err)
 	}
-	if len(result.Items) != 1 || result.NextCursor == nil || !result.HasMore {
+	if result.ResultType != PublicSearchAll || len(result.Items) != 1 || !result.HasMore || result.NextCursor == nil {
 		t.Fatalf("result = %+v", result)
 	}
-	if strings.Contains(result.Items[0].Video.URL, "ObjectKey") || result.Items[0].Video.URL == "" || result.Items[0].Thumbnail.URL == "" {
-		t.Fatalf("read targets = %+v", result.Items[0])
+	item := result.Items[0]
+	if item.LikeCount != 3 || item.IsLiked || item.IsSaved {
+		t.Fatalf("public state = %+v", item)
+	}
+	if item.Video.URL == "" || item.Thumbnail.URL == "" || strings.Contains(item.Video.URL, "ObjectKey") {
+		t.Fatalf("read targets = %+v", item)
 	}
 
 	decoded, err := base64.RawURLEncoding.DecodeString(*result.NextCursor)
 	if err != nil {
 		t.Fatalf("decode cursor: %v", err)
 	}
-	var cursor VideoCursor
+	var cursor PublicVideoCursor
 	if err := json.Unmarshal(decoded, &cursor); err != nil {
 		t.Fatalf("unmarshal cursor: %v", err)
 	}
-	if cursor.ID != 11 || cursor.CreatedAt.Location() != time.UTC || !cursor.CreatedAt.Equal(createdAt) {
+	wantHash, err := publicVideoFilterHash("", nil)
+	if err != nil {
+		t.Fatalf("publicVideoFilterHash() error = %v", err)
+	}
+	if cursor.ResultType != PublicSearchAll || cursor.Similarity != 0 || cursor.ID != 11 ||
+		!cursor.CreatedAt.Equal(createdAt) || cursor.FilterHash != wantHash {
 		t.Fatalf("cursor = %+v", cursor)
+	}
+}
+
+func TestVideoUsecaseListReelsMatchedKeepsFiltersAndViewer(t *testing.T) {
+	category := entity.CategoryBrewing
+	viewer := activeVideoUser(9)
+	calls := 0
+	videos := &videoRepositoryMock{listPublicFunc: func(_ context.Context, input repository.PublicVideoListInput) (repository.PublicVideoPage, error) {
+		calls++
+		if input.SearchMode != repository.PublicVideoSearchMatched || input.Title != "latte" || input.Category == nil || *input.Category != category {
+			t.Fatalf("ListPublic input = %#v", input)
+		}
+		if input.ViewerUserID == nil || *input.ViewerUserID != viewer.ID {
+			t.Fatalf("ViewerUserID = %v, want %d", input.ViewerUserID, viewer.ID)
+		}
+		return repository.PublicVideoPage{Items: []repository.PublicVideoItem{{
+			ID: 1, UserID: 2, AuthorName: "author", Category: category, Title: "Latte Art",
+			VideoObjectKey: "videos/1/output/a.mp4", ThumbnailObjectKey: "videos/1/thumbnail/a.jpg",
+			CreatedAt: time.Now(), LikeCount: 4, IsLiked: true, IsSaved: true,
+		}}}, nil
+	}}
+	storage := &objectStorageRepositoryMock{createReadURLFunc: func(_ context.Context, key string, ttl time.Duration) (repository.ReadTarget, error) {
+		return repository.ReadTarget{URL: "https://read.example/" + key, ExpiresAt: time.Now().Add(ttl)}, nil
+	}}
+	uc, _ := NewVideoUsecase(videos, storage, validVideoUsecaseConfig())
+
+	result, err := uc.ListReels(context.Background(), viewer, PublicVideoListInput{Title: "latte", Category: &category, Limit: 20})
+	if err != nil {
+		t.Fatalf("ListReels() error = %v", err)
+	}
+	if calls != 1 || result.ResultType != PublicSearchMatched || len(result.Items) != 1 {
+		t.Fatalf("calls=%d result=%+v", calls, result)
+	}
+	if !result.Items[0].IsLiked || !result.Items[0].IsSaved || result.Items[0].LikeCount != 4 {
+		t.Fatalf("public state = %+v", result.Items[0])
+	}
+}
+
+func TestVideoUsecaseListReelsFallsBackToSimilarOnlyWhenTitlePresent(t *testing.T) {
+	category := entity.CategoryLatteArt
+	createdAt := time.Date(2026, 8, 8, 10, 0, 0, 0, time.FixedZone("JST", 9*60*60))
+	calls := 0
+	videos := &videoRepositoryMock{listPublicFunc: func(_ context.Context, input repository.PublicVideoListInput) (repository.PublicVideoPage, error) {
+		calls++
+		if input.Title != "latte" || input.Category == nil || *input.Category != category {
+			t.Fatalf("filters changed during fallback: %#v", input)
+		}
+		switch calls {
+		case 1:
+			if input.SearchMode != repository.PublicVideoSearchMatched {
+				t.Fatalf("first SearchMode = %s", input.SearchMode)
+			}
+			return repository.PublicVideoPage{}, nil
+		case 2:
+			if input.SearchMode != repository.PublicVideoSearchSimilar {
+				t.Fatalf("second SearchMode = %s", input.SearchMode)
+			}
+			return repository.PublicVideoPage{
+				Items: []repository.PublicVideoItem{{
+					ID: 7, UserID: 3, AuthorName: "author", Category: category, Title: "latte art",
+					VideoObjectKey: "videos/7/output/a.mp4", ThumbnailObjectKey: "videos/7/thumbnail/a.jpg",
+					CreatedAt: createdAt, Similarity: 0.75,
+				}},
+				HasMore: true, LastCreatedAt: createdAt, LastID: 7, LastSimilarity: 0.75,
+			}, nil
+		default:
+			t.Fatalf("unexpected ListPublic call %d", calls)
+			return repository.PublicVideoPage{}, nil
+		}
+	}}
+	storage := &objectStorageRepositoryMock{createReadURLFunc: func(_ context.Context, key string, ttl time.Duration) (repository.ReadTarget, error) {
+		return repository.ReadTarget{URL: "https://read.example/" + key, ExpiresAt: time.Now().Add(ttl)}, nil
+	}}
+	uc, _ := NewVideoUsecase(videos, storage, validVideoUsecaseConfig())
+
+	result, err := uc.ListReels(context.Background(), nil, PublicVideoListInput{Title: "latte", Category: &category, Limit: 10})
+	if err != nil {
+		t.Fatalf("ListReels() error = %v", err)
+	}
+	if calls != 2 || result.ResultType != PublicSearchSimilar || len(result.Items) != 1 || result.NextCursor == nil {
+		t.Fatalf("calls=%d result=%+v", calls, result)
+	}
+	decoded, err := base64.RawURLEncoding.DecodeString(*result.NextCursor)
+	if err != nil {
+		t.Fatalf("decode cursor: %v", err)
+	}
+	var cursor PublicVideoCursor
+	if err := json.Unmarshal(decoded, &cursor); err != nil {
+		t.Fatalf("unmarshal cursor: %v", err)
+	}
+	if cursor.ResultType != PublicSearchSimilar || cursor.Similarity != 0.75 {
+		t.Fatalf("cursor = %+v", cursor)
+	}
+}
+
+func TestVideoUsecaseListReelsCategoryOnlyZeroDoesNotFallback(t *testing.T) {
+	category := entity.CategoryBeans
+	calls := 0
+	videos := &videoRepositoryMock{listPublicFunc: func(_ context.Context, input repository.PublicVideoListInput) (repository.PublicVideoPage, error) {
+		calls++
+		if input.SearchMode != repository.PublicVideoSearchMatched || input.Title != "" || input.Category == nil || *input.Category != category {
+			t.Fatalf("ListPublic input = %#v", input)
+		}
+		return repository.PublicVideoPage{}, nil
+	}}
+	uc, _ := NewVideoUsecase(videos, &objectStorageRepositoryMock{}, validVideoUsecaseConfig())
+
+	result, err := uc.ListReels(context.Background(), nil, PublicVideoListInput{Category: &category, Limit: 20})
+	if err != nil {
+		t.Fatalf("ListReels() error = %v", err)
+	}
+	if calls != 1 || result.ResultType != PublicSearchMatched || len(result.Items) != 0 {
+		t.Fatalf("calls=%d result=%+v", calls, result)
+	}
+}
+
+func TestVideoUsecaseListReelsSimilarFallbackCanReturnEmpty(t *testing.T) {
+	calls := 0
+	videos := &videoRepositoryMock{listPublicFunc: func(_ context.Context, input repository.PublicVideoListInput) (repository.PublicVideoPage, error) {
+		calls++
+		if calls == 1 && input.SearchMode != repository.PublicVideoSearchMatched {
+			t.Fatalf("first SearchMode = %s", input.SearchMode)
+		}
+		if calls == 2 && input.SearchMode != repository.PublicVideoSearchSimilar {
+			t.Fatalf("second SearchMode = %s", input.SearchMode)
+		}
+		return repository.PublicVideoPage{}, nil
+	}}
+	uc, _ := NewVideoUsecase(videos, &objectStorageRepositoryMock{}, validVideoUsecaseConfig())
+
+	result, err := uc.ListReels(context.Background(), nil, PublicVideoListInput{Title: "nothing", Limit: 20})
+	if err != nil {
+		t.Fatalf("ListReels() error = %v", err)
+	}
+	if calls != 2 || result.ResultType != PublicSearchSimilar || len(result.Items) != 0 || result.HasMore || result.NextCursor != nil {
+		t.Fatalf("calls=%d result=%+v", calls, result)
+	}
+}
+
+func TestVideoUsecaseListReelsRejectsCursorWithDifferentFilterHash(t *testing.T) {
+	repositoryCalled := false
+	videos := &videoRepositoryMock{listPublicFunc: func(_ context.Context, input repository.PublicVideoListInput) (repository.PublicVideoPage, error) {
+		repositoryCalled = true
+		return repository.PublicVideoPage{}, nil
+	}}
+	uc, _ := NewVideoUsecase(videos, &objectStorageRepositoryMock{}, validVideoUsecaseConfig())
+
+	_, err := uc.ListReels(context.Background(), nil, PublicVideoListInput{
+		Title: "latte",
+		Limit: 20,
+		Cursor: &PublicVideoCursor{
+			ResultType: PublicSearchMatched,
+			CreatedAt:  time.Now(),
+			ID:         1,
+			FilterHash: strings.Repeat("0", 64),
+		},
+	})
+	if !errors.Is(err, entity.ErrCursorInvalid) {
+		t.Fatalf("error = %v, want ErrCursorInvalid", err)
+	}
+	if repositoryCalled {
+		t.Fatal("repository was called with a cursor from different filters")
+	}
+}
+
+func TestVideoUsecaseGetDetailMapsLikeSavedStateAndReadURLs(t *testing.T) {
+	createdAt := time.Date(2026, 8, 8, 13, 30, 0, 0, time.FixedZone("JST", 9*60*60))
+	viewer := activeVideoUser(10)
+	videos := &videoRepositoryMock{
+		findPublicByIDFunc: func(_ context.Context, videoID uint64, viewerID *uint64) (*repository.PublicVideoItem, error) {
+			if videoID != 44 || viewerID == nil || *viewerID != viewer.ID {
+				t.Fatalf("FindPublicByID args videoID=%d viewerID=%v", videoID, viewerID)
+			}
+			return &repository.PublicVideoItem{
+				ID:                 44,
+				UserID:             3,
+				AuthorName:         "author",
+				Category:           entity.CategoryLatteArt,
+				Title:              "latte art",
+				Description:        "desc",
+				VideoObjectKey:     "videos/44/output/video.mp4",
+				ThumbnailObjectKey: "videos/44/thumbnail/thumb.jpg",
+				CreatedAt:          createdAt,
+				LikeCount:          7,
+				IsLiked:            true,
+				IsSaved:            true,
+			}, nil
+		},
+	}
+	storage := &objectStorageRepositoryMock{
+		createReadURLFunc: func(_ context.Context, objectKey string, ttl time.Duration) (repository.ReadTarget, error) {
+			if ttl != 10*time.Minute {
+				t.Fatalf("ttl = %s, want 10m", ttl)
+			}
+			return repository.ReadTarget{URL: "https://read.example/" + objectKey, ExpiresAt: time.Now().Add(ttl)}, nil
+		},
+	}
+	uc, err := NewVideoUsecase(videos, storage, validVideoUsecaseConfig())
+	if err != nil {
+		t.Fatalf("NewVideoUsecase() error = %v", err)
+	}
+
+	result, err := uc.GetDetail(context.Background(), viewer, 44)
+	if err != nil {
+		t.Fatalf("GetDetail() error = %v", err)
+	}
+	if result.ID != 44 || result.LikeCount != 7 || !result.IsLiked || !result.IsSaved {
+		t.Fatalf("result = %+v", result)
+	}
+	if result.Video.URL == "" || result.Thumbnail.URL == "" {
+		t.Fatalf("read URLs were not issued: %+v", result)
 	}
 }
 

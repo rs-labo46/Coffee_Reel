@@ -36,7 +36,7 @@ func TestNewSavedVideoUsecaseRejectsInvalidConfiguration(t *testing.T) {
 	}
 }
 
-func TestSavedVideoUsecaseSaveValidatesActorAndForwardsUTC(t *testing.T) {
+func TestSavedVideoUsecaseSaveValidatesActorAndForwardsCurrentTime(t *testing.T) {
 	before := time.Now()
 	called := false
 	saved := &savedVideoRepositoryMock{saveFunc: func(_ context.Context, userID, videoID uint64, now time.Time) error {
@@ -44,7 +44,7 @@ func TestSavedVideoUsecaseSaveValidatesActorAndForwardsUTC(t *testing.T) {
 		if userID != 4 || videoID != 9 {
 			t.Fatalf("Save(%d,%d)", userID, videoID)
 		}
-		if now.Location() != time.UTC || now.Before(before) || now.After(time.Now()) {
+		if now.Before(before) || now.After(time.Now()) {
 			t.Fatalf("now=%s", now)
 		}
 		return nil
@@ -117,7 +117,7 @@ func TestSavedVideoUsecaseListBuildsReadURLsAndSavedCursor(t *testing.T) {
 	created := time.Date(2026, 8, 3, 9, 30, 0, 0, time.FixedZone("JST", 9*60*60))
 	inputCursor := &VideoCursor{CreatedAt: created.Add(time.Hour), ID: 99}
 	saved := &savedVideoRepositoryMock{listByUserFunc: func(_ context.Context, userID uint64, limit int, cursor *repository.SavedVideoCursor) (repository.SavedVideoPage, error) {
-		if userID != 3 || limit != 2 || cursor == nil || cursor.ID != 99 || cursor.CreatedAt.Location() != time.UTC {
+		if userID != 3 || limit != 2 || cursor == nil || cursor.ID != 99 {
 			t.Fatalf("ListByUser(%d,%d,%+v)", userID, limit, cursor)
 		}
 		return repository.SavedVideoPage{
@@ -152,7 +152,7 @@ func TestSavedVideoUsecaseListBuildsReadURLsAndSavedCursor(t *testing.T) {
 	if err := json.Unmarshal(decoded, &cursor); err != nil {
 		t.Fatalf("unmarshal cursor:%v", err)
 	}
-	if cursor.ID != 55 || !cursor.CreatedAt.Equal(created) || cursor.CreatedAt.Location() != time.UTC {
+	if cursor.ID != 55 || !cursor.CreatedAt.Equal(created) {
 		t.Fatalf("cursor=%+v", cursor)
 	}
 }
@@ -198,14 +198,14 @@ func TestSavedVideoUsecaseListRejectsInvalidActorAndPaging(t *testing.T) {
 	}
 }
 
-func TestSavedVideoCursorConvertsUTCAndPreservesNil(t *testing.T) {
+func TestSavedVideoCursorPreservesTimeAndNil(t *testing.T) {
 	if got := savedVideoCursor(nil); got != nil {
 		t.Fatalf("savedVideoCursor(nil)=%+v", got)
 	}
 	jst := time.FixedZone("JST", 9*60*60)
 	input := &VideoCursor{CreatedAt: time.Date(2026, 8, 3, 12, 0, 0, 0, jst), ID: 4}
 	got := savedVideoCursor(input)
-	if got == nil || got.ID != 4 || got.CreatedAt.Location() != time.UTC || !got.CreatedAt.Equal(input.CreatedAt) {
+	if got == nil || got.ID != 4 || !got.CreatedAt.Equal(input.CreatedAt) {
 		t.Fatalf("cursor=%+v", got)
 	}
 }

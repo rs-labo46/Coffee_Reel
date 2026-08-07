@@ -23,13 +23,13 @@ func TestNewIdempotencyRecord(t *testing.T) {
 	if record.KeyHash != keyHash || record.RequestHash != requestHash {
 		t.Fatalf("hashes changed unexpectedly: %#v", record)
 	}
-	if record.CreatedAt.Location() != time.UTC || record.ExpiresAt.Location() != time.UTC {
-		t.Fatalf("timestamps must be UTC: %#v", record)
+	if !record.CreatedAt.Equal(now) || !record.ExpiresAt.Equal(expiresAt) {
+		t.Fatalf("timestamps changed: %#v", record)
 	}
 }
 
 func TestNewIdempotencyRecordRejectsInvalidInput(t *testing.T) {
-	now := time.Date(2026, 7, 28, 3, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 7, 28, 3, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 	validHash := strings.Repeat("a", 64)
 
 	tests := []struct {

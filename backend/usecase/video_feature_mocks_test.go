@@ -12,7 +12,7 @@ type videoRepositoryMock struct {
 	createWithIdempotencyFunc           func(context.Context, *entity.Video, *entity.IdempotencyRecord) (repository.VideoCreateResult, error)
 	completeUploadFunc                  func(context.Context, uint64, uint64, time.Time) (*entity.Video, error)
 	findPublicByIDFunc                  func(context.Context, uint64, *uint64) (*repository.PublicVideoItem, error)
-	listPublicFunc                      func(context.Context, int, *repository.VideoCursor, *uint64) (repository.PublicVideoPage, error)
+	listPublicFunc                      func(context.Context, repository.PublicVideoListInput) (repository.PublicVideoPage, error)
 	findOwnedByIDFunc                   func(context.Context, uint64, uint64) (*repository.OwnedVideoDetail, error)
 	listOwnedFunc                       func(context.Context, uint64, int, *repository.VideoCursor) (repository.OwnedVideoPage, error)
 	setPrivateByOwnerFunc               func(context.Context, uint64, uint64, time.Time) (*entity.Video, error)
@@ -44,11 +44,11 @@ func (m *videoRepositoryMock) FindPublicByID(ctx context.Context, videoID uint64
 	}
 	return m.findPublicByIDFunc(ctx, videoID, viewerUserID)
 }
-func (m *videoRepositoryMock) ListPublic(ctx context.Context, limit int, cursor *repository.VideoCursor, viewerUserID *uint64) (repository.PublicVideoPage, error) {
+func (m *videoRepositoryMock) ListPublic(ctx context.Context, input repository.PublicVideoListInput) (repository.PublicVideoPage, error) {
 	if m.listPublicFunc == nil {
 		panic("unexpected VideoRepository.ListPublic call")
 	}
-	return m.listPublicFunc(ctx, limit, cursor, viewerUserID)
+	return m.listPublicFunc(ctx, input)
 }
 func (m *videoRepositoryMock) FindOwnedByID(ctx context.Context, userID, videoID uint64) (*repository.OwnedVideoDetail, error) {
 	if m.findOwnedByIDFunc == nil {

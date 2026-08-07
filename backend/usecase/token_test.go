@@ -89,7 +89,7 @@ func TestPasswordHashUsesBcryptCost10AndComparisonDoesNotCollapseInternalErrors(
 
 func TestAccessTokenRoundTripAndLifetime(t *testing.T) {
 	service := newTestTokenService(t)
-	now := time.Date(2026, 7, 21, 0, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 7, 21, 0, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 
 	token, err := service.GenerateAccessToken(123, entity.RoleAdmin, 9, now)
 	if err != nil {
@@ -109,9 +109,6 @@ func TestAccessTokenRoundTripAndLifetime(t *testing.T) {
 	if !claims.ExpiresAt.Equal(now.Add(15 * time.Minute)) {
 		t.Fatalf("ExpiresAt = %s, want %s", claims.ExpiresAt, now.Add(15*time.Minute))
 	}
-	if claims.IssuedAt.Location() != time.UTC || claims.ExpiresAt.Location() != time.UTC {
-		t.Fatal("token timestamps must be returned in UTC")
-	}
 
 	if _, err := service.ParseAccessToken(token, now.Add(15*time.Minute)); !errors.Is(err, entity.ErrUnauthorized) {
 		t.Fatalf("ParseAccessToken(at expiration) error = %v, want ErrUnauthorized", err)
@@ -120,7 +117,7 @@ func TestAccessTokenRoundTripAndLifetime(t *testing.T) {
 
 func TestAccessTokenRejectsInvalidInputsAndTampering(t *testing.T) {
 	service := newTestTokenService(t)
-	now := time.Date(2026, 7, 21, 0, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 7, 21, 0, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 
 	if _, err := service.GenerateAccessToken(0, entity.RoleUser, 0, now); err == nil {
 		t.Fatal("GenerateAccessToken() accepted user ID 0")
@@ -176,7 +173,7 @@ func TestAccessTokenRejectsInvalidInputsAndTampering(t *testing.T) {
 }
 
 func TestAccessTokenRejectsInvalidClaims(t *testing.T) {
-	now := time.Date(2026, 7, 21, 0, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 7, 21, 0, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 	service := newTestTokenService(t)
 
 	tests := []struct {

@@ -75,7 +75,7 @@ func createAdminVideoIntegrationVideo(
 	updatedAt := createdAt
 	var normalizedDeletedAt *time.Time
 	if deletedAt != nil {
-		value := deletedAt
+		value := *deletedAt
 		normalizedDeletedAt = &value
 		updatedAt = value
 	}
@@ -137,7 +137,7 @@ func TestAdminVideoRepositoryListUsesCursorAndExcludesDeleted(t *testing.T) {
 		"owner-list@example.com",
 		entity.RoleUser,
 		entity.StatusActive,
-		time.Date(2026, 8, 6, 0, 0, 0, 0, time.UTC),
+		time.Date(2026, 8, 6, 0, 0, 0, 0, time.FixedZone("JST", 9*60*60)),
 	)
 
 	oldest := createAdminVideoIntegrationVideo(
@@ -148,7 +148,7 @@ func TestAdminVideoRepositoryListUsesCursorAndExcludesDeleted(t *testing.T) {
 		"oldest",
 		entity.VideoProcessingUploading,
 		entity.VideoPublishPrivate,
-		time.Date(2026, 8, 6, 1, 0, 0, 0, time.UTC),
+		time.Date(2026, 8, 6, 1, 0, 0, 0, time.FixedZone("JST", 9*60*60)),
 		nil,
 	)
 	sameTimeLowerID := createAdminVideoIntegrationVideo(
@@ -159,7 +159,7 @@ func TestAdminVideoRepositoryListUsesCursorAndExcludesDeleted(t *testing.T) {
 		"same lower",
 		entity.VideoProcessingReady,
 		entity.VideoPublishHidden,
-		time.Date(2026, 8, 6, 2, 0, 0, 0, time.UTC),
+		time.Date(2026, 8, 6, 2, 0, 0, 0, time.FixedZone("JST", 9*60*60)),
 		nil,
 	)
 	sameTimeHigherID := createAdminVideoIntegrationVideo(
@@ -170,7 +170,7 @@ func TestAdminVideoRepositoryListUsesCursorAndExcludesDeleted(t *testing.T) {
 		"same higher",
 		entity.VideoProcessingReady,
 		entity.VideoPublishPublished,
-		time.Date(2026, 8, 6, 2, 0, 0, 0, time.UTC),
+		time.Date(2026, 8, 6, 2, 0, 0, 0, time.FixedZone("JST", 9*60*60)),
 		nil,
 	)
 	newest := createAdminVideoIntegrationVideo(
@@ -181,10 +181,10 @@ func TestAdminVideoRepositoryListUsesCursorAndExcludesDeleted(t *testing.T) {
 		"newest",
 		entity.VideoProcessingFailed,
 		entity.VideoPublishPrivate,
-		time.Date(2026, 8, 6, 3, 0, 0, 0, time.UTC),
+		time.Date(2026, 8, 6, 3, 0, 0, 0, time.FixedZone("JST", 9*60*60)),
 		nil,
 	)
-	deletedAt := time.Date(2026, 8, 6, 4, 1, 0, 0, time.UTC)
+	deletedAt := time.Date(2026, 8, 6, 4, 1, 0, 0, time.FixedZone("JST", 9*60*60))
 	deleted := createAdminVideoIntegrationVideo(
 		t,
 		db,
@@ -193,7 +193,7 @@ func TestAdminVideoRepositoryListUsesCursorAndExcludesDeleted(t *testing.T) {
 		"deleted",
 		entity.VideoProcessingReady,
 		entity.VideoPublishPrivate,
-		time.Date(2026, 8, 6, 4, 0, 0, 0, time.UTC),
+		time.Date(2026, 8, 6, 4, 0, 0, 0, time.FixedZone("JST", 9*60*60)),
 		&deletedAt,
 	)
 
@@ -249,7 +249,7 @@ func TestAdminVideoRepositoryListUsesCursorAndExcludesDeleted(t *testing.T) {
 func TestAdminVideoRepositoryFindByIDReturnsOutputMetaAndExcludesDeleted(t *testing.T) {
 	db := openAdminVideoIntegrationDB(t)
 	repository := NewAdminVideoRepository(db)
-	now := time.Date(2026, 8, 6, 1, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 8, 6, 1, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 	owner := createAdminVideoIntegrationUser(
 		t,
 		db,
@@ -306,7 +306,7 @@ func TestAdminVideoRepositoryFindByIDReturnsOutputMetaAndExcludesDeleted(t *test
 func TestAdminVideoRepositoryHideCommitsVideoAndAuditLog(t *testing.T) {
 	db := openAdminVideoIntegrationDB(t)
 	repository := NewAdminVideoRepository(db)
-	now := time.Date(2026, 8, 6, 2, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 8, 6, 2, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 	admin := createAdminVideoIntegrationUser(
 		t,
 		db,
@@ -383,7 +383,7 @@ func TestAdminVideoRepositoryHideCommitsVideoAndAuditLog(t *testing.T) {
 func TestAdminVideoRepositoryHideRollsBackWhenAuditInsertFails(t *testing.T) {
 	db := openAdminVideoIntegrationDB(t)
 	repository := NewAdminVideoRepository(db)
-	now := time.Date(2026, 8, 6, 2, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 8, 6, 2, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 	admin := createAdminVideoIntegrationUser(
 		t,
 		db,
@@ -459,7 +459,7 @@ CHECK (request_id <> 'reject-audit')
 func TestAdminVideoRepositoryRestoreCommitsVideoAndAuditLog(t *testing.T) {
 	db := openAdminVideoIntegrationDB(t)
 	repository := NewAdminVideoRepository(db)
-	now := time.Date(2026, 8, 6, 3, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 8, 6, 3, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 	admin := createAdminVideoIntegrationUser(
 		t,
 		db,
@@ -536,7 +536,7 @@ func TestAdminVideoRepositoryRestoreCommitsVideoAndAuditLog(t *testing.T) {
 func TestAdminVideoRepositoryRestoreRejectsSuspendedOwner(t *testing.T) {
 	db := openAdminVideoIntegrationDB(t)
 	repository := NewAdminVideoRepository(db)
-	now := time.Date(2026, 8, 6, 4, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 8, 6, 4, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 	admin := createAdminVideoIntegrationUser(
 		t,
 		db,
@@ -604,7 +604,7 @@ func TestAdminVideoRepositoryRestoreRejectsSuspendedOwner(t *testing.T) {
 func TestAdminVideoRepositoryHideRejectsInvalidStateWithoutAudit(t *testing.T) {
 	db := openAdminVideoIntegrationDB(t)
 	repository := NewAdminVideoRepository(db)
-	now := time.Date(2026, 8, 6, 5, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 8, 6, 5, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 	admin := createAdminVideoIntegrationUser(
 		t,
 		db,
@@ -663,7 +663,7 @@ func TestAdminVideoRepositoryHideRejectsInvalidStateWithoutAudit(t *testing.T) {
 
 func TestAdminAuditLogVideoActionConstraintRejectsInvalidTransition(t *testing.T) {
 	db := openAdminVideoIntegrationDB(t)
-	now := time.Date(2026, 8, 6, 6, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 8, 6, 6, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 	admin := createAdminVideoIntegrationUser(
 		t,
 		db,

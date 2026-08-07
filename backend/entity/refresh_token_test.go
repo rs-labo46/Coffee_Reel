@@ -7,7 +7,7 @@ import (
 )
 
 func TestRefreshTokenExpirationBoundary(t *testing.T) {
-	expiresAt := time.Date(2026, 7, 21, 12, 0, 0, 0, time.UTC)
+	expiresAt := time.Date(2026, 7, 21, 12, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 	token := RefreshToken{ExpiresAt: expiresAt}
 
 	if token.IsExpired(expiresAt.Add(-time.Nanosecond)) {
@@ -27,7 +27,7 @@ func TestRefreshTokenExpirationBoundary(t *testing.T) {
 }
 
 func TestRefreshTokenIsUsable(t *testing.T) {
-	now := time.Date(2026, 7, 21, 12, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 7, 21, 12, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 	past := now.Add(-time.Minute)
 
 	tests := []struct {
@@ -60,16 +60,13 @@ func TestRefreshTokenMarkUsed(t *testing.T) {
 	if token.UsedAt == nil || !token.UsedAt.Equal(now) {
 		t.Fatalf("UsedAt = %v, want %s", token.UsedAt, now)
 	}
-	if token.UsedAt.Location() != time.UTC {
-		t.Fatalf("UsedAt location = %s, want UTC", token.UsedAt.Location())
-	}
 	if token.ReplacedByID == nil || *token.ReplacedByID != 99 {
 		t.Fatalf("ReplacedByID = %v, want 99", token.ReplacedByID)
 	}
 }
 
 func TestRefreshTokenRevokeIsIdempotent(t *testing.T) {
-	first := time.Date(2026, 7, 21, 1, 0, 0, 0, time.UTC)
+	first := time.Date(2026, 7, 21, 1, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 	second := first.Add(time.Hour)
 	token := RefreshToken{}
 

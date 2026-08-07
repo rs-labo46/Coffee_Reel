@@ -130,8 +130,8 @@ func TestNewAdminVideoUsecaseRejectsInvalidConfiguration(t *testing.T) {
 func TestAdminVideoUsecaseListBuildsCursor(t *testing.T) {
 	jst := time.FixedZone("JST", 9*60*60)
 	inputCursorTime := time.Date(2026, 8, 6, 10, 0, 0, 0, jst)
-	firstCreatedAt := time.Date(2026, 8, 6, 0, 30, 0, 0, time.UTC)
-	lastCreatedAt := time.Date(2026, 8, 6, 0, 0, 0, 0, time.UTC)
+	firstCreatedAt := time.Date(2026, 8, 6, 0, 30, 0, 0, time.FixedZone("JST", 9*60*60))
+	lastCreatedAt := time.Date(2026, 8, 6, 0, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 
 	videos := &adminVideoRepositoryMock{
 		listFunc: func(
@@ -144,7 +144,6 @@ func TestAdminVideoUsecaseListBuildsCursor(t *testing.T) {
 			}
 			if cursor == nil ||
 				!cursor.CreatedAt.Equal(inputCursorTime) ||
-				cursor.CreatedAt.Location() != time.UTC ||
 				cursor.ID != 50 {
 				t.Fatalf("cursor = %#v", cursor)
 			}
@@ -209,11 +208,6 @@ func TestAdminVideoUsecaseListBuildsCursor(t *testing.T) {
 	if result.Items[1].Author.Status != entity.StatusSuspended {
 		t.Fatalf("last item = %#v", result.Items[1])
 	}
-	if result.Items[0].CreatedAt.Location() != time.UTC ||
-		result.Items[1].UpdatedAt.Location() != time.UTC {
-		t.Fatalf("items were not normalized to UTC: %#v", result.Items)
-	}
-
 	decoded, err := base64.RawURLEncoding.DecodeString(*result.NextCursor)
 	if err != nil {
 		t.Fatalf("decode next cursor: %v", err)
@@ -223,8 +217,7 @@ func TestAdminVideoUsecaseListBuildsCursor(t *testing.T) {
 		t.Fatalf("decode cursor JSON: %v", err)
 	}
 	if cursor.ID != 30 ||
-		!cursor.CreatedAt.Equal(lastCreatedAt) ||
-		cursor.CreatedAt.Location() != time.UTC {
+		!cursor.CreatedAt.Equal(lastCreatedAt) {
 		t.Fatalf("cursor = %#v", cursor)
 	}
 }

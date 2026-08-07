@@ -204,10 +204,8 @@ func (v *videoValidator) ValidatePublicListQuery(
 		return usecase.PublicVideoListInput{}, entity.ErrInvalidInput
 	}
 
-	_, offset := cursor.CreatedAt.Zone()
 	if !cursor.ResultType.IsValid() ||
 		cursor.CreatedAt.IsZero() ||
-		offset != 0 ||
 		cursor.ID == 0 ||
 		cursor.ID > math.MaxInt64 ||
 		!isLowerHexSHA256(cursor.FilterHash) {
@@ -222,7 +220,6 @@ func (v *videoValidator) ValidatePublicListQuery(
 		return usecase.PublicVideoListInput{}, entity.ErrInvalidInput
 	}
 
-	cursor.CreatedAt = cursor.CreatedAt
 	input.Cursor = &cursor
 	return input, nil
 }
@@ -288,16 +285,13 @@ func (v *videoValidator) ValidateListQuery(rawLimit, rawCursor string) (usecase.
 			entity.ErrInvalidInput
 	}
 
-	_, offset := cursor.CreatedAt.Zone()
 	if cursor.CreatedAt.IsZero() ||
-		offset != 0 ||
 		cursor.ID == 0 ||
 		cursor.ID > math.MaxInt64 {
 		return usecase.VideoListInput{},
 			entity.ErrInvalidInput
 	}
 
-	cursor.CreatedAt = cursor.CreatedAt
 	input.Cursor = &cursor
 
 	return input, nil

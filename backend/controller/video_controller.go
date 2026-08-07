@@ -86,6 +86,8 @@ type publicVideoResponse struct {
 	Author       videoAuthorResponse `json:"author"`
 	PlaybackURL  string              `json:"playback_url"`
 	ThumbnailURL string              `json:"thumbnail_url"`
+	LikeCount    int64               `json:"like_count"`
+	IsLiked      bool                `json:"is_liked"`
 	IsSaved      bool                `json:"is_saved"`
 	CreatedAt    time.Time           `json:"created_at"`
 }
@@ -493,6 +495,7 @@ func newPublicVideoListResponse(result usecase.PublicVideoListResult) publicVide
 
 	return publicVideoListResponse{
 		Items:      items,
+		ResultType: result.ResultType,
 		NextCursor: result.NextCursor,
 		HasMore:    result.HasMore,
 	}
@@ -510,6 +513,8 @@ func newPublicVideoResponse(result usecase.PublicVideoResult) publicVideoRespons
 		},
 		PlaybackURL:  result.Video.URL,
 		ThumbnailURL: result.Thumbnail.URL,
+		LikeCount:    result.LikeCount,
+		IsLiked:      result.IsLiked,
 		IsSaved:      result.IsSaved,
 		CreatedAt:    result.CreatedAt,
 	}

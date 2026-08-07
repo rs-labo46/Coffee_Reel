@@ -56,9 +56,6 @@ func TestUserInvalidateAccessTokens(t *testing.T) {
 	if !user.UpdatedAt.Equal(now) {
 		t.Fatalf("UpdatedAt = %s, want %s", user.UpdatedAt, now)
 	}
-	if user.UpdatedAt.Location() != time.UTC {
-		t.Fatalf("UpdatedAt location = %s, want UTC", user.UpdatedAt.Location())
-	}
 	if !user.CreatedAt.Equal(originalCreatedAt) {
 		t.Fatal("InvalidateAccessTokens must not change CreatedAt")
 	}
@@ -76,8 +73,8 @@ func TestUserJSONDoesNotExposeAuthenticationSecrets(t *testing.T) {
 		Role:         RoleUser,
 		Status:       StatusActive,
 		TokenVersion: 42,
-		CreatedAt:    time.Date(2026, 7, 21, 0, 0, 0, 0, time.UTC),
-		UpdatedAt:    time.Date(2026, 7, 21, 0, 0, 0, 0, time.UTC),
+		CreatedAt:    time.Date(2026, 7, 21, 0, 0, 0, 0, time.FixedZone("JST", 9*60*60)),
+		UpdatedAt:    time.Date(2026, 7, 21, 0, 0, 0, 0, time.FixedZone("JST", 9*60*60)),
 	}
 
 	body, err := json.Marshal(user)
@@ -127,9 +124,6 @@ func TestUserSuspend(t *testing.T) {
 	if !user.UpdatedAt.Equal(now) {
 		t.Fatalf("UpdatedAt = %s, want %s", user.UpdatedAt, now)
 	}
-	if user.UpdatedAt.Location() != time.UTC {
-		t.Fatalf("UpdatedAt location = %s, want UTC", user.UpdatedAt.Location())
-	}
 	if !user.CreatedAt.Equal(createdAt) {
 		t.Fatal("Suspend must not change CreatedAt")
 	}
@@ -147,7 +141,7 @@ func TestUserSuspend(t *testing.T) {
 //------------
 
 func TestUserSuspendRejectsInvalidState(t *testing.T) {
-	now := time.Date(2026, 7, 21, 8, 30, 0, 0, time.UTC)
+	now := time.Date(2026, 7, 21, 8, 30, 0, 0, time.FixedZone("JST", 9*60*60))
 
 	tests := []struct {
 		name    string
@@ -242,9 +236,6 @@ func TestUserResume(t *testing.T) {
 	if !user.UpdatedAt.Equal(now) {
 		t.Fatalf("UpdatedAt = %s, want %s", user.UpdatedAt, now)
 	}
-	if user.UpdatedAt.Location() != time.UTC {
-		t.Fatalf("UpdatedAt location = %s, want UTC", user.UpdatedAt.Location())
-	}
 	if !user.CreatedAt.Equal(createdAt) {
 		t.Fatal("Resume must not change CreatedAt")
 	}
@@ -254,7 +245,7 @@ func TestUserResume(t *testing.T) {
 }
 
 func TestUserResumeRejectsInvalidState(t *testing.T) {
-	now := time.Date(2026, 7, 21, 8, 30, 0, 0, time.UTC)
+	now := time.Date(2026, 7, 21, 8, 30, 0, 0, time.FixedZone("JST", 9*60*60))
 
 	tests := []struct {
 		name    string

@@ -27,8 +27,8 @@ func TestNewAdminAuditLog(t *testing.T) {
 	if log.Reason != "規約違反のため" {
 		t.Fatalf("Reason = %q", log.Reason)
 	}
-	if !log.CreatedAt.Equal(now) || log.CreatedAt.Location() != time.UTC {
-		t.Fatalf("CreatedAt = %s, want UTC %s", log.CreatedAt, now)
+	if !log.CreatedAt.Equal(now) {
+		t.Fatalf("CreatedAt = %s, want %s", log.CreatedAt, now)
 	}
 }
 

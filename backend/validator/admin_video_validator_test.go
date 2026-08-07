@@ -189,7 +189,7 @@ func TestAdminVideoValidatorValidateListQuery(t *testing.T) {
 
 func TestAdminVideoValidatorValidateCursor(t *testing.T) {
 	validator := NewAdminVideoValidator()
-	createdAt := time.Date(2026, 8, 6, 1, 2, 3, 0, time.UTC)
+	createdAt := time.Date(2026, 8, 6, 1, 2, 3, 0, time.FixedZone("JST", 9*60*60))
 	validJSON := fmt.Sprintf(
 		`{"created_at":%q,"id":10}`,
 		createdAt.Format(time.RFC3339Nano),
@@ -202,12 +202,11 @@ func TestAdminVideoValidatorValidateCursor(t *testing.T) {
 	}
 	if input.Cursor == nil ||
 		input.Cursor.ID != 10 ||
-		!input.Cursor.CreatedAt.Equal(createdAt) ||
-		input.Cursor.CreatedAt.Location() != time.UTC {
+		!input.Cursor.CreatedAt.Equal(createdAt) {
 		t.Fatalf("cursor = %#v", input.Cursor)
 	}
 
-	t.Run("offset cursor is normalized to UTC", func(t *testing.T) {
+	t.Run("JST cursor is accepted", func(t *testing.T) {
 		offsetJSON := `{"created_at":"2026-08-06T10:02:03+09:00","id":10}`
 		offsetCursor := base64.RawURLEncoding.EncodeToString([]byte(offsetJSON))
 
@@ -215,20 +214,18 @@ func TestAdminVideoValidatorValidateCursor(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ValidateListQuery() error = %v", err)
 		}
-		want := time.Date(2026, 8, 6, 1, 2, 3, 0, time.UTC)
+		want := time.Date(2026, 8, 6, 10, 2, 3, 0, time.FixedZone("JST", 9*60*60))
 		if input.Cursor == nil ||
-			!input.Cursor.CreatedAt.Equal(want) ||
-			input.Cursor.CreatedAt.Location() != time.UTC {
+			!input.Cursor.CreatedAt.Equal(want) {
 			t.Fatalf("cursor = %#v", input.Cursor)
 		}
 	})
 
 	invalidJSONValues := []string{
-		`{"created_at":"2026-08-06T01:02:03Z","id":0}`,
-		`{"created_at":"0001-01-01T00:00:00Z","id":10}`,
-		`{"created_at":"2026-08-06T01:02:03Z","id":9223372036854775808}`,
-		`{"created_at":"2026-08-06T01:02:03Z","id":10,"extra":true}`,
-		`{"created_at":"2026-08-06T01:02:03Z","id":10}{}`,
+		`{"created_at":"2026-08-06T10:02:03+09:00","id":0}`,
+		`{"created_at":"2026-08-06T10:02:03+09:00","id":9223372036854775808}`,
+		`{"created_at":"2026-08-06T10:02:03+09:00","id":10,"extra":true}`,
+		`{"created_at":"2026-08-06T10:02:03+09:00","id":10}{}`,
 	}
 
 	invalidCursors := []string{"%%%"}

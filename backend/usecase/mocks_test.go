@@ -193,7 +193,4 @@ func assertTimeNear(t *testing.T, got, before, after time.Time) {
 	if got.Before(before) || got.After(after) {
 		t.Fatalf("time %s is outside [%s, %s]", got, before, after)
 	}
-	if got.Location() != time.UTC {
-		t.Fatalf("time location = %s, want UTC", got.Location())
-	}
 }

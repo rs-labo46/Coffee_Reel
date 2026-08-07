@@ -222,7 +222,7 @@ func TestStorageCleanupValueValidation(t *testing.T) {
 }
 
 func testCleanupTime() time.Time {
-	return time.Date(2026, 7, 28, 4, 0, 0, 0, time.UTC)
+	return time.Date(2026, 7, 28, 4, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 }
 
 func mustNewCleanupJob(t *testing.T, now time.Time) *StorageCleanupJob {

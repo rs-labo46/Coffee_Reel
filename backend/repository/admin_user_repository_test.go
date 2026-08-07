@@ -13,7 +13,7 @@ import (
 func TestAdminUserRepositoryListUsersUsesCursorAndExcludesAdmins(t *testing.T) {
 	db := openPostgresIntegrationDB(t)
 	repository := NewAdminUserRepository(db)
-	base := time.Date(2026, 7, 23, 10, 0, 0, 0, time.UTC)
+	base := time.Date(2026, 7, 23, 10, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 
 	users := []*entity.User{
 		{
@@ -91,7 +91,7 @@ func TestAdminUserRepositoryListUsersUsesCursorAndExcludesAdmins(t *testing.T) {
 func TestAdminUserRepositorySuspendAndResumeAreAtomic(t *testing.T) {
 	db := openPostgresIntegrationDB(t)
 	repository := NewAdminUserRepository(db)
-	now := time.Date(2026, 7, 23, 12, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 7, 23, 12, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 
 	admin := &entity.User{
 		Name:         "admin",
@@ -224,7 +224,7 @@ func TestAdminUserRepositorySuspendAndResumeAreAtomic(t *testing.T) {
 func TestAdminUserRepositoryRollsBackWhenAuditLogIsInvalid(t *testing.T) {
 	db := openPostgresIntegrationDB(t)
 	repository := NewAdminUserRepository(db)
-	now := time.Date(2026, 7, 23, 13, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 7, 23, 13, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 
 	admin := &entity.User{
 		Name:         "admin",
@@ -310,7 +310,7 @@ func TestAdminUserRepositoryRollsBackWhenAuditLogIsInvalid(t *testing.T) {
 func TestAdminUserRepositorySuspendRejectsAdmin(t *testing.T) {
 	db := openPostgresIntegrationDB(t)
 	repository := NewAdminUserRepository(db)
-	now := time.Date(2026, 7, 23, 14, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 7, 23, 14, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 
 	actor := &entity.User{
 		Name:         "actor-admin",
@@ -377,7 +377,7 @@ func TestAdminUserRepositorySuspendRejectsAdmin(t *testing.T) {
 func TestAdminUserRepositoryResumeRejectsAdmin(t *testing.T) {
 	db := openPostgresIntegrationDB(t)
 	repository := NewAdminUserRepository(db)
-	now := time.Date(2026, 7, 23, 15, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 7, 23, 15, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 
 	actor := &entity.User{
 		Name:         "actor-admin",

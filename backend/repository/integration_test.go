@@ -55,7 +55,7 @@ func openPostgresIntegrationDB(t *testing.T) *gorm.DB {
 	if testCfg.RuntimeParams == nil {
 		testCfg.RuntimeParams = make(map[string]string)
 	}
-	testCfg.RuntimeParams["search_path"] = schema
+	testCfg.RuntimeParams["search_path"] = schema + ",public"
 	testSQL := stdlib.OpenDB(*testCfg)
 	testSQL.SetMaxOpenConns(20)
 	testSQL.SetMaxIdleConns(20)

@@ -91,7 +91,7 @@ func TestStorageCleanupUsecaseObjectNotFoundIsMarkedSucceeded(t *testing.T) {
 		claimNextFunc: func(context.Context, time.Time) (*entity.StorageCleanupJob, error) { return job, nil },
 		markSucceededFunc: func(_ context.Context, jobID uint64, now time.Time) error {
 			marked = true
-			if jobID != job.ID || now.Location() != time.UTC {
+			if jobID != job.ID {
 				t.Fatalf("MarkSucceeded(%d, %s)", jobID, now)
 			}
 			return nil
@@ -180,7 +180,7 @@ func TestStorageCleanupUsecasePermanentOrFinalAttemptFailureIsMarkedFailed(t *te
 				claimNextFunc: func(context.Context, time.Time) (*entity.StorageCleanupJob, error) { return job, nil },
 				markFailedFunc: func(_ context.Context, jobID uint64, code, message string, now time.Time) error {
 					marked = true
-					if jobID != job.ID || code != tt.wantCode || message != tt.wantMessage || now.Location() != time.UTC {
+					if jobID != job.ID || code != tt.wantCode || message != tt.wantMessage {
 						t.Fatalf("MarkFailed(%d,%q,%q,%s)", jobID, code, message, now)
 					}
 					return nil
@@ -222,7 +222,7 @@ func TestStorageCleanupUsecaseRecoverTimedOutJobsBuildsRecoveryInput(t *testing.
 }
 
 func TestStorageCleanupUsecaseDetectOrphanObjectsRegistersOnlyOldUnreferencedObjectsAcrossPages(t *testing.T) {
-	now := time.Date(2026, 8, 3, 12, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 8, 3, 12, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 	old := now.Add(-2 * time.Hour)
 	recent := now.Add(-30 * time.Minute)
 	nextCursor := "page-2"

@@ -219,7 +219,7 @@ func TestVideoProcessingJobStatusAndFailureCodeValidation(t *testing.T) {
 }
 
 func testJobTime() time.Time {
-	return time.Date(2026, 7, 28, 2, 0, 0, 0, time.UTC)
+	return time.Date(2026, 7, 28, 2, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 }
 
 func mustNewVideoJob(t *testing.T, now time.Time) *VideoProcessingJob {

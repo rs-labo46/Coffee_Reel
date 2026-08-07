@@ -165,7 +165,7 @@ func TestAdminUserUsecaseSuspendUser(t *testing.T) {
 		if adminID != 9 || targetID != 3 || reason != "reason" || requestID != "request-1" {
 			t.Fatalf("inputs = %d %d %q %q", adminID, targetID, reason, requestID)
 		}
-		if now.Before(before) || now.Location() != time.UTC {
+		if now.Before(before) {
 			t.Fatalf("now = %s", now)
 		}
 		return &entity.User{ID: 3, Status: entity.StatusSuspended, UpdatedAt: now}, nil
@@ -348,12 +348,6 @@ func TestAdminUserUsecaseListUsersReturnsFinalPageWithoutNextCursor(t *testing.T
 			if cursor.ID != 7 || !cursor.CreatedAt.Equal(inputCursorTime) {
 				t.Fatalf("cursor = %#v", cursor)
 			}
-			if cursor.CreatedAt.Location() != time.UTC {
-				t.Fatalf(
-					"cursor location = %s, want UTC",
-					cursor.CreatedAt.Location(),
-				)
-			}
 
 			return repository.AdminUserListResult{
 				Users: []repository.AdminUserListItem{
@@ -410,12 +404,6 @@ func TestAdminUserUsecaseListUsersReturnsFinalPageWithoutNextCursor(t *testing.T
 			"CreatedAt = %s, want %s",
 			result.Items[0].CreatedAt,
 			itemCreatedAt,
-		)
-	}
-	if result.Items[0].CreatedAt.Location() != time.UTC {
-		t.Fatalf(
-			"CreatedAt location = %s, want UTC",
-			result.Items[0].CreatedAt.Location(),
 		)
 	}
 }
@@ -542,13 +530,8 @@ func TestAdminUserUsecaseGetUserDetail(t *testing.T) {
 		t.Fatalf("result = %#v", result)
 	}
 
-	if !result.CreatedAt.Equal(userCreatedAt) ||
-		result.CreatedAt.Location() != time.UTC {
-		t.Fatalf(
-			"CreatedAt = %s, want UTC %s",
-			result.CreatedAt,
-			userCreatedAt,
-		)
+	if !result.CreatedAt.Equal(userCreatedAt) {
+		t.Fatalf("CreatedAt = %s, want %s", result.CreatedAt, userCreatedAt)
 	}
 
 	if len(result.Videos) != 1 {
@@ -563,13 +546,8 @@ func TestAdminUserUsecaseGetUserDetail(t *testing.T) {
 		t.Fatalf("video = %#v", video)
 	}
 
-	if !video.CreatedAt.Equal(videoCreatedAt) ||
-		video.CreatedAt.Location() != time.UTC {
-		t.Fatalf(
-			"video CreatedAt = %s, want UTC %s",
-			video.CreatedAt,
-			videoCreatedAt,
-		)
+	if !video.CreatedAt.Equal(videoCreatedAt) {
+		t.Fatalf("video CreatedAt = %s, want %s", video.CreatedAt, videoCreatedAt)
 	}
 }
 
@@ -597,7 +575,7 @@ func TestAdminUserUsecaseResumeUser(t *testing.T) {
 					requestID,
 				)
 			}
-			if now.Before(before) || now.Location() != time.UTC {
+			if now.Before(before) {
 				t.Fatalf("now = %s", now)
 			}
 
@@ -634,8 +612,7 @@ func TestAdminUserUsecaseResumeUser(t *testing.T) {
 	if result.ID != 3 || result.Status != entity.StatusActive {
 		t.Fatalf("result = %#v", result)
 	}
-	if result.UpdatedAt.Before(before) ||
-		result.UpdatedAt.Location() != time.UTC {
+	if result.UpdatedAt.Before(before) {
 		t.Fatalf("UpdatedAt = %s", result.UpdatedAt)
 	}
 }

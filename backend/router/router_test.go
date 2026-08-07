@@ -103,6 +103,18 @@ func (s *videoControllerStub) Delete(c echo.Context) error {
 
 var _ controller.IVideoController = (*videoControllerStub)(nil)
 
+type videoLikeControllerStub struct{}
+
+func (s *videoLikeControllerStub) Like(c echo.Context) error {
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (s *videoLikeControllerStub) Unlike(c echo.Context) error {
+	return c.NoContent(http.StatusNoContent)
+}
+
+var _ controller.IVideoLikeController = (*videoLikeControllerStub)(nil)
+
 type savedVideoControllerStub struct{}
 
 func (s *savedVideoControllerStub) Save(c echo.Context) error {
@@ -317,6 +329,7 @@ func newTestRouter(
 		VideoComponents{
 			Controller:      &videoControllerStub{},
 			SavedController: &savedVideoControllerStub{},
+			LikeController:  &videoLikeControllerStub{},
 		},
 	)
 }
@@ -359,9 +372,25 @@ func TestRouterRegistersVideoRoutes(t *testing.T) {
 		"PUT /videos/:video_id/saved":            false,
 		"DELETE /videos/:video_id/saved":         false,
 		"GET /me/saved-videos":                   false,
+		"PUT /videos/:video_id/like":             false,
+		"DELETE /videos/:video_id/like":          false,
 	}
 
 	assertRoutes(t, e, want)
+}
+
+func TestRouterDoesNotRegisterVideoLikeStateRoute(t *testing.T) {
+	e := newTestRouter(
+		&controllerStub{},
+		&userUsecaseStub{},
+		&tokenServiceStub{},
+	)
+
+	for _, route := range e.Routes() {
+		if route.Method == http.MethodGet && route.Path == "/videos/:video_id/like" {
+			t.Fatal("GET /videos/:video_id/like must not be registered")
+		}
+	}
 }
 
 func TestRouterAppliesCommonMiddleware(t *testing.T) {

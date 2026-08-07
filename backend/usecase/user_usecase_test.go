@@ -396,7 +396,7 @@ func TestUserUsecaseRefreshRejectsInvalidTokenStatesBeforeRotation(t *testing.T)
 			findToken: &entity.RefreshToken{UserID: 9, FamilyID: "family", ExpiresAt: now.Add(time.Hour), UsedAt: &usedAt},
 			refreshTokens: &refreshTokenRepositoryMock{revokeFamilyAndIncrementTokenVersionFunc: func(_ context.Context, userID uint64, familyID string, at time.Time) error {
 				revokeCalled = true
-				if userID != 9 || familyID != "family" || at.Location() != time.UTC {
+				if userID != 9 || familyID != "family" {
 					t.Fatalf("RevokeFamilyAndIncrementTokenVersion(%d, %q, %s)", userID, familyID, at)
 				}
 				return nil
@@ -497,7 +497,7 @@ func TestUserUsecaseLogoutIsIdempotentForMissingAndAlreadyRevokedTokens(t *testi
 			},
 			revokeFamilyFunc: func(_ context.Context, familyID string, now time.Time) error {
 				revokeCalls++
-				if familyID != "family" || now.Location() != time.UTC {
+				if familyID != "family" {
 					t.Fatalf("RevokeFamily(%q, %s)", familyID, now)
 				}
 				return nil

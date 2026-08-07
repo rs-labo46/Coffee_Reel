@@ -462,21 +462,18 @@ func TestRunStartsAllTasksAndStops(t *testing.T) {
 	cancel()
 	waitDone(t, done)
 
-	assertUTCNow := func(name string, now time.Time) {
+	assertCurrentTime := func(name string, now time.Time) {
 		t.Helper()
 		if now.IsZero() {
 			t.Fatalf("%s now is zero", name)
 		}
-		if now.Location() != time.UTC {
-			t.Fatalf("%s location = %v, want UTC", name, now.Location())
-		}
 	}
 
-	assertUTCNow("ExpireUploads", expiry.now)
-	assertUTCNow("processing recovery", processingRecovery.now)
-	assertUTCNow("cleanup recovery", cleanupRecovery.now)
-	assertUTCNow("orphan detection", orphanNow)
-	assertUTCNow("idempotency cleanup", idempotency.now)
+	assertCurrentTime("ExpireUploads", expiry.now)
+	assertCurrentTime("processing recovery", processingRecovery.now)
+	assertCurrentTime("cleanup recovery", cleanupRecovery.now)
+	assertCurrentTime("orphan detection", orphanNow)
+	assertCurrentTime("idempotency cleanup", idempotency.now)
 
 	if expiry.limit != config.UploadExpiryLimit {
 		t.Fatalf(

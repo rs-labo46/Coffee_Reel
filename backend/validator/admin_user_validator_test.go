@@ -78,7 +78,7 @@ func TestAdminUserValidatorValidateUserListQuery(t *testing.T) {
 	}
 
 	cursor := usecase.AdminUserCursor{
-		CreatedAt: time.Date(2026, 7, 23, 10, 0, 0, 123, time.UTC),
+		CreatedAt: time.Date(2026, 7, 23, 10, 0, 0, 123, time.FixedZone("JST", 9*60*60)),
 		ID:        25,
 	}
 	payload, err := json.Marshal(cursor)
@@ -99,16 +99,14 @@ func TestAdminUserValidatorValidateUserListQuery(t *testing.T) {
 func TestAdminUserValidatorRejectsInvalidCursor(t *testing.T) {
 	validator := newAdminUserValidatorForTest()
 
-	unknownField := base64.RawURLEncoding.EncodeToString([]byte(`{"created_at":"2026-07-23T10:00:00Z","id":1,"extra":true}`))
-	nonUTC := base64.RawURLEncoding.EncodeToString([]byte(`{"created_at":"2026-07-23T19:00:00+09:00","id":1}`))
-	zeroID := base64.RawURLEncoding.EncodeToString([]byte(`{"created_at":"2026-07-23T10:00:00Z","id":0}`))
-	tooLargeID := base64.RawURLEncoding.EncodeToString([]byte(`{"created_at":"2026-07-23T10:00:00Z","id":9223372036854775808}`))
+	unknownField := base64.RawURLEncoding.EncodeToString([]byte(`{"created_at":"2026-07-23T19:00:00+09:00","id":1,"extra":true}`))
+	zeroID := base64.RawURLEncoding.EncodeToString([]byte(`{"created_at":"2026-07-23T19:00:00+09:00","id":0}`))
+	tooLargeID := base64.RawURLEncoding.EncodeToString([]byte(`{"created_at":"2026-07-23T19:00:00+09:00","id":9223372036854775808}`))
 
 	for _, value := range []string{
 		"not-base64",
 		base64.RawURLEncoding.EncodeToString([]byte(`not-json`)),
 		unknownField,
-		nonUTC,
 		zeroID,
 		tooLargeID,
 	} {
@@ -183,7 +181,7 @@ func TestAdminUserValidatorRejectsIncompleteOrTrailingCursorJSON(t *testing.T) {
 		},
 		{
 			name: "missing id",
-			json: `{"created_at":"2026-07-23T10:00:00Z"}`,
+			json: `{"created_at":"2026-07-23T19:00:00+09:00"}`,
 		},
 		{
 			name: "zero created_at",
@@ -191,12 +189,12 @@ func TestAdminUserValidatorRejectsIncompleteOrTrailingCursorJSON(t *testing.T) {
 		},
 		{
 			name: "second JSON object",
-			json: `{"created_at":"2026-07-23T10:00:00Z","id":1}` +
+			json: `{"created_at":"2026-07-23T19:00:00+09:00","id":1}` +
 				`{"created_at":"2026-07-23T09:00:00Z","id":2}`,
 		},
 		{
 			name: "trailing null",
-			json: `{"created_at":"2026-07-23T10:00:00Z","id":1} null`,
+			json: `{"created_at":"2026-07-23T19:00:00+09:00","id":1} null`,
 		},
 	}
 

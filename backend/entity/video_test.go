@@ -305,7 +305,7 @@ func TestOutputVideoMetaValidate(t *testing.T) {
 }
 
 func testVideoTime() time.Time {
-	return time.Date(2026, 7, 28, 1, 0, 0, 0, time.UTC)
+	return time.Date(2026, 7, 28, 1, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 }
 
 func mustNewTestVideo(t *testing.T, now time.Time) *Video {

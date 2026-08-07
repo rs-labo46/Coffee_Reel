@@ -115,7 +115,7 @@ func setAdminVideoPathParam(
 
 func TestAdminVideoControllerList(t *testing.T) {
 	nextCursor := "next-cursor"
-	createdAt := time.Date(2026, 8, 6, 1, 0, 0, 0, time.UTC)
+	createdAt := time.Date(2026, 8, 6, 1, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 
 	videos := &adminVideoUsecaseStub{
 		listFunc: func(
@@ -222,7 +222,7 @@ func TestAdminVideoControllerListReturnsEmptyArray(t *testing.T) {
 func TestAdminVideoControllerDetail(t *testing.T) {
 	playbackURL := "https://storage.example/video"
 	thumbnailURL := "https://storage.example/thumbnail"
-	createdAt := time.Date(2026, 8, 6, 1, 0, 0, 0, time.UTC)
+	createdAt := time.Date(2026, 8, 6, 1, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 
 	videos := &adminVideoUsecaseStub{
 		getFunc: func(
@@ -286,7 +286,7 @@ func TestAdminVideoControllerDetail(t *testing.T) {
 }
 
 func TestAdminVideoControllerHide(t *testing.T) {
-	updatedAt := time.Date(2026, 8, 6, 2, 0, 0, 0, time.UTC)
+	updatedAt := time.Date(2026, 8, 6, 2, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 	videos := &adminVideoUsecaseStub{
 		hideFunc: func(
 			_ context.Context,
@@ -472,7 +472,7 @@ func TestAdminVideoControllerDoesNotExposeInternalError(t *testing.T) {
 }
 
 func TestAdminVideoControllerRestore(t *testing.T) {
-	updatedAt := time.Date(2026, 8, 6, 3, 0, 0, 0, time.UTC)
+	updatedAt := time.Date(2026, 8, 6, 3, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 	videos := &adminVideoUsecaseStub{
 		restoreFunc: func(
 			_ context.Context,
