@@ -402,7 +402,7 @@ func TestVideoProcessingUsecaseMaintenanceInputsAndForwarding(t *testing.T) {
 		},
 	}
 	jobs := &videoProcessingJobRepositoryMock{recoverTimedOutFunc: func(_ context.Context, input repository.ProcessingRecoveryInput) (int, error) {
-		if !input.Now.Equal(nowJST.UTC()) || !input.TimeoutBefore.Equal(nowJST.UTC().Add(-videoProcessingTimeout)) || input.Limit != 5 || input.RetryDelays != validVideoProcessingConfig().RetryDelays {
+		if !input.Now.Equal(nowJST) || !input.TimeoutBefore.Equal(nowJST.Add(-videoProcessingTimeout)) || input.Limit != 5 || input.RetryDelays != validVideoProcessingConfig().RetryDelays {
 			t.Fatalf("recovery input=%+v", input)
 		}
 		return 2, nil

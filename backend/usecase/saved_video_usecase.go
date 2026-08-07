@@ -87,7 +87,7 @@ func (u *savedVideoUsecase) List(ctx context.Context, actor *entity.User, input 
 	}
 	if page.HasMore && len(items) > 0 {
 		cursor, err := encodeVideoCursor(VideoCursor{
-			CreatedAt: page.LastCreatedAt.UTC(),
+			CreatedAt: page.LastCreatedAt,
 			ID:        page.LastID,
 		})
 		if err != nil {
@@ -105,7 +105,7 @@ func savedVideoCursor(cursor *VideoCursor) *repository.SavedVideoCursor {
 	}
 
 	return &repository.SavedVideoCursor{
-		CreatedAt: cursor.CreatedAt.UTC(),
+		CreatedAt: cursor.CreatedAt,
 		ID:        cursor.ID,
 	}
 }

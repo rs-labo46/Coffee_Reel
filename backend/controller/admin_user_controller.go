@@ -126,7 +126,7 @@ func (a *adminUserController) GetUserDetail(c echo.Context) error {
 			Title:            video.Title,
 			ProcessingStatus: video.ProcessingStatus,
 			PublishStatus:    video.PublishStatus,
-			CreatedAt:        video.CreatedAt.UTC(),
+			CreatedAt:        video.CreatedAt,
 		})
 	}
 
@@ -135,7 +135,7 @@ func (a *adminUserController) GetUserDetail(c echo.Context) error {
 		Name:      result.Name,
 		Email:     result.Email,
 		Status:    result.Status,
-		CreatedAt: result.CreatedAt.UTC(),
+		CreatedAt: result.CreatedAt,
 		Videos:    videos,
 	})
 }
@@ -183,7 +183,7 @@ func (a *adminUserController) changeUserStatus(c echo.Context, change func(ctx c
 	return c.JSON(http.StatusOK, adminUserStatusResponse{
 		ID:        result.ID,
 		Status:    result.Status,
-		UpdatedAt: result.UpdatedAt.UTC(),
+		UpdatedAt: result.UpdatedAt,
 	})
 }
 

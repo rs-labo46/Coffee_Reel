@@ -168,8 +168,8 @@ func (a *adminVideoController) Detail(c echo.Context) error {
 		PublishStatus:    result.PublishStatus,
 		PlaybackURL:      result.PlaybackURL,
 		ThumbnailURL:     result.ThumbnailURL,
-		CreatedAt:        result.CreatedAt.UTC(),
-		UpdatedAt:        result.UpdatedAt.UTC(),
+		CreatedAt:        result.CreatedAt,
+		UpdatedAt:        result.UpdatedAt,
 	})
 }
 
@@ -228,7 +228,7 @@ func (a *adminVideoController) changeState(c echo.Context,
 		ID:               result.ID,
 		ProcessingStatus: result.ProcessingStatus,
 		PublishStatus:    result.PublishStatus,
-		UpdatedAt:        result.UpdatedAt.UTC(),
+		UpdatedAt:        result.UpdatedAt,
 	})
 }
 

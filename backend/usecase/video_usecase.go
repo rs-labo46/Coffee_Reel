@@ -282,7 +282,7 @@ func (u *videoUsecase) StartUpload(ctx context.Context, actor *entity.User, inpu
 	}
 
 	issuedAt := time.Now()
-	remaining := current.UploadExpiresAt.UTC().Sub(issuedAt)
+	remaining := current.UploadExpiresAt.Sub(issuedAt)
 	if remaining <= 0 {
 		return StartUploadResult{}, entity.ErrUploadExpired
 	}
@@ -298,8 +298,8 @@ func (u *videoUsecase) StartUpload(ctx context.Context, actor *entity.User, inpu
 		Category:         current.Category,
 		ProcessingStatus: current.ProcessingStatus,
 		PublishStatus:    current.PublishStatus,
-		UploadExpiresAt:  current.UploadExpiresAt.UTC(),
-		CreatedAt:        current.CreatedAt.UTC(),
+		UploadExpiresAt:  current.UploadExpiresAt,
+		CreatedAt:        current.CreatedAt,
 		Upload:           uploadInfoFromRepository(uploadTarget),
 		Created:          created.Created,
 	}, nil
@@ -336,7 +336,7 @@ func (u *videoUsecase) CompleteUpload(ctx context.Context, actor *entity.User, v
 	}
 
 	now := time.Now()
-	if !now.Before(video.UploadExpiresAt.UTC()) {
+	if !now.Before(video.UploadExpiresAt) {
 		return VideoStateResult{}, entity.ErrUploadExpired
 	}
 
@@ -416,7 +416,7 @@ func (u *videoUsecase) ListReels(ctx context.Context, viewer *entity.User, input
 		cursor, err := encodePublicVideoCursor(PublicVideoCursor{
 			ResultType: resultType,
 			Similarity: similarity,
-			CreatedAt:  page.LastCreatedAt.UTC(),
+			CreatedAt:  page.LastCreatedAt,
 			ID:         page.LastID,
 			FilterHash: filterHash,
 		})
@@ -471,7 +471,7 @@ func (u *videoUsecase) ListMine(ctx context.Context, actor *entity.User, input V
 			Description:      item.Description,
 			ProcessingStatus: item.ProcessingStatus,
 			PublishStatus:    item.PublishStatus,
-			UploadExpiresAt:  item.UploadExpiresAt.UTC(),
+			UploadExpiresAt:  item.UploadExpiresAt,
 			CreatedAt:        item.CreatedAt,
 			UpdatedAt:        item.UpdatedAt,
 		}
@@ -499,7 +499,7 @@ func (u *videoUsecase) ListMine(ctx context.Context, actor *entity.User, input V
 
 	output := OwnedVideoListResult{Items: items, HasMore: page.HasMore}
 	if page.HasMore && len(items) > 0 {
-		cursor, err := encodeVideoCursor(VideoCursor{CreatedAt: page.LastCreatedAt.UTC(), ID: page.LastID})
+		cursor, err := encodeVideoCursor(VideoCursor{CreatedAt: page.LastCreatedAt, ID: page.LastID})
 		if err != nil {
 			return OwnedVideoListResult{}, err
 		}
@@ -533,9 +533,9 @@ func (u *videoUsecase) GetMine(ctx context.Context, actor *entity.User, videoID 
 		Description:      video.Description,
 		ProcessingStatus: video.ProcessingStatus,
 		PublishStatus:    video.PublishStatus,
-		UploadExpiresAt:  video.UploadExpiresAt.UTC(),
-		CreatedAt:        video.CreatedAt.UTC(),
-		UpdatedAt:        video.UpdatedAt.UTC(),
+		UploadExpiresAt:  video.UploadExpiresAt,
+		CreatedAt:        video.CreatedAt,
+		UpdatedAt:        video.UpdatedAt,
 		FailureCode:      detail.FailureCode,
 	}
 	if detail.SourceMeta != nil {
@@ -550,7 +550,7 @@ func (u *videoUsecase) GetMine(ctx context.Context, actor *entity.User, videoID 
 			VideoCodec:     detail.SourceMeta.VideoCodec,
 			HasAudio:       detail.SourceMeta.HasAudio,
 			AudioCodec:     detail.SourceMeta.AudioCodec,
-			CreatedAt:      detail.SourceMeta.CreatedAt.UTC(),
+			CreatedAt:      detail.SourceMeta.CreatedAt,
 		}
 	}
 
@@ -723,7 +723,7 @@ func repositoryPublicVideoListInput(
 		cursor = &repository.PublicVideoCursor{
 			ResultType: repository.PublicVideoSearchMode(input.Cursor.ResultType),
 			Similarity: input.Cursor.Similarity,
-			CreatedAt:  input.Cursor.CreatedAt.UTC(),
+			CreatedAt:  input.Cursor.CreatedAt,
 			ID:         input.Cursor.ID,
 			FilterHash: filterHash,
 		}
@@ -778,7 +778,7 @@ func videoStateResult(video *entity.Video) VideoStateResult {
 		ID:               video.ID,
 		ProcessingStatus: video.ProcessingStatus,
 		PublishStatus:    video.PublishStatus,
-		UpdatedAt:        video.UpdatedAt.UTC(),
+		UpdatedAt:        video.UpdatedAt,
 	}
 }
 
@@ -786,11 +786,11 @@ func repositoryVideoCursor(cursor *VideoCursor) *repository.VideoCursor {
 	if cursor == nil {
 		return nil
 	}
-	return &repository.VideoCursor{CreatedAt: cursor.CreatedAt.UTC(), ID: cursor.ID}
+	return &repository.VideoCursor{CreatedAt: cursor.CreatedAt, ID: cursor.ID}
 }
 
 func encodeVideoCursor(cursor VideoCursor) (string, error) {
-	payload, err := json.Marshal(VideoCursor{CreatedAt: cursor.CreatedAt.UTC(), ID: cursor.ID})
+	payload, err := json.Marshal(VideoCursor{CreatedAt: cursor.CreatedAt, ID: cursor.ID})
 	if err != nil {
 		return "", fmt.Errorf("encode video cursor: %w", err)
 	}
@@ -801,7 +801,7 @@ func encodePublicVideoCursor(cursor PublicVideoCursor) (string, error) {
 	payload, err := json.Marshal(PublicVideoCursor{
 		ResultType: cursor.ResultType,
 		Similarity: cursor.Similarity,
-		CreatedAt:  cursor.CreatedAt.UTC(),
+		CreatedAt:  cursor.CreatedAt,
 		ID:         cursor.ID,
 		FilterHash: cursor.FilterHash,
 	})
@@ -842,12 +842,12 @@ func uploadInfoFromRepository(target repository.UploadTarget) UploadInfo {
 		Method:      target.Method,
 		URL:         target.URL,
 		ContentType: target.ContentType,
-		ExpiresAt:   target.ExpiresAt.UTC(),
+		ExpiresAt:   target.ExpiresAt,
 	}
 }
 
 func readInfoFromRepository(target repository.ReadTarget) ReadInfo {
-	return ReadInfo{URL: target.URL, ExpiresAt: target.ExpiresAt.UTC()}
+	return ReadInfo{URL: target.URL, ExpiresAt: target.ExpiresAt}
 }
 
 func hashIdempotencyKey(key []byte, value string) string {

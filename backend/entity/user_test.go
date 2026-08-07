@@ -53,8 +53,8 @@ func TestUserInvalidateAccessTokens(t *testing.T) {
 	if user.TokenVersion != 8 {
 		t.Fatalf("TokenVersion = %d, want 8", user.TokenVersion)
 	}
-	if !user.UpdatedAt.Equal(now.UTC()) {
-		t.Fatalf("UpdatedAt = %s, want %s", user.UpdatedAt, now.UTC())
+	if !user.UpdatedAt.Equal(now) {
+		t.Fatalf("UpdatedAt = %s, want %s", user.UpdatedAt, now)
 	}
 	if user.UpdatedAt.Location() != time.UTC {
 		t.Fatalf("UpdatedAt location = %s, want UTC", user.UpdatedAt.Location())
@@ -124,8 +124,8 @@ func TestUserSuspend(t *testing.T) {
 	if user.TokenVersion != 8 {
 		t.Fatalf("TokenVersion = %d, want 8", user.TokenVersion)
 	}
-	if !user.UpdatedAt.Equal(now.UTC()) {
-		t.Fatalf("UpdatedAt = %s, want %s", user.UpdatedAt, now.UTC())
+	if !user.UpdatedAt.Equal(now) {
+		t.Fatalf("UpdatedAt = %s, want %s", user.UpdatedAt, now)
 	}
 	if user.UpdatedAt.Location() != time.UTC {
 		t.Fatalf("UpdatedAt location = %s, want UTC", user.UpdatedAt.Location())
@@ -239,8 +239,8 @@ func TestUserResume(t *testing.T) {
 	if user.TokenVersion != 8 {
 		t.Fatalf("TokenVersion = %d, want 8", user.TokenVersion)
 	}
-	if !user.UpdatedAt.Equal(now.UTC()) {
-		t.Fatalf("UpdatedAt = %s, want %s", user.UpdatedAt, now.UTC())
+	if !user.UpdatedAt.Equal(now) {
+		t.Fatalf("UpdatedAt = %s, want %s", user.UpdatedAt, now)
 	}
 	if user.UpdatedAt.Location() != time.UTC {
 		t.Fatalf("UpdatedAt location = %s, want UTC", user.UpdatedAt.Location())

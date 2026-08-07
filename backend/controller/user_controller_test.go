@@ -67,7 +67,7 @@ func TestUserControllerSignUpValidatesThenReturnsSafeCreatedUser(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
 		t.Fatalf("json.Unmarshal() error = %v, body=%s", err, rec.Body.String())
 	}
-	if response.Data.ID != 10 || response.Data.Email != "user@example.com" || !response.Data.CreatedAt.Equal(createdAt.UTC()) {
+	if response.Data.ID != 10 || response.Data.Email != "user@example.com" || !response.Data.CreatedAt.Equal(createdAt) {
 		t.Fatalf("response = %+v", response)
 	}
 	for _, secret := range []string{"secret-hash", "password", "token_version", "99"} {

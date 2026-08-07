@@ -42,7 +42,7 @@ func (r *savedVideoRepository) Save(ctx context.Context, userID, videoID uint64,
 	if userID == 0 || videoID == 0 || now.IsZero() {
 		return entity.ErrInvalidInput
 	}
-	now = now.UTC()
+	now = now
 
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var video entity.Video
@@ -123,7 +123,7 @@ func (r *savedVideoRepository) ListByUser(ctx context.Context, userID uint64, li
 		Where("videos.processing_status = ? AND videos.publish_status = ? AND videos.deleted_at IS NULL", entity.VideoProcessingReady, entity.VideoPublishPublished)
 
 	if cursor != nil {
-		query = query.Where("(saved_videos.created_at < ? OR (saved_videos.created_at = ? AND saved_videos.id < ?))", cursor.CreatedAt.UTC(), cursor.CreatedAt.UTC(), cursor.ID)
+		query = query.Where("(saved_videos.created_at < ? OR (saved_videos.created_at = ? AND saved_videos.id < ?))", cursor.CreatedAt, cursor.CreatedAt, cursor.ID)
 	}
 
 	if err := query.Order("saved_videos.created_at DESC").Order("saved_videos.id DESC").Limit(limit + 1).Scan(&rows).Error; err != nil {
@@ -146,7 +146,7 @@ func (r *savedVideoRepository) ListByUser(ctx context.Context, userID uint64, li
 			Description:        row.Description,
 			VideoObjectKey:     row.VideoObjectKey,
 			ThumbnailObjectKey: row.ThumbnailObjectKey,
-			CreatedAt:          row.CreatedAt.UTC(),
+			CreatedAt:          row.CreatedAt,
 			LikeCount:          row.LikeCount,
 			IsLiked:            row.IsLiked,
 			IsSaved:            true,
@@ -160,7 +160,7 @@ func (r *savedVideoRepository) ListByUser(ctx context.Context, userID uint64, li
 
 	if len(rows) > 0 {
 		last := rows[len(rows)-1]
-		page.LastCreatedAt = last.SavedCreatedAt.UTC()
+		page.LastCreatedAt = last.SavedCreatedAt
 		page.LastID = last.SavedID
 	}
 

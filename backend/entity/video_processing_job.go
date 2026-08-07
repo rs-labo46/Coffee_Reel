@@ -84,7 +84,7 @@ func NewVideoProcessingJob(videoID uint64, now time.Time) (*VideoProcessingJob, 
 	if videoID == 0 || now.IsZero() {
 		return nil, ErrInvalidInput
 	}
-	now = now.UTC()
+	now = now
 	return &VideoProcessingJob{
 		VideoID:          videoID,
 		Status:           VideoJobQueued,
@@ -102,8 +102,8 @@ func (j *VideoProcessingJob) Claim(now time.Time) error {
 	if now.IsZero() {
 		return ErrInvalidInput
 	}
-	now = now.UTC()
-	if j == nil || (j.Status != VideoJobQueued && j.Status != VideoJobRetryWait) || j.AttemptCount < 0 || j.MaxAttempts != videoProcessingMaxAttempts || j.AttemptCount >= j.MaxAttempts || j.AvailableAt.IsZero() || now.Before(j.AvailableAt.UTC()) {
+	now = now
+	if j == nil || (j.Status != VideoJobQueued && j.Status != VideoJobRetryWait) || j.AttemptCount < 0 || j.MaxAttempts != videoProcessingMaxAttempts || j.AttemptCount >= j.MaxAttempts || j.AvailableAt.IsZero() || now.Before(j.AvailableAt) {
 		return ErrProcessingJobConflict
 	}
 	j.Status = VideoJobRunning
@@ -118,8 +118,8 @@ func (j *VideoProcessingJob) ScheduleRetry(availableAt time.Time, code, message 
 	if now.IsZero() || availableAt.IsZero() {
 		return ErrInvalidInput
 	}
-	now = now.UTC()
-	availableAt = availableAt.UTC()
+	now = now
+	availableAt = availableAt
 	message, ok := normalizeVideoJobError(code, message)
 	if !ok {
 		return ErrInvalidInput
@@ -143,7 +143,7 @@ func (j *VideoProcessingJob) MarkSucceeded(now time.Time) error {
 	if j == nil || j.Status != VideoJobRunning || j.AttemptCount < 1 || j.StartedAt == nil || j.FinishedAt != nil {
 		return ErrProcessingJobConflict
 	}
-	now = now.UTC()
+	now = now
 	j.Status = VideoJobSucceeded
 	j.FinishedAt = &now
 	j.LastErrorCode = ""
@@ -163,7 +163,7 @@ func (j *VideoProcessingJob) MarkFailed(code, message string, now time.Time) err
 	if j == nil || j.Status != VideoJobRunning || j.AttemptCount < 1 || j.StartedAt == nil || j.FinishedAt != nil {
 		return ErrProcessingJobConflict
 	}
-	now = now.UTC()
+	now = now
 	j.Status = VideoJobFailed
 	j.FinishedAt = &now
 	j.LastErrorCode = code
@@ -179,7 +179,7 @@ func (j *VideoProcessingJob) Cancel(now time.Time) error {
 	if j == nil || (j.Status != VideoJobQueued && j.Status != VideoJobRetryWait && j.Status != VideoJobRunning) || j.FinishedAt != nil {
 		return ErrProcessingJobConflict
 	}
-	now = now.UTC()
+	now = now
 	j.Status = VideoJobCancelled
 	j.FinishedAt = &now
 	j.UpdatedAt = now

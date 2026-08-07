@@ -225,13 +225,13 @@ func (u *userController) Me(c echo.Context) error {
 
 // LoginまたはRefresh成功時に、Refresh Token CookieとCSRF Cookieを設定する。
 func (u *userController) setAuthCookies(c echo.Context, tokens usecase.AuthTokens) {
-	c.SetCookie(&http.Cookie{Name: refreshCookieName, Value: tokens.RefreshToken, Path: cookiePath, Expires: tokens.RefreshTokenExpiresAt.UTC(), MaxAge: cookieMaxAge, Secure: u.cookies.Secure, HttpOnly: true, SameSite: http.SameSiteLaxMode})
-	c.SetCookie(&http.Cookie{Name: csrfCookieName, Value: tokens.CSRFToken, Path: cookiePath, Domain: u.cookies.CSRFDomain, Expires: tokens.RefreshTokenExpiresAt.UTC(), MaxAge: cookieMaxAge, Secure: u.cookies.Secure, HttpOnly: false, SameSite: http.SameSiteLaxMode})
+	c.SetCookie(&http.Cookie{Name: refreshCookieName, Value: tokens.RefreshToken, Path: cookiePath, Expires: tokens.RefreshTokenExpiresAt, MaxAge: cookieMaxAge, Secure: u.cookies.Secure, HttpOnly: true, SameSite: http.SameSiteLaxMode})
+	c.SetCookie(&http.Cookie{Name: csrfCookieName, Value: tokens.CSRFToken, Path: cookiePath, Domain: u.cookies.CSRFDomain, Expires: tokens.RefreshTokenExpiresAt, MaxAge: cookieMaxAge, Secure: u.cookies.Secure, HttpOnly: false, SameSite: http.SameSiteLaxMode})
 }
 
 // 認証Cookieを発行時と同じ属性で期限切れにし、Browserから削除する。
 func (u *userController) clearAuthCookies(c echo.Context) {
-	expiresAt := time.Unix(0, 0).UTC()
+	expiresAt := time.Unix(0, 0)
 
 	c.SetCookie(&http.Cookie{Name: refreshCookieName, Value: "", Path: cookiePath, Expires: expiresAt, MaxAge: -1, Secure: u.cookies.Secure, HttpOnly: true, SameSite: http.SameSiteLaxMode})
 	c.SetCookie(&http.Cookie{Name: csrfCookieName, Value: "", Path: cookiePath, Domain: u.cookies.CSRFDomain, Expires: expiresAt, MaxAge: -1, Secure: u.cookies.Secure, HttpOnly: false, SameSite: http.SameSiteLaxMode})
@@ -283,7 +283,7 @@ func requestID(c echo.Context) string {
 
 // User Entityから会員登録・Me用の安全なResponseを作成する。
 func newUserResponse(user *entity.User) userResponse {
-	return userResponse{ID: user.ID, Name: user.Name, Email: user.Email, Role: user.Role, Status: user.Status, CreatedAt: user.CreatedAt.UTC()}
+	return userResponse{ID: user.ID, Name: user.Name, Email: user.Email, Role: user.Role, Status: user.Status, CreatedAt: user.CreatedAt}
 }
 
 // User EntityからLogin Response用のUser情報を作成する。

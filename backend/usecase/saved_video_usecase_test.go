@@ -152,7 +152,7 @@ func TestSavedVideoUsecaseListBuildsReadURLsAndSavedCursor(t *testing.T) {
 	if err := json.Unmarshal(decoded, &cursor); err != nil {
 		t.Fatalf("unmarshal cursor:%v", err)
 	}
-	if cursor.ID != 55 || !cursor.CreatedAt.Equal(created.UTC()) || cursor.CreatedAt.Location() != time.UTC {
+	if cursor.ID != 55 || !cursor.CreatedAt.Equal(created) || cursor.CreatedAt.Location() != time.UTC {
 		t.Fatalf("cursor=%+v", cursor)
 	}
 }

@@ -85,8 +85,8 @@ func NewVideo(userID uint64, category CategoryCode, title, description, original
 	title = strings.TrimSpace(title)
 	description = strings.TrimSpace(description)
 	originalObjectKey = strings.TrimSpace(originalObjectKey)
-	now = now.UTC()
-	uploadExpiresAt = uploadExpiresAt.UTC()
+	now = now
+	uploadExpiresAt = uploadExpiresAt
 
 	if userID == 0 || !category.IsValid() || now.IsZero() || !uploadExpiresAt.After(now) {
 		return nil, ErrInvalidInput
@@ -128,14 +128,14 @@ func (v *Video) CompleteUpload(now time.Time) error {
 	if now.IsZero() {
 		return ErrInvalidInput
 	}
-	now = now.UTC()
+	now = now
 	if v == nil || v.IsDeleted() {
 		return ErrVideoStateConflict
 	}
 	if v.ProcessingStatus != VideoProcessingUploading || v.PublishStatus != VideoPublishPrivate {
 		return ErrVideoStateConflict
 	}
-	if !now.Before(v.UploadExpiresAt.UTC()) {
+	if !now.Before(v.UploadExpiresAt) {
 		return ErrUploadExpired
 	}
 	v.ProcessingStatus = VideoProcessingUploaded
@@ -147,11 +147,11 @@ func (v *Video) ExpireUpload(now time.Time) error {
 	if now.IsZero() {
 		return ErrInvalidInput
 	}
-	now = now.UTC()
+	now = now
 	if v == nil || v.IsDeleted() || v.ProcessingStatus != VideoProcessingUploading || v.PublishStatus != VideoPublishPrivate {
 		return ErrVideoStateConflict
 	}
-	if now.Before(v.UploadExpiresAt.UTC()) {
+	if now.Before(v.UploadExpiresAt) {
 		return ErrVideoStateConflict
 	}
 	v.ProcessingStatus = VideoProcessingExpired
@@ -167,7 +167,7 @@ func (v *Video) StartProcessing(now time.Time) error {
 		return ErrVideoStateConflict
 	}
 	v.ProcessingStatus = VideoProcessingProcessing
-	v.UpdatedAt = now.UTC()
+	v.UpdatedAt = now
 	return nil
 }
 
@@ -181,7 +181,7 @@ func (v *Video) RecordSourceValidation(meta SourceVideoMeta, now time.Time) erro
 	if err := meta.Validate(); err != nil {
 		return err
 	}
-	now = now.UTC()
+	now = now
 	meta.VideoID = v.ID
 	meta.CreatedAt = now
 	v.SourceMeta = &meta
@@ -199,7 +199,7 @@ func (v *Video) CompleteProcessing(meta OutputVideoMeta, ownerActive bool, now t
 	if err := meta.Validate(); err != nil {
 		return err
 	}
-	now = now.UTC()
+	now = now
 	meta.VideoID = v.ID
 	meta.CreatedAt = now
 	v.OutputMeta = &meta
@@ -222,7 +222,7 @@ func (v *Video) FailProcessing(now time.Time) error {
 	}
 	v.ProcessingStatus = VideoProcessingFailed
 	v.PublishStatus = VideoPublishPrivate
-	v.UpdatedAt = now.UTC()
+	v.UpdatedAt = now
 	return nil
 }
 
@@ -237,7 +237,7 @@ func (v *Video) SetPrivateByOwner(userID uint64, now time.Time) error {
 		return ErrVideoStateConflict
 	}
 	v.PublishStatus = VideoPublishPrivate
-	v.UpdatedAt = now.UTC()
+	v.UpdatedAt = now
 	return nil
 }
 
@@ -255,7 +255,7 @@ func (v *Video) RepublishByOwner(userID uint64, ownerActive bool, now time.Time)
 		return ErrUserSuspended
 	}
 	v.PublishStatus = VideoPublishPublished
-	v.UpdatedAt = now.UTC()
+	v.UpdatedAt = now
 	return nil
 }
 
@@ -267,7 +267,7 @@ func (v *Video) HideByAdmin(now time.Time) error {
 		return ErrVideoStateConflict
 	}
 	v.PublishStatus = VideoPublishHidden
-	v.UpdatedAt = now.UTC()
+	v.UpdatedAt = now
 	return nil
 }
 
@@ -282,7 +282,7 @@ func (v *Video) RestoreByAdmin(ownerActive bool, now time.Time) error {
 		return ErrUserSuspended
 	}
 	v.PublishStatus = VideoPublishPublished
-	v.UpdatedAt = now.UTC()
+	v.UpdatedAt = now
 	return nil
 }
 
@@ -296,7 +296,7 @@ func (v *Video) DeleteByOwner(userID uint64, now time.Time) error {
 	if v.IsDeleted() {
 		return ErrVideoStateConflict
 	}
-	deletedAt := now.UTC()
+	deletedAt := now
 	v.DeletedAt = &deletedAt
 	v.PublishStatus = VideoPublishPrivate
 	v.UpdatedAt = deletedAt

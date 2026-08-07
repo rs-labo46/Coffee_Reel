@@ -75,8 +75,8 @@ func (r *adminUserRepository) ListUsers(ctx context.Context, limit int, cursor *
 	if cursor != nil {
 		query = query.Where(
 			"created_at < ? OR (created_at = ? AND id < ?)",
-			cursor.CreatedAt.UTC(),
-			cursor.CreatedAt.UTC(),
+			cursor.CreatedAt,
+			cursor.CreatedAt,
 			cursor.ID,
 		)
 	}
@@ -97,7 +97,7 @@ func (r *adminUserRepository) ListUsers(ctx context.Context, limit int, cursor *
 	result := AdminUserListResult{Users: users, HasMore: hasMore}
 	if len(users) > 0 {
 		last := users[len(users)-1]
-		result.LastCreatedAt = last.CreatedAt.UTC()
+		result.LastCreatedAt = last.CreatedAt
 		result.LastID = last.ID
 	}
 	return result, nil
@@ -168,7 +168,7 @@ func (r *adminUserRepository) SuspendUser(
 
 		if err := tx.Model(&entity.RefreshToken{}).
 			Where("user_id = ? AND revoked_at IS NULL", user.ID).
-			Update("revoked_at", now.UTC()).Error; err != nil {
+			Update("revoked_at", now).Error; err != nil {
 			return fmt.Errorf("revoke refresh tokens for suspended user: %w", err)
 		}
 

@@ -37,7 +37,7 @@ func (u User) IsAdmin() bool {
 
 func (u *User) InvalidateAccessTokens(now time.Time) {
 	u.TokenVersion++
-	u.UpdatedAt = now.UTC()
+	u.UpdatedAt = now
 }
 
 func (u *User) Suspend(now time.Time) error {
@@ -51,7 +51,7 @@ func (u *User) Suspend(now time.Time) error {
 
 	u.Status = StatusSuspended
 	u.TokenVersion++
-	u.UpdatedAt = now.UTC()
+	u.UpdatedAt = now
 
 	return nil
 }
@@ -64,7 +64,7 @@ func (u *User) Resume(now time.Time) error {
 		return ErrUserStatusConflict
 	}
 	u.Status = StatusActive
-	u.UpdatedAt = now.UTC()
+	u.UpdatedAt = now
 
 	return nil
 }

@@ -17,6 +17,6 @@ func NewVideoLike(userID, videoID uint64, now time.Time) (*VideoLike, error) {
 	return &VideoLike{
 		UserID:    userID,
 		VideoID:   videoID,
-		CreatedAt: now.UTC(),
+		CreatedAt: now,
 	}, nil
 }

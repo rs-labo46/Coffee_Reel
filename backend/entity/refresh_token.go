@@ -17,7 +17,7 @@ type RefreshToken struct {
 }
 
 func (r RefreshToken) IsExpired(now time.Time) bool {
-	return !now.UTC().Before(r.ExpiresAt.UTC())
+	return !now.Before(r.ExpiresAt)
 }
 
 func (r RefreshToken) IsUsable(now time.Time) bool {
@@ -25,7 +25,7 @@ func (r RefreshToken) IsUsable(now time.Time) bool {
 }
 
 func (r *RefreshToken) MarkUsed(replacedByID uint64, now time.Time) {
-	usedAt := now.UTC()
+	usedAt := now
 	r.UsedAt = &usedAt
 	r.ReplacedByID = &replacedByID
 }
@@ -34,6 +34,6 @@ func (r *RefreshToken) Revoke(now time.Time) {
 	if r.RevokedAt != nil {
 		return
 	}
-	revokedAt := now.UTC()
+	revokedAt := now
 	r.RevokedAt = &revokedAt
 }

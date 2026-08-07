@@ -27,7 +27,7 @@ func newIntegrationRefreshToken(userID uint64, hash, family string, expiresAt ti
 		UserID:    userID,
 		TokenHash: hash,
 		FamilyID:  family,
-		ExpiresAt: expiresAt.UTC().Truncate(time.Microsecond),
+		ExpiresAt: expiresAt.Truncate(time.Microsecond),
 		CreatedAt: time.Now().Truncate(time.Microsecond),
 	}
 }

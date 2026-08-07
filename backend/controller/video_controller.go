@@ -181,8 +181,8 @@ func (v *videoController) StartUpload(c echo.Context) error {
 			Category:         result.Category,
 			ProcessingStatus: result.ProcessingStatus,
 			PublishStatus:    result.PublishStatus,
-			UploadExpiresAt:  result.UploadExpiresAt.UTC(),
-			CreatedAt:        result.CreatedAt.UTC(),
+			UploadExpiresAt:  result.UploadExpiresAt,
+			CreatedAt:        result.CreatedAt,
 		},
 		Upload: uploadResponse{
 			Method: result.Upload.Method,
@@ -190,7 +190,7 @@ func (v *videoController) StartUpload(c echo.Context) error {
 			Headers: uploadHeadersResponse{
 				ContentType: result.Upload.ContentType,
 			},
-			ExpiresAt: result.Upload.ExpiresAt.UTC(),
+			ExpiresAt: result.Upload.ExpiresAt,
 		},
 	})
 }
@@ -379,8 +379,8 @@ func (v *videoController) MineDetail(c echo.Context) error {
 		FailureCode:      result.FailureCode,
 		PlaybackURL:      playbackURL,
 		ThumbnailURL:     thumbnailURL,
-		CreatedAt:        result.CreatedAt.UTC(),
-		UpdatedAt:        result.UpdatedAt.UTC(),
+		CreatedAt:        result.CreatedAt,
+		UpdatedAt:        result.UpdatedAt,
 	})
 }
 
@@ -492,7 +492,7 @@ func newPublicVideoResponse(result usecase.PublicVideoResult) publicVideoRespons
 		PlaybackURL:  result.Video.URL,
 		ThumbnailURL: result.Thumbnail.URL,
 		IsSaved:      result.IsSaved,
-		CreatedAt:    result.CreatedAt.UTC(),
+		CreatedAt:    result.CreatedAt,
 	}
 }
 

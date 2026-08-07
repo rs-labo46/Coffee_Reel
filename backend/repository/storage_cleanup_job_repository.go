@@ -61,7 +61,7 @@ func (r *storageCleanupJobRepository) ClaimNext(ctx context.Context, now time.Ti
 	if now.IsZero() {
 		return nil, entity.ErrInvalidInput
 	}
-	now = now.UTC()
+	now = now
 
 	var output *entity.StorageCleanupJob
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -97,8 +97,8 @@ func (r *storageCleanupJobRepository) ScheduleRetry(ctx context.Context, jobID u
 	if jobID == 0 || availableAt.IsZero() || now.IsZero() {
 		return entity.ErrInvalidInput
 	}
-	availableAt = availableAt.UTC()
-	now = now.UTC()
+	availableAt = availableAt
+	now = now
 
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var job entity.StorageCleanupJob
@@ -125,7 +125,7 @@ func (r *storageCleanupJobRepository) MarkSucceeded(ctx context.Context, jobID u
 	if jobID == 0 || now.IsZero() {
 		return entity.ErrInvalidInput
 	}
-	now = now.UTC()
+	now = now
 
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var job entity.StorageCleanupJob
@@ -152,7 +152,7 @@ func (r *storageCleanupJobRepository) MarkFailed(ctx context.Context, jobID uint
 	if jobID == 0 || now.IsZero() {
 		return entity.ErrInvalidInput
 	}
-	now = now.UTC()
+	now = now
 
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var job entity.StorageCleanupJob
@@ -185,8 +185,8 @@ func (r *storageCleanupJobRepository) RecoverTimedOut(ctx context.Context, input
 		}
 	}
 
-	timeoutBefore := input.TimeoutBefore.UTC()
-	now := input.Now.UTC()
+	timeoutBefore := input.TimeoutBefore
+	now := input.Now
 	count := 0
 
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {

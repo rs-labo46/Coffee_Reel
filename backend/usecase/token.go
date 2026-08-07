@@ -107,7 +107,7 @@ func (s *tokenService) GenerateAccessToken(userID uint64, role entity.UserRole, 
 		return "", fmt.Errorf("invalid user role")
 	}
 
-	now = now.UTC()
+	now = now
 
 	claims := accessTokenClaims{
 		Role:         role,
@@ -147,7 +147,7 @@ func (s *tokenService) ParseAccessToken(tokenString string, now time.Time) (Acce
 		return AccessTokenClaims{}, entity.ErrUnauthorized
 	}
 
-	now = now.UTC()
+	now = now
 
 	if claims.IssuedAt == nil || claims.ExpiresAt == nil || claims.IssuedAt.Time.After(now) || now.Compare(claims.ExpiresAt.Time) >= 0 || claims.IssuedAt.Time.Compare(claims.ExpiresAt.Time) >= 0 {
 		return AccessTokenClaims{}, entity.ErrUnauthorized
@@ -162,7 +162,7 @@ func (s *tokenService) ParseAccessToken(tokenString string, now time.Time) (Acce
 		return AccessTokenClaims{}, entity.ErrUnauthorized
 	}
 
-	return AccessTokenClaims{UserID: userID, Role: claims.Role, TokenVersion: claims.TokenVersion, IssuedAt: claims.IssuedAt.Time.UTC(), ExpiresAt: claims.ExpiresAt.Time.UTC()}, nil
+	return AccessTokenClaims{UserID: userID, Role: claims.Role, TokenVersion: claims.TokenVersion, IssuedAt: claims.IssuedAt.Time, ExpiresAt: claims.ExpiresAt.Time}, nil
 }
 
 // 乱数32bytesからRefresh Tokenを生成する

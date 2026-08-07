@@ -314,7 +314,7 @@ func TestVideoUsecaseListReelsBuildsReadURLsAndOpaqueCursor(t *testing.T) {
 	if err := json.Unmarshal(decoded, &cursor); err != nil {
 		t.Fatalf("unmarshal cursor: %v", err)
 	}
-	if cursor.ID != 11 || cursor.CreatedAt.Location() != time.UTC || !cursor.CreatedAt.Equal(createdAt.UTC()) {
+	if cursor.ID != 11 || cursor.CreatedAt.Location() != time.UTC || !cursor.CreatedAt.Equal(createdAt) {
 		t.Fatalf("cursor = %+v", cursor)
 	}
 }

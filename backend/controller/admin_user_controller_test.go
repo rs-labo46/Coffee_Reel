@@ -320,12 +320,12 @@ func TestAdminUserControllerResumeUser(t *testing.T) {
 	if response.ID != 10 || response.Status != entity.StatusActive {
 		t.Fatalf("response = %#v", response)
 	}
-	if !response.UpdatedAt.Equal(updatedAt.UTC()) ||
+	if !response.UpdatedAt.Equal(updatedAt) ||
 		response.UpdatedAt.Location() != time.UTC {
 		t.Fatalf(
 			"UpdatedAt = %s, want UTC %s",
 			response.UpdatedAt,
-			updatedAt.UTC(),
+			updatedAt,
 		)
 	}
 }
@@ -642,12 +642,12 @@ func TestAdminUserControllerGetUserDetailMapsVideosAndUTC(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !response.CreatedAt.Equal(userCreatedAt.UTC()) ||
+	if !response.CreatedAt.Equal(userCreatedAt) ||
 		response.CreatedAt.Location() != time.UTC {
 		t.Fatalf(
 			"CreatedAt = %s, want UTC %s",
 			response.CreatedAt,
-			userCreatedAt.UTC(),
+			userCreatedAt,
 		)
 	}
 	if len(response.Videos) != 1 {
@@ -661,12 +661,12 @@ func TestAdminUserControllerGetUserDetailMapsVideosAndUTC(t *testing.T) {
 		video.PublishStatus != "published" {
 		t.Fatalf("video = %#v", video)
 	}
-	if !video.CreatedAt.Equal(videoCreatedAt.UTC()) ||
+	if !video.CreatedAt.Equal(videoCreatedAt) ||
 		video.CreatedAt.Location() != time.UTC {
 		t.Fatalf(
 			"video CreatedAt = %s, want UTC %s",
 			video.CreatedAt,
-			videoCreatedAt.UTC(),
+			videoCreatedAt,
 		)
 	}
 }

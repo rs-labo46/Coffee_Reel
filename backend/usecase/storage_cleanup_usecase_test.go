@@ -203,7 +203,7 @@ func TestStorageCleanupUsecaseRecoverTimedOutJobsBuildsRecoveryInput(t *testing.
 	nowJST := time.Date(2026, 8, 3, 12, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 	config := validStorageCleanupConfig()
 	jobs := &storageCleanupJobRepositoryMock{recoverTimedOutFunc: func(_ context.Context, input repository.StorageCleanupRecoveryInput) (int, error) {
-		if !input.Now.Equal(nowJST.UTC()) || !input.TimeoutBefore.Equal(nowJST.UTC().Add(-config.Timeout)) || input.Limit != 25 || input.RetryDelays != config.RetryDelays {
+		if !input.Now.Equal(nowJST) || !input.TimeoutBefore.Equal(nowJST.Add(-config.Timeout)) || input.Limit != 25 || input.RetryDelays != config.RetryDelays {
 			t.Fatalf("recovery input = %+v", input)
 		}
 		return 4, nil

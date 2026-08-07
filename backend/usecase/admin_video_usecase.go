@@ -177,7 +177,7 @@ func (u *adminVideoUsecase) List(ctx context.Context, actor *entity.User, input 
 
 		cursor, err := encodeAdminVideoCursor(
 			AdminVideoCursor{
-				CreatedAt: last.CreatedAt.UTC(),
+				CreatedAt: last.CreatedAt,
 				ID:        last.ID,
 			},
 		)
@@ -221,8 +221,8 @@ func (u *adminVideoUsecase) Get(ctx context.Context, actor *entity.User, videoID
 		Category:         detail.Category,
 		ProcessingStatus: detail.ProcessingStatus,
 		PublishStatus:    detail.PublishStatus,
-		CreatedAt:        detail.CreatedAt.UTC(),
-		UpdatedAt:        detail.UpdatedAt.UTC(),
+		CreatedAt:        detail.CreatedAt,
+		UpdatedAt:        detail.UpdatedAt,
 	}
 
 	if !canIssueAdminVideoReadURL(detail) {
@@ -378,14 +378,14 @@ func repositoryAdminVideoCursor(cursor *AdminVideoCursor) *repository.AdminVideo
 	}
 
 	return &repository.AdminVideoCursor{
-		CreatedAt: cursor.CreatedAt.UTC(),
+		CreatedAt: cursor.CreatedAt,
 		ID:        cursor.ID,
 	}
 }
 
 func encodeAdminVideoCursor(cursor AdminVideoCursor) (string, error) {
 	payload, err := json.Marshal(AdminVideoCursor{
-		CreatedAt: cursor.CreatedAt.UTC(),
+		CreatedAt: cursor.CreatedAt,
 		ID:        cursor.ID,
 	})
 	if err != nil {
@@ -413,6 +413,6 @@ func adminVideoStateResult(state *repository.AdminVideoState) AdminVideoStateRes
 		ID:               state.VideoID,
 		ProcessingStatus: state.ProcessingStatus,
 		PublishStatus:    state.PublishStatus,
-		UpdatedAt:        state.UpdatedAt.UTC(),
+		UpdatedAt:        state.UpdatedAt,
 	}
 }

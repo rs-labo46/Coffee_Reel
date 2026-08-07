@@ -67,7 +67,7 @@ func (r *refreshTokenRepository) Rotate(ctx context.Context, tokenHash string, n
 		return fmt.Errorf("next refresh token is required")
 	}
 
-	now = now.UTC()
+	now = now
 	reused := false
 
 	if err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -133,7 +133,7 @@ func (r *refreshTokenRepository) RevokeFamily(ctx context.Context, familyID stri
 	if familyID == "" {
 		return fmt.Errorf("family ID is required")
 	}
-	if err := r.db.WithContext(ctx).Model(&entity.RefreshToken{}).Where("family_id = ? AND revoked_at IS NULL", familyID).Update("revoked_at", now.UTC()).Error; err != nil {
+	if err := r.db.WithContext(ctx).Model(&entity.RefreshToken{}).Where("family_id = ? AND revoked_at IS NULL", familyID).Update("revoked_at", now).Error; err != nil {
 		return fmt.Errorf("revoke refresh token family: %w", err)
 	}
 	return nil
@@ -150,7 +150,7 @@ func (r *refreshTokenRepository) RevokeFamilyAndIncrementTokenVersion(ctx contex
 	}
 
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		return revokeFamilyAndIncrementTokenVersion(tx, userID, familyID, now.UTC())
+		return revokeFamilyAndIncrementTokenVersion(tx, userID, familyID, now)
 	})
 }
 
@@ -160,7 +160,7 @@ func (r *refreshTokenRepository) RevokeByUserID(ctx context.Context, userID uint
 		return fmt.Errorf("user ID is required")
 	}
 
-	if err := r.db.WithContext(ctx).Model(&entity.RefreshToken{}).Where("user_id = ? AND revoked_at IS NULL", userID).Update("revoked_at", now.UTC()).Error; err != nil {
+	if err := r.db.WithContext(ctx).Model(&entity.RefreshToken{}).Where("user_id = ? AND revoked_at IS NULL", userID).Update("revoked_at", now).Error; err != nil {
 		return fmt.Errorf("revoke refresh tokens by user ID: %w", err)
 	}
 	return nil
@@ -168,7 +168,7 @@ func (r *refreshTokenRepository) RevokeByUserID(ctx context.Context, userID uint
 
 // 期限切れのTokenを削除する
 func (r *refreshTokenRepository) DeleteExpired(ctx context.Context, now time.Time) error {
-	if err := r.db.WithContext(ctx).Where("expires_at <= ?", now.UTC()).Delete(&entity.RefreshToken{}).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("expires_at <= ?", now).Delete(&entity.RefreshToken{}).Error; err != nil {
 		return fmt.Errorf("delete expired refresh tokens: %w", err)
 	}
 	return nil

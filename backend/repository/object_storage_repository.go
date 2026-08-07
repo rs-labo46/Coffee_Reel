@@ -226,7 +226,7 @@ func (r *objectStorageRepository) Stat(ctx context.Context, objectKey string) (S
 		info.ContentType = *result.ContentType
 	}
 	if result.LastModified != nil {
-		info.LastModifiedAt = result.LastModified.UTC()
+		info.LastModifiedAt = result.LastModified
 	}
 
 	return info, nil
@@ -375,7 +375,7 @@ func (r *objectStorageRepository) ListManagedObjects(ctx context.Context, cursor
 			SizeBytes: aws.ToInt64(item.Size),
 		}
 		if item.LastModified != nil {
-			managed.LastModifiedAt = item.LastModified.UTC()
+			managed.LastModifiedAt = item.LastModified
 		}
 
 		items = append(items, managed)

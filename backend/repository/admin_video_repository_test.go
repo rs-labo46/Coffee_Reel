@@ -50,8 +50,8 @@ func createAdminVideoIntegrationUser(
 		PasswordHash: "hashed-password",
 		Role:         role,
 		Status:       status,
-		CreatedAt:    createdAt.UTC(),
-		UpdatedAt:    createdAt.UTC(),
+		CreatedAt:    createdAt,
+		UpdatedAt:    createdAt,
 	}
 	if err := db.Create(user).Error; err != nil {
 		t.Fatalf("create user: %v", err)
@@ -72,10 +72,10 @@ func createAdminVideoIntegrationVideo(
 ) *entity.Video {
 	t.Helper()
 
-	updatedAt := createdAt.UTC()
+	updatedAt := createdAt
 	var normalizedDeletedAt *time.Time
 	if deletedAt != nil {
-		value := deletedAt.UTC()
+		value := deletedAt
 		normalizedDeletedAt = &value
 		updatedAt = value
 	}
@@ -86,10 +86,10 @@ func createAdminVideoIntegrationVideo(
 		Title:             title,
 		Description:       "description",
 		OriginalObjectKey: fmt.Sprintf("videos/%d/source/%s.mp4", ownerID, keySuffix),
-		UploadExpiresAt:   createdAt.UTC().Add(15 * time.Minute),
+		UploadExpiresAt:   createdAt.Add(15 * time.Minute),
 		ProcessingStatus:  processingStatus,
 		PublishStatus:     publishStatus,
-		CreatedAt:         createdAt.UTC(),
+		CreatedAt:         createdAt,
 		UpdatedAt:         updatedAt,
 		DeletedAt:         normalizedDeletedAt,
 	}
@@ -119,7 +119,7 @@ func createAdminVideoIntegrationOutputMeta(
 		VideoCodec:         "h264",
 		HasAudio:           true,
 		AudioCodec:         "aac",
-		CreatedAt:          createdAt.UTC(),
+		CreatedAt:          createdAt,
 	}
 	if err := db.Create(meta).Error; err != nil {
 		t.Fatalf("create output meta: %v", err)

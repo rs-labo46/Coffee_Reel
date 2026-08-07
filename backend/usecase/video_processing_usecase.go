@@ -172,14 +172,14 @@ func (u *videoProcessingUsecase) ExpireUploads(ctx context.Context, now time.Tim
 	if now.IsZero() || limit < 1 {
 		return 0, entity.ErrInvalidInput
 	}
-	return u.videos.ExpireUploads(ctx, now.UTC(), limit)
+	return u.videos.ExpireUploads(ctx, now, limit)
 }
 
 func (u *videoProcessingUsecase) RecoverTimedOutJobs(ctx context.Context, now time.Time, limit int) (int, error) {
 	if now.IsZero() || limit < 1 {
 		return 0, entity.ErrInvalidInput
 	}
-	now = now.UTC()
+	now = now
 	return u.jobs.RecoverTimedOut(ctx, repository.ProcessingRecoveryInput{
 		TimeoutBefore: now.Add(-videoProcessingTimeout),
 		Now:           now,
@@ -192,7 +192,7 @@ func (u *videoProcessingUsecase) DeleteExpiredIdempotencyRecords(ctx context.Con
 	if now.IsZero() || limit < 1 {
 		return 0, entity.ErrInvalidInput
 	}
-	return u.videos.DeleteExpiredIdempotencyRecords(ctx, now.UTC(), limit)
+	return u.videos.DeleteExpiredIdempotencyRecords(ctx, now, limit)
 }
 
 func (u *videoProcessingUsecase) recordFailure(ctx context.Context, claim *repository.ProcessingClaim, failure processingFailure, generatedVideoKey, generatedThumbnailKey string) error {

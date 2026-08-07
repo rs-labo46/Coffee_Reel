@@ -52,7 +52,7 @@ func (r *videoProcessingJobRepository) ClaimNext(ctx context.Context, now time.T
 	if now.IsZero() {
 		return nil, entity.ErrInvalidInput
 	}
-	now = now.UTC()
+	now = now
 
 	var claim *ProcessingClaim
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -136,8 +136,8 @@ func (r *videoProcessingJobRepository) ScheduleRetry(ctx context.Context, jobID 
 		return err
 	}
 
-	availableAt = availableAt.UTC()
-	now = now.UTC()
+	availableAt = availableAt
+	now = now
 
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var job entity.VideoProcessingJob
@@ -165,7 +165,7 @@ func (r *videoProcessingJobRepository) Cancel(ctx context.Context, jobID uint64,
 	if jobID == 0 || now.IsZero() {
 		return entity.ErrInvalidInput
 	}
-	now = now.UTC()
+	now = now
 
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var job entity.VideoProcessingJob
@@ -207,8 +207,8 @@ func (r *videoProcessingJobRepository) RecoverTimedOut(ctx context.Context, inpu
 		}
 	}
 
-	timeoutBefore := input.TimeoutBefore.UTC()
-	now := input.Now.UTC()
+	timeoutBefore := input.TimeoutBefore
+	now := input.Now
 	count := 0
 
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {

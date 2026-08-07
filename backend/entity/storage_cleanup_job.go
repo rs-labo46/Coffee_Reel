@@ -67,7 +67,7 @@ func NewStorageCleanupJob(videoID *uint64, objectKey string, assetType StorageAs
 	if videoID != nil && *videoID == 0 {
 		return nil, ErrInvalidInput
 	}
-	now = now.UTC()
+	now = now
 	return &StorageCleanupJob{
 		VideoID:          videoID,
 		ObjectKey:        objectKey,
@@ -100,8 +100,8 @@ func (j *StorageCleanupJob) Claim(now time.Time) error {
 	if now.IsZero() {
 		return ErrInvalidInput
 	}
-	now = now.UTC()
-	if j == nil || (j.Status != StorageCleanupQueued && j.Status != StorageCleanupRetryWait) || j.AttemptCount < 0 || j.MaxAttempts != storageCleanupMaxAttempts || j.AttemptCount >= j.MaxAttempts || j.AvailableAt.IsZero() || now.Before(j.AvailableAt.UTC()) {
+	now = now
+	if j == nil || (j.Status != StorageCleanupQueued && j.Status != StorageCleanupRetryWait) || j.AttemptCount < 0 || j.MaxAttempts != storageCleanupMaxAttempts || j.AttemptCount >= j.MaxAttempts || j.AvailableAt.IsZero() || now.Before(j.AvailableAt) {
 		return ErrCleanupJobConflict
 	}
 	j.Status = StorageCleanupRunning
@@ -116,8 +116,8 @@ func (j *StorageCleanupJob) ScheduleRetry(availableAt time.Time, code, message s
 	if now.IsZero() || availableAt.IsZero() {
 		return ErrInvalidInput
 	}
-	now = now.UTC()
-	availableAt = availableAt.UTC()
+	now = now
+	availableAt = availableAt
 	code, message, ok := normalizeCleanupError(code, message)
 	if !ok {
 		return ErrInvalidInput
@@ -141,7 +141,7 @@ func (j *StorageCleanupJob) MarkSucceeded(now time.Time) error {
 	if j == nil || j.Status != StorageCleanupRunning || j.AttemptCount < 1 || j.StartedAt == nil || j.FinishedAt != nil {
 		return ErrCleanupJobConflict
 	}
-	now = now.UTC()
+	now = now
 	j.Status = StorageCleanupSucceeded
 	j.FinishedAt = &now
 	j.LastErrorCode = ""
@@ -161,7 +161,7 @@ func (j *StorageCleanupJob) MarkFailed(code, message string, now time.Time) erro
 	if j == nil || j.Status != StorageCleanupRunning || j.AttemptCount < 1 || j.StartedAt == nil || j.FinishedAt != nil {
 		return ErrCleanupJobConflict
 	}
-	now = now.UTC()
+	now = now
 	j.Status = StorageCleanupFailed
 	j.FinishedAt = &now
 	j.LastErrorCode = code

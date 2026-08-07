@@ -190,7 +190,7 @@ func (v *videoValidator) ValidateListQuery(rawLimit, rawCursor string) (usecase.
 			entity.ErrInvalidInput
 	}
 
-	cursor.CreatedAt = cursor.CreatedAt.UTC()
+	cursor.CreatedAt = cursor.CreatedAt
 	input.Cursor = &cursor
 
 	return input, nil

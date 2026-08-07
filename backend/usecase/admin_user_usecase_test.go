@@ -142,7 +142,7 @@ func TestAdminUserUsecaseListUsersGeneratesCursorFromLastReturnedUser(t *testing
 	if err := json.Unmarshal(payload, &cursor); err != nil {
 		t.Fatal(err)
 	}
-	if cursor.ID != 1 || !cursor.CreatedAt.Equal(lastTime.UTC()) {
+	if cursor.ID != 1 || !cursor.CreatedAt.Equal(lastTime) {
 		t.Fatalf("cursor = %#v", cursor)
 	}
 }
@@ -345,7 +345,7 @@ func TestAdminUserUsecaseListUsersReturnsFinalPageWithoutNextCursor(t *testing.T
 			if cursor == nil {
 				t.Fatal("cursor is nil")
 			}
-			if cursor.ID != 7 || !cursor.CreatedAt.Equal(inputCursorTime.UTC()) {
+			if cursor.ID != 7 || !cursor.CreatedAt.Equal(inputCursorTime) {
 				t.Fatalf("cursor = %#v", cursor)
 			}
 			if cursor.CreatedAt.Location() != time.UTC {
@@ -405,11 +405,11 @@ func TestAdminUserUsecaseListUsersReturnsFinalPageWithoutNextCursor(t *testing.T
 	if len(result.Items) != 1 {
 		t.Fatalf("Items length = %d, want 1", len(result.Items))
 	}
-	if !result.Items[0].CreatedAt.Equal(itemCreatedAt.UTC()) {
+	if !result.Items[0].CreatedAt.Equal(itemCreatedAt) {
 		t.Fatalf(
 			"CreatedAt = %s, want %s",
 			result.Items[0].CreatedAt,
-			itemCreatedAt.UTC(),
+			itemCreatedAt,
 		)
 	}
 	if result.Items[0].CreatedAt.Location() != time.UTC {
@@ -542,12 +542,12 @@ func TestAdminUserUsecaseGetUserDetail(t *testing.T) {
 		t.Fatalf("result = %#v", result)
 	}
 
-	if !result.CreatedAt.Equal(userCreatedAt.UTC()) ||
+	if !result.CreatedAt.Equal(userCreatedAt) ||
 		result.CreatedAt.Location() != time.UTC {
 		t.Fatalf(
 			"CreatedAt = %s, want UTC %s",
 			result.CreatedAt,
-			userCreatedAt.UTC(),
+			userCreatedAt,
 		)
 	}
 
@@ -563,12 +563,12 @@ func TestAdminUserUsecaseGetUserDetail(t *testing.T) {
 		t.Fatalf("video = %#v", video)
 	}
 
-	if !video.CreatedAt.Equal(videoCreatedAt.UTC()) ||
+	if !video.CreatedAt.Equal(videoCreatedAt) ||
 		video.CreatedAt.Location() != time.UTC {
 		t.Fatalf(
 			"video CreatedAt = %s, want UTC %s",
 			video.CreatedAt,
-			videoCreatedAt.UTC(),
+			videoCreatedAt,
 		)
 	}
 }

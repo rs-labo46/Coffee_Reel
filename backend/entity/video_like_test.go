@@ -15,7 +15,7 @@ func TestNewVideoLike(t *testing.T) {
 	if like.UserID != 10 || like.VideoID != 20 {
 		t.Fatalf("like = %#v", like)
 	}
-	if !like.CreatedAt.Equal(now.UTC()) || like.CreatedAt.Location() != time.UTC {
+	if !like.CreatedAt.Equal(now) || like.CreatedAt.Location() != time.UTC {
 		t.Fatalf("CreatedAt = %v, want UTC", like.CreatedAt)
 	}
 }

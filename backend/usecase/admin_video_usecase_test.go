@@ -143,7 +143,7 @@ func TestAdminVideoUsecaseListBuildsCursor(t *testing.T) {
 				t.Fatalf("limit = %d, want 2", limit)
 			}
 			if cursor == nil ||
-				!cursor.CreatedAt.Equal(inputCursorTime.UTC()) ||
+				!cursor.CreatedAt.Equal(inputCursorTime) ||
 				cursor.CreatedAt.Location() != time.UTC ||
 				cursor.ID != 50 {
 				t.Fatalf("cursor = %#v", cursor)

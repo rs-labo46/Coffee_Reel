@@ -75,7 +75,7 @@ func NewAdminAuditLog(
 		AfterStatus:  afterStatus,
 		Reason:       reason,
 		RequestID:    requestID,
-		CreatedAt:    now.UTC(),
+		CreatedAt:    now,
 	}, nil
 }
 

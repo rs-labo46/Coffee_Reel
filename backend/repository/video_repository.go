@@ -332,14 +332,14 @@ func (r *videoRepository) ListPublic(ctx context.Context, input PublicVideoListI
 				"(word_similarity(lower(?), lower(videos.title)), videos.created_at, videos.id) < (?, ?, ?)",
 				input.Title,
 				input.Cursor.Similarity,
-				input.Cursor.CreatedAt.UTC(),
+				input.Cursor.CreatedAt,
 				input.Cursor.ID,
 			)
 		} else {
 			query = query.Where(
 				"videos.created_at < ? OR (videos.created_at = ? AND videos.id < ?)",
-				input.Cursor.CreatedAt.UTC(),
-				input.Cursor.CreatedAt.UTC(),
+				input.Cursor.CreatedAt,
+				input.Cursor.CreatedAt,
 				input.Cursor.ID,
 			)
 		}
@@ -363,7 +363,7 @@ func (r *videoRepository) ListPublic(ctx context.Context, input PublicVideoListI
 	}
 
 	for i := range items {
-		items[i].CreatedAt = items[i].CreatedAt.UTC()
+		items[i].CreatedAt = items[i].CreatedAt
 	}
 
 	page := PublicVideoPage{
@@ -569,8 +569,8 @@ func (r *videoRepository) ListOwned(
 	if cursor != nil {
 		query = query.Where(
 			"(videos.created_at < ? OR (videos.created_at = ? AND videos.id < ?))",
-			cursor.CreatedAt.UTC(),
-			cursor.CreatedAt.UTC(),
+			cursor.CreatedAt,
+			cursor.CreatedAt,
 			cursor.ID,
 		)
 	}
@@ -589,9 +589,9 @@ func (r *videoRepository) ListOwned(
 	}
 
 	for i := range items {
-		items[i].UploadExpiresAt = items[i].UploadExpiresAt.UTC()
-		items[i].CreatedAt = items[i].CreatedAt.UTC()
-		items[i].UpdatedAt = items[i].UpdatedAt.UTC()
+		items[i].UploadExpiresAt = items[i].UploadExpiresAt
+		items[i].CreatedAt = items[i].CreatedAt
+		items[i].UpdatedAt = items[i].UpdatedAt
 	}
 
 	page := OwnedVideoPage{
@@ -688,7 +688,7 @@ func (r *videoRepository) DeleteByOwner(ctx context.Context, userID, videoID uin
 		}
 		if err := tx.Model(&entity.VideoProcessingJob{}).
 			Where("video_id = ? AND status IN ?", video.ID, []entity.VideoProcessingJobStatus{entity.VideoJobQueued, entity.VideoJobRetryWait}).
-			Updates(entity.VideoProcessingJob{Status: entity.VideoJobCancelled, FinishedAt: ptrTime(now.UTC()), UpdatedAt: now.UTC()}).Error; err != nil {
+			Updates(entity.VideoProcessingJob{Status: entity.VideoJobCancelled, FinishedAt: ptrTime(now), UpdatedAt: now}).Error; err != nil {
 			return fmt.Errorf("cancel processing job: %w", err)
 		}
 		if err := createCleanupJob(tx, &video.ID, video.OriginalObjectKey, entity.StorageAssetOriginal, entity.StorageCleanupVideoDelete, now); err != nil {
@@ -732,7 +732,7 @@ func isConstraintViolation(err error, constraint string) bool {
 }
 
 func ptrTime(value time.Time) *time.Time {
-	value = value.UTC()
+	value = value
 	return &value
 }
 
@@ -744,7 +744,7 @@ func (r *videoRepository) ExpireUploads(ctx context.Context, now time.Time, limi
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var videos []entity.Video
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
-			Where("processing_status = ? AND publish_status = ? AND deleted_at IS NULL AND upload_expires_at <= ?", entity.VideoProcessingUploading, entity.VideoPublishPrivate, now.UTC()).
+			Where("processing_status = ? AND publish_status = ? AND deleted_at IS NULL AND upload_expires_at <= ?", entity.VideoProcessingUploading, entity.VideoPublishPrivate, now).
 			Order("upload_expires_at ASC").Order("id ASC").Limit(limit).Find(&videos).Error; err != nil {
 			return fmt.Errorf("claim expired uploads: %w", err)
 		}
@@ -944,13 +944,13 @@ func (r *videoRepository) DeleteExpiredIdempotencyRecords(ctx context.Context, n
 		return 0, entity.ErrInvalidInput
 	}
 	var ids []uint64
-	if err := r.db.WithContext(ctx).Model(&entity.IdempotencyRecord{}).Where("expires_at <= ?", now.UTC()).Order("expires_at ASC").Limit(limit).Pluck("id", &ids).Error; err != nil {
+	if err := r.db.WithContext(ctx).Model(&entity.IdempotencyRecord{}).Where("expires_at <= ?", now).Order("expires_at ASC").Limit(limit).Pluck("id", &ids).Error; err != nil {
 		return 0, fmt.Errorf("list expired idempotency records: %w", err)
 	}
 	if len(ids) == 0 {
 		return 0, nil
 	}
-	result := r.db.WithContext(ctx).Where("id IN ? AND expires_at <= ?", ids, now.UTC()).Delete(&entity.IdempotencyRecord{})
+	result := r.db.WithContext(ctx).Where("id IN ? AND expires_at <= ?", ids, now).Delete(&entity.IdempotencyRecord{})
 	if result.Error != nil {
 		return 0, fmt.Errorf("delete expired idempotency records: %w", result.Error)
 	}

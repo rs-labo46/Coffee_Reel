@@ -13,5 +13,5 @@ func NewSavedVideo(userID, videoID uint64, now time.Time) (*SavedVideo, error) {
 	if userID == 0 || videoID == 0 || now.IsZero() {
 		return nil, ErrInvalidInput
 	}
-	return &SavedVideo{UserID: userID, VideoID: videoID, CreatedAt: now.UTC()}, nil
+	return &SavedVideo{UserID: userID, VideoID: videoID, CreatedAt: now}, nil
 }

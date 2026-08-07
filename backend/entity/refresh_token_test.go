@@ -57,8 +57,8 @@ func TestRefreshTokenMarkUsed(t *testing.T) {
 
 	token.MarkUsed(99, now)
 
-	if token.UsedAt == nil || !token.UsedAt.Equal(now.UTC()) {
-		t.Fatalf("UsedAt = %v, want %s", token.UsedAt, now.UTC())
+	if token.UsedAt == nil || !token.UsedAt.Equal(now) {
+		t.Fatalf("UsedAt = %v, want %s", token.UsedAt, now)
 	}
 	if token.UsedAt.Location() != time.UTC {
 		t.Fatalf("UsedAt location = %s, want UTC", token.UsedAt.Location())

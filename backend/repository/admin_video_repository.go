@@ -106,8 +106,8 @@ func (r *adminVideoRepository) List(ctx context.Context, limit int, cursor *Admi
 	if cursor != nil {
 		query = query.Where(
 			"videos.created_at < ? OR (videos.created_at = ? AND videos.id < ?)",
-			cursor.CreatedAt.UTC(),
-			cursor.CreatedAt.UTC(),
+			cursor.CreatedAt,
+			cursor.CreatedAt,
 			cursor.ID,
 		)
 	}
@@ -126,8 +126,8 @@ func (r *adminVideoRepository) List(ctx context.Context, limit int, cursor *Admi
 	}
 
 	for index := range items {
-		items[index].CreatedAt = items[index].CreatedAt.UTC()
-		items[index].UpdatedAt = items[index].UpdatedAt.UTC()
+		items[index].CreatedAt = items[index].CreatedAt
+		items[index].UpdatedAt = items[index].UpdatedAt
 	}
 
 	result := AdminVideoListResult{
@@ -185,8 +185,8 @@ func (r *adminVideoRepository) FindByID(ctx context.Context, videoID uint64) (*A
 		return nil, fmt.Errorf("find admin video output meta: %w", err)
 	}
 
-	detail.CreatedAt = detail.CreatedAt.UTC()
-	detail.UpdatedAt = detail.UpdatedAt.UTC()
+	detail.CreatedAt = detail.CreatedAt
+	detail.UpdatedAt = detail.UpdatedAt
 
 	return &detail, nil
 }
@@ -256,7 +256,7 @@ func (r *adminVideoRepository) Hide(ctx context.Context, adminUserID uint64, vid
 			VideoID:          video.ID,
 			ProcessingStatus: video.ProcessingStatus,
 			PublishStatus:    video.PublishStatus,
-			UpdatedAt:        video.UpdatedAt.UTC(),
+			UpdatedAt:        video.UpdatedAt,
 		}
 
 		return nil
@@ -342,7 +342,7 @@ func (r *adminVideoRepository) Restore(ctx context.Context, adminUserID uint64, 
 			VideoID:          video.ID,
 			ProcessingStatus: video.ProcessingStatus,
 			PublishStatus:    video.PublishStatus,
-			UpdatedAt:        video.UpdatedAt.UTC(),
+			UpdatedAt:        video.UpdatedAt,
 		}
 
 		return nil

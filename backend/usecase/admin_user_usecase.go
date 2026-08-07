@@ -131,7 +131,7 @@ func (u *adminUserUsecase) ListUsers(ctx context.Context, actor *entity.User, in
 	var repositoryCursor *repository.AdminUserCursor
 	if input.Cursor != nil {
 		repositoryCursor = &repository.AdminUserCursor{
-			CreatedAt: input.Cursor.CreatedAt.UTC(),
+			CreatedAt: input.Cursor.CreatedAt,
 			ID:        input.Cursor.ID,
 		}
 	}
@@ -148,7 +148,7 @@ func (u *adminUserUsecase) ListUsers(ctx context.Context, actor *entity.User, in
 			Name:      user.Name,
 			Email:     user.Email,
 			Status:    user.Status,
-			CreatedAt: user.CreatedAt.UTC(),
+			CreatedAt: user.CreatedAt,
 		})
 	}
 
@@ -158,7 +158,7 @@ func (u *adminUserUsecase) ListUsers(ctx context.Context, actor *entity.User, in
 	}
 	if result.HasMore && len(items) > 0 {
 		cursor, err := encodeAdminUserCursor(AdminUserCursor{
-			CreatedAt: result.LastCreatedAt.UTC(),
+			CreatedAt: result.LastCreatedAt,
 			ID:        result.LastID,
 		})
 		if err != nil {
@@ -187,7 +187,7 @@ func (u *adminUserUsecase) GetUserDetail(ctx context.Context, actor *entity.User
 			Title:            video.Title,
 			ProcessingStatus: video.ProcessingStatus,
 			PublishStatus:    video.PublishStatus,
-			CreatedAt:        video.CreatedAt.UTC(),
+			CreatedAt:        video.CreatedAt,
 		})
 	}
 
@@ -196,7 +196,7 @@ func (u *adminUserUsecase) GetUserDetail(ctx context.Context, actor *entity.User
 		Name:      detail.Name,
 		Email:     detail.Email,
 		Status:    detail.Status,
-		CreatedAt: detail.CreatedAt.UTC(),
+		CreatedAt: detail.CreatedAt,
 		Videos:    videos,
 	}, nil
 }
@@ -211,7 +211,7 @@ func (u *adminUserUsecase) SuspendUser(ctx context.Context, actor *entity.User, 
 		return AdminUserStatusResult{}, err
 	}
 
-	return AdminUserStatusResult{ID: user.ID, Status: user.Status, UpdatedAt: user.UpdatedAt.UTC()}, nil
+	return AdminUserStatusResult{ID: user.ID, Status: user.Status, UpdatedAt: user.UpdatedAt}, nil
 }
 
 func (u *adminUserUsecase) ResumeUser(ctx context.Context, actor *entity.User, targetUserID uint64, reason string, requestID string) (AdminUserStatusResult, error) {
@@ -224,12 +224,12 @@ func (u *adminUserUsecase) ResumeUser(ctx context.Context, actor *entity.User, t
 		return AdminUserStatusResult{}, err
 	}
 
-	return AdminUserStatusResult{ID: user.ID, Status: user.Status, UpdatedAt: user.UpdatedAt.UTC()}, nil
+	return AdminUserStatusResult{ID: user.ID, Status: user.Status, UpdatedAt: user.UpdatedAt}, nil
 }
 
 func encodeAdminUserCursor(cursor AdminUserCursor) (string, error) {
 	payload, err := json.Marshal(AdminUserCursor{
-		CreatedAt: cursor.CreatedAt.UTC(),
+		CreatedAt: cursor.CreatedAt,
 		ID:        cursor.ID,
 	})
 	if err != nil {
