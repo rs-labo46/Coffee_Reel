@@ -31,6 +31,10 @@ func main() {
 		log.Fatal(err)
 	}
 
+	if err := migrate.MigrateAdminAuditLogVideoActions(postgresDB); err != nil {
+		log.Fatal(err)
+	}
+
 	if err := migrate.MigrateVideos(postgresDB); err != nil {
 		log.Fatal(err)
 	}
