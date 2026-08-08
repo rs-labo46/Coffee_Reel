@@ -61,6 +61,7 @@ export default function LikeButton({
       const state = isLiked
         ? await unlikeVideo(videoID)
         : await likeVideo(videoID);
+
       onChange(state);
     } catch (error: unknown) {
       if (error instanceof ApiClientError && error.status === 404) {
@@ -86,12 +87,14 @@ export default function LikeButton({
           ? `${isLiked ? "いいねを解除" : "いいね"} ${likeCount}件`
           : `ログインしていいね ${likeCount}件`
       }
-      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-white/15 bg-black/20 px-4 py-2 text-sm font-black text-stone-100 transition hover:border-amber-300/50 hover:bg-amber-300/10 disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
+      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-white/15 bg-black/20 px-4 py-2 text-sm font-black text-stone-100 transition hover:border-pink-300/50 hover:bg-pink-400/10 disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
     >
       <svg
         aria-hidden="true"
         viewBox="0 0 24 24"
-        className="h-4 w-4"
+        className={`h-4 w-4 transition ${
+          isLiked ? "text-pink-400" : "text-stone-100"
+        }`}
         fill={isLiked ? "currentColor" : "none"}
         stroke="currentColor"
         strokeWidth="2"
@@ -100,7 +103,9 @@ export default function LikeButton({
       >
         <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z" />
       </svg>
-      <span>{isSubmitting ? "更新中" : isLiked ? "いいね済み" : "いいね"}</span>
+
+      <span>{isSubmitting ? "更新中" : "いいね"}</span>
+
       <span aria-hidden="true">{likeCount}</span>
     </button>
   );

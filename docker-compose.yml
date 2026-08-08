@@ -102,6 +102,34 @@ services:
       MINIO_ROOT_USER: "${MINIO_ROOT_USER}"
       MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD}"
       STORAGE_BUCKET: "${STORAGE_BUCKET}"
+
+  seed:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: worker
+    command: ["go", "run", "./cmd/seed"]
+    restart: "no"
+    environment:
+      GO_ENV: "local"
+      DATABASE_URL: "host=db user=${POSTGRES_USER} password=${POSTGRES_PASSWORD} dbname=${POSTGRES_DB} port=5432 sslmode=disable TimeZone=Asia/Tokyo"
+
+      STORAGE_PROVIDER: "${STORAGE_PROVIDER}"
+      STORAGE_ENDPOINT: "http://minio:9000"
+      STORAGE_PRESIGN_ENDPOINT: "http://minio:9000"
+      STORAGE_REGION: "${STORAGE_REGION}"
+      STORAGE_BUCKET: "${STORAGE_BUCKET}"
+      STORAGE_ACCESS_KEY_ID: "${STORAGE_ACCESS_KEY_ID}"
+      STORAGE_SECRET_ACCESS_KEY: "${STORAGE_SECRET_ACCESS_KEY}"
+      STORAGE_FORCE_PATH_STYLE: "${STORAGE_FORCE_PATH_STYLE}"
+      STORAGE_MANAGED_PREFIX: "${STORAGE_MANAGED_PREFIX}"
+      FFPROBE_PATH: "${FFPROBE_PATH}"
+      FFMPEG_PATH: "${FFMPEG_PATH}"
+    depends_on:
+      create-admin:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
   backend:
     build:
       context: ./backend
@@ -140,6 +168,8 @@ services:
       - "${PORT}:${PORT}"
     depends_on:
       create-admin:
+        condition: service_completed_successfully
+      seed:
         condition: service_completed_successfully
       redis:
         condition: service_healthy

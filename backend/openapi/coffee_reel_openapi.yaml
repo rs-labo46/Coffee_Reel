@@ -1,0 +1,1806 @@
+# yaml-language-server: $schema=https://spec.openapis.org/oas/3.0/schema/2024-10-18
+openapi: 3.0.3
+info:
+  title: Coffee Reel API
+  version: 1.0.0
+tags:
+  - name: Auth
+    description: 会員登録、ログイン、Token再発行、ログアウト、現在ユーザー取得。
+  - name: Admin Users
+    description: activeなadminによる一般ユーザー管理。
+  - name: Admin Videos
+    description: activeなadminによる投稿一覧・詳細・非公開・公開再開。
+  - name: Videos
+    description: 動画投稿、公開動画一覧・検索、詳細、自分の投稿管理。
+  - name: Saved Videos
+    description: 公開動画の保存・保存解除・保存一覧。
+  - name: Likes
+    description: 公開動画へのいいね・いいね解除。
+paths:
+  /signup:
+    post:
+      tags:
+        - Auth
+      summary: 会員登録
+      description: 一般Userをrole=user、status=activeで作成する。成功時に自動ログインは行わない。
+      operationId: signup
+      responses:
+        "201":
+          description: 作成成功。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserDataResponse"
+        "400":
+          $ref: "#/components/responses/ValidationFailed"
+        "409":
+          $ref: "#/components/responses/EmailAlreadyExists"
+        "429":
+          $ref: "#/components/responses/RateLimitExceeded"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupRequest"
+  /login:
+    post:
+      tags:
+        - Auth
+      summary: ログイン
+      description: 認証成功時、Access TokenをJSONで返し、refresh_token Cookieとcsrf_token Cookieを設定する。
+      operationId: login
+      responses:
+        "200":
+          description: ログイン成功。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          $ref: "#/components/responses/ValidationFailed"
+        "401":
+          $ref: "#/components/responses/InvalidCredentials"
+        "403":
+          $ref: "#/components/responses/UserSuspended"
+        "429":
+          $ref: "#/components/responses/RateLimitExceeded"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+  /refresh:
+    post:
+      tags:
+        - Auth
+      summary: Access Token再発行
+      description: Refresh Tokenをローテーションし、新しいAccess Tokenと認証Cookieを発行する。使用済みRefresh Tokenの再利用検知時は同じFamilyを失効する。
+      operationId: refreshAccessToken
+      responses:
+        "200":
+          description: 再発行成功。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefreshResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 403 csrf_invalid または user_suspended。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "429":
+          $ref: "#/components/responses/RateLimitExceeded"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+      security:
+        - refreshCookie: []
+          csrfCookie: []
+          csrfHeader: []
+  /logout:
+    post:
+      tags:
+        - Auth
+      summary: ログアウト
+      description:
+        Refresh Tokenが存在する場合はそのFamilyを失効し、認証Cookieを削除する。Refresh Token Cookie自体は必須ではないが、CSRF Middlewareによりcsrf_token
+        CookieとX-CSRF-Tokenは必須。
+      operationId: logout
+      responses:
+        "204":
+          description: ログアウト成功。Response bodyなし。
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/CsrfInvalid"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - csrfCookie: []
+          csrfHeader: []
+  /me:
+    get:
+      tags:
+        - Auth
+      summary: 現在ユーザー取得
+      description: Bearer Access TokenをDB上の現在User状態とTokenVersionまで検証し、認証済みUserを返す。
+      operationId: getMe
+      responses:
+        "200":
+          description: 取得成功。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserDataResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - bearerAuth: []
+  /admin/users:
+    get:
+      tags:
+        - Admin Users
+      summary: 一般ユーザー一覧
+      description: role=userのactive/suspended Userをcreated_at DESC, id DESCでCursorページングする。adminは一覧対象外。
+      operationId: adminListUsers
+      responses:
+        "200":
+          description: 一覧取得成功。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationFailed"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/AdminRequired"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      parameters:
+        - $ref: "#/components/parameters/LimitQuery"
+        - $ref: "#/components/parameters/CursorQuery"
+      security:
+        - bearerAuth: []
+  /admin/users/{user_id}:
+    get:
+      tags:
+        - Admin Users
+      summary: 一般ユーザー詳細
+      description: role=userの対象Userと、未削除の投稿一覧を返す。
+      operationId: adminGetUserDetail
+      responses:
+        "200":
+          description: 詳細取得成功。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserDetailResponse"
+        "400":
+          $ref: "#/components/responses/ValidationFailed"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/AdminRequired"
+        "404":
+          $ref: "#/components/responses/UserNotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      parameters:
+        - $ref: "#/components/parameters/UserIdPath"
+      security:
+        - bearerAuth: []
+  /admin/users/{user_id}/suspend:
+    patch:
+      tags:
+        - Admin Users
+      summary: 一般ユーザー利用停止
+      description: activeな一般Userをsuspendedへ変更し、Refresh Token失効・TokenVersion増加・公開動画hidden化・監査ログ作成を同一Transactionで行う。
+      operationId: adminSuspendUser
+      responses:
+        "200":
+          description: 状態変更成功。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserStatusResponse"
+        "400":
+          $ref: "#/components/responses/ValidationFailed"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 403 admin_required または user_management_forbidden。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          $ref: "#/components/responses/UserNotFound"
+        "409":
+          $ref: "#/components/responses/UserStatusConflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      parameters:
+        - $ref: "#/components/parameters/UserIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReasonRequest"
+      security:
+        - bearerAuth: []
+  /admin/users/{user_id}/resume:
+    patch:
+      tags:
+        - Admin Users
+      summary: 一般ユーザー利用再開
+      description: suspendedな一般Userをactiveへ戻し監査ログを作成する。動画は自動再公開しない。
+      operationId: adminResumeUser
+      responses:
+        "200":
+          description: 状態変更成功。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserStatusResponse"
+        "400":
+          $ref: "#/components/responses/ValidationFailed"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 403 admin_required または user_management_forbidden。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          $ref: "#/components/responses/UserNotFound"
+        "409":
+          $ref: "#/components/responses/UserStatusConflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      parameters:
+        - $ref: "#/components/parameters/UserIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReasonRequest"
+      security:
+        - bearerAuth: []
+  /admin/videos:
+    get:
+      tags:
+        - Admin Videos
+      summary: 管理者投稿一覧
+      description: 未削除の全投稿状態をcreated_at DESC, id DESCで取得する。公開動画だけには限定しない。
+      operationId: adminListVideos
+      responses:
+        "200":
+          description: 一覧取得成功。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminVideoListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationFailed"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/AdminRequired"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      parameters:
+        - $ref: "#/components/parameters/LimitQuery"
+        - $ref: "#/components/parameters/CursorQuery"
+      security:
+        - bearerAuth: []
+  /admin/videos/{video_id}:
+    get:
+      tags:
+        - Admin Videos
+      summary: 管理者投稿詳細
+      description: 未削除投稿を取得する。ready/publishedまたはready/hiddenだけ期限付き再生URL・サムネイルURLを発行し、privateには発行しない。Object Keyは返さない。
+      operationId: adminGetVideoDetail
+      responses:
+        "200":
+          description: 詳細取得成功。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminVideoDetailResponse"
+        "400":
+          $ref: "#/components/responses/ValidationFailed"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/AdminRequired"
+        "404":
+          $ref: "#/components/responses/VideoNotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      parameters:
+        - $ref: "#/components/parameters/VideoIdPath"
+      security:
+        - bearerAuth: []
+  /admin/videos/{video_id}/hide:
+    patch:
+      tags:
+        - Admin Videos
+      summary: 投稿を管理者非公開
+      description: ready/published/未削除のVideoだけをhiddenへ変更し、video_hide監査ログを同一Transactionで作成する。
+      operationId: adminHideVideo
+      responses:
+        "200":
+          description: 非公開成功。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminVideoStateResponse"
+        "400":
+          $ref: "#/components/responses/ValidationFailed"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/AdminRequired"
+        "404":
+          $ref: "#/components/responses/VideoNotFound"
+        "409":
+          $ref: "#/components/responses/VideoStateConflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      parameters:
+        - $ref: "#/components/parameters/VideoIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StrictReasonRequest"
+      security:
+        - bearerAuth: []
+  /admin/videos/{video_id}/restore:
+    patch:
+      tags:
+        - Admin Videos
+      summary: 投稿を管理者公開再開
+      description: ready/hidden/未削除かつ投稿者activeの場合だけpublishedへ戻し、video_restore監査ログを同一Transactionで作成する。
+      operationId: adminRestoreVideo
+      responses:
+        "200":
+          description: 公開再開成功。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminVideoStateResponse"
+        "400":
+          $ref: "#/components/responses/ValidationFailed"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/AdminRequired"
+        "404":
+          $ref: "#/components/responses/VideoNotFound"
+        "409":
+          description: 409 video_state_conflict または video_owner_suspended。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      parameters:
+        - $ref: "#/components/parameters/VideoIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StrictReasonRequest"
+      security:
+        - bearerAuth: []
+  /videos:
+    post:
+      tags:
+        - Videos
+      summary: 動画投稿開始
+      description: 投稿メタデータを作成し、Object Storageへ直接PUTする期限付きURLを返す。同じIdempotency-Key・同じ入力の再送は既存Videoを再利用し、Controllerは同じく201を返す。
+      operationId: startVideoUpload
+      responses:
+        "201":
+          description: 投稿開始成功。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StartUploadResponse"
+        "400":
+          $ref: "#/components/responses/ValidationFailed"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/IdempotencyConflict"
+        "429":
+          $ref: "#/components/responses/RateLimitExceeded"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartUploadRequest"
+      security:
+        - bearerAuth: []
+    get:
+      tags:
+        - Videos
+      summary: 公開動画一覧・検索
+      description:
+        ready/published/未削除のVideoだけを返す。title/category未指定はresult_type=all。条件指定時は通常検索matched。初回matchedが0件かつtitle指定ありの場合だけpg_trgm類似検索へ切り替えresult_type=similar。titleは大文字小文字を区別しない部分一致で、%,
+        _, \ は文字としてEscapeされる。Bearer Headerなしはゲスト。Headerが存在して不正な場合は401で、ゲストへ降格しない。
+      operationId: listPublicVideos
+      responses:
+        "200":
+          description: 取得成功。0件でも空配列を返す。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicVideoListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationFailed"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      parameters:
+        - name: title
+          in: query
+          required: false
+          description: 指定した場合、trim後1〜100文字。空指定は400。
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+        - name: category
+          in: query
+          required: false
+          description: 指定した場合は定義済みカテゴリー完全一致。空指定は400。
+          schema:
+            $ref: "#/components/schemas/CategoryCode"
+        - $ref: "#/components/parameters/LimitQuery"
+        - $ref: "#/components/parameters/PublicCursorQuery"
+      security:
+        - {}
+        - bearerAuth: []
+  /videos/{video_id}/upload-complete:
+    post:
+      tags:
+        - Videos
+      summary: 動画Upload完了通知
+      description: Storage上の既定Objectを確認し、uploadingならuploadedへ変更してProcessing Jobを1件だけ作成する。uploaded/processing/ready/failed状態への再送は状態を変更せず202で現在状態を返す。
+      operationId: completeVideoUpload
+      responses:
+        "202":
+          description: 完了通知受付。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VideoStateResponse"
+        "400":
+          $ref: "#/components/responses/ValidationFailed"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/VideoNotFound"
+        "409":
+          description: 409 upload_expired, video_source_invalid, video_state_conflict。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "429":
+          $ref: "#/components/responses/RateLimitExceeded"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+      parameters:
+        - $ref: "#/components/parameters/VideoIdPath"
+      security:
+        - bearerAuth: []
+  /videos/{video_id}:
+    get:
+      tags:
+        - Videos
+      summary: 公開動画詳細
+      description: ready/published/未削除のVideoだけを返す。Bearer Headerなしはゲスト。不正Bearer Headerは401。
+      operationId: getPublicVideoDetail
+      responses:
+        "200":
+          description: 取得成功。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicVideo"
+        "400":
+          $ref: "#/components/responses/ValidationFailed"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/VideoNotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      parameters:
+        - $ref: "#/components/parameters/VideoIdPath"
+      security:
+        - {}
+        - bearerAuth: []
+  /videos/{video_id}/like:
+    put:
+      tags:
+        - Likes
+      summary: いいね
+      description: activeな認証Userが公開動画へいいねする。重複Requestは新規行を増やさず200で現在件数とis_liked=trueを返す。
+      operationId: likeVideo
+      responses:
+        "200":
+          description: いいね後状態。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VideoLikeResponse"
+        "400":
+          $ref: "#/components/responses/ValidationFailed"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/VideoNotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      parameters:
+        - $ref: "#/components/parameters/VideoIdPath"
+      security:
+        - bearerAuth: []
+    delete:
+      tags:
+        - Likes
+      summary: いいね解除
+      description: 現在も公開条件を満たすVideoに対し、本人Likeを物理削除する。Likeが存在しなくても200でis_liked=falseを返す。
+      operationId: unlikeVideo
+      responses:
+        "200":
+          description: 解除後状態。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VideoLikeResponse"
+        "400":
+          $ref: "#/components/responses/ValidationFailed"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/VideoNotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      parameters:
+        - $ref: "#/components/parameters/VideoIdPath"
+      security:
+        - bearerAuth: []
+  /videos/{video_id}/saved:
+    put:
+      tags:
+        - Saved Videos
+      summary: 動画保存
+      description: 公開条件を満たすVideoを保存する。同じUser/Videoの再送は重複行を作らず204。
+      operationId: saveVideo
+      responses:
+        "204":
+          description: 保存成功。Response bodyなし。
+        "400":
+          $ref: "#/components/responses/ValidationFailed"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/VideoNotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      parameters:
+        - $ref: "#/components/parameters/VideoIdPath"
+      security:
+        - bearerAuth: []
+    delete:
+      tags:
+        - Saved Videos
+      summary: 動画保存解除
+      description: user_idとvideo_idの保存関係を物理削除する。関係行が存在しなくても204。現在のVideo公開状態・存在確認は行わない。
+      operationId: removeSavedVideo
+      responses:
+        "204":
+          description: 保存解除成功。Response bodyなし。
+        "400":
+          $ref: "#/components/responses/ValidationFailed"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      parameters:
+        - $ref: "#/components/parameters/VideoIdPath"
+      security:
+        - bearerAuth: []
+  /me/videos:
+    get:
+      tags:
+        - Videos
+      summary: 自分の投稿一覧
+      description: 認証User自身の未削除Videoを全状態でcreated_at DESC, id DESCに取得する。hidden動画にはサムネイルURLを発行しない。
+      operationId: listMyVideos
+      responses:
+        "200":
+          description: 一覧取得成功。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnedVideoListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationFailed"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      parameters:
+        - $ref: "#/components/parameters/LimitQuery"
+        - $ref: "#/components/parameters/CursorQuery"
+      security:
+        - bearerAuth: []
+  /me/videos/{video_id}:
+    get:
+      tags:
+        - Videos
+      summary: 自分の投稿詳細
+      description: 認証User自身の未削除Videoを返す。failed時は安全なfailure_codeを返す。ready/privateまたはready/publishedだけ再生URL・サムネイルURLを返し、hiddenでは返さない。
+      operationId: getMyVideoDetail
+      responses:
+        "200":
+          description: 詳細取得成功。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnedVideoDetailResponse"
+        "400":
+          $ref: "#/components/responses/ValidationFailed"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/VideoNotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      parameters:
+        - $ref: "#/components/parameters/VideoIdPath"
+      security:
+        - bearerAuth: []
+    delete:
+      tags:
+        - Videos
+      summary: 自分の投稿削除
+      description: 認証User自身の未削除Videoを論理削除しpublish_status=privateにする。必要なStorage Cleanup Jobを同一DB Transactionで作成する。Storage削除完了は待たない。
+      operationId: deleteMyVideo
+      responses:
+        "204":
+          description: 削除受付成功。Response bodyなし。
+        "400":
+          $ref: "#/components/responses/ValidationFailed"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/VideoNotFound"
+        "409":
+          $ref: "#/components/responses/VideoStateConflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      parameters:
+        - $ref: "#/components/parameters/VideoIdPath"
+      security:
+        - bearerAuth: []
+  /me/videos/{video_id}/private:
+    patch:
+      tags:
+        - Videos
+      summary: 自分の投稿を非公開
+      description: ready/publishedの自分の未削除Videoだけをprivateへ変更する。
+      operationId: setMyVideoPrivate
+      responses:
+        "200":
+          description: 状態変更成功。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VideoStateResponse"
+        "400":
+          $ref: "#/components/responses/ValidationFailed"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/VideoNotFound"
+        "409":
+          $ref: "#/components/responses/VideoStateConflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      parameters:
+        - $ref: "#/components/parameters/VideoIdPath"
+      security:
+        - bearerAuth: []
+  /me/videos/{video_id}/publish:
+    patch:
+      tags:
+        - Videos
+      summary: 自分の投稿を再公開
+      description: ready/privateの自分の未削除Videoをpublishedへ戻す。hiddenは投稿者から再公開できない。
+      operationId: republishMyVideo
+      responses:
+        "200":
+          description: 状態変更成功。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VideoStateResponse"
+        "400":
+          $ref: "#/components/responses/ValidationFailed"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/VideoNotFound"
+        "409":
+          $ref: "#/components/responses/VideoStateConflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      parameters:
+        - $ref: "#/components/parameters/VideoIdPath"
+      security:
+        - bearerAuth: []
+  /me/saved-videos:
+    get:
+      tags:
+        - Saved Videos
+      summary: 保存動画一覧
+      description: 認証Userの保存関係のうち、現在もready/published/未削除のVideoだけを保存日時の新しい順で返す。Responseにはresult_typeを出力しない。
+      operationId: listSavedVideos
+      responses:
+        "200":
+          description: 一覧取得成功。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SavedVideoListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationFailed"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      parameters:
+        - $ref: "#/components/parameters/LimitQuery"
+        - $ref: "#/components/parameters/CursorQuery"
+      security:
+        - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Authorization: Bearer {access_token}. Access TokenはJWT HS256。"
+    refreshCookie:
+      type: apiKey
+      in: cookie
+      name: refresh_token
+      description: Login/Refreshで発行されるHttpOnly Refresh Token Cookie。
+    csrfCookie:
+      type: apiKey
+      in: cookie
+      name: csrf_token
+      description: Login/Refreshで発行されるCSRF Cookie。
+    csrfHeader:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+      description: csrf_token Cookieと完全一致させる。RefreshとLogoutで検証される。
+  parameters:
+    UserIdPath:
+      name: user_id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+        maximum: 9223372036854775807
+    VideoIdPath:
+      name: video_id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+        maximum: 9223372036854775807
+    LimitQuery:
+      name: limit
+      in: query
+      required: false
+      description: 1〜100。未指定時20。
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    CursorQuery:
+      name: cursor
+      in: query
+      required: false
+      description: Backendが返したBase64 Raw URL Encodingの不透明Cursor。改変せず次ページへ渡す。
+      schema:
+        type: string
+        minLength: 1
+    PublicCursorQuery:
+      name: cursor
+      in: query
+      required: false
+      description: GET /videosが返した不透明Cursor。同じtitle/category条件のまま再利用する。検索条件変更後の再利用は400。
+      schema:
+        type: string
+        minLength: 1
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: 動画投稿開始操作の冪等性キー。空文字・Unicode空白を含む値は拒否。現在の実行設定では最大128bytes。
+      schema:
+        type: string
+        minLength: 1
+  schemas:
+    UserRole:
+      type: string
+      enum:
+        - user
+        - admin
+    UserStatus:
+      type: string
+      enum:
+        - active
+        - suspended
+    CategoryCode:
+      type: string
+      enum:
+        - brewing
+        - roasting
+        - latte_art
+        - beans
+        - equipment
+    VideoProcessingStatus:
+      type: string
+      enum:
+        - uploading
+        - expired
+        - uploaded
+        - processing
+        - ready
+        - failed
+    VideoPublishStatus:
+      type: string
+      enum:
+        - private
+        - published
+        - hidden
+    VideoFailureCode:
+      type: string
+      enum:
+        - invalid_format
+        - video_corrupt
+        - duration_exceeded
+        - size_exceeded
+        - resolution_exceeded
+        - invalid_aspect_ratio
+        - frame_rate_exceeded
+        - video_track_missing
+        - processing_failed
+      description: 投稿者向け詳細APIへ公開される失敗コード。内部障害はprocessing_failedへ正規化される。
+    PublicSearchResultType:
+      type: string
+      enum:
+        - all
+        - matched
+        - similar
+    ApiError:
+      type: object
+      required:
+        - status
+        - code
+        - message
+        - request_id
+      properties:
+        status:
+          type: integer
+          format: int32
+        code:
+          type: string
+        message:
+          type: string
+        request_id:
+          type: string
+    SignupRequest:
+      type: object
+      required:
+        - name
+        - email
+        - password
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+          description: 前後空白を除去後1〜50文字。
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          description: trim・小文字化して検証・保存する。
+        password:
+          type: string
+          format: password
+          minLength: 8
+          description: 8文字以上かつUTF-8で72bytes以下。trimしない。
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          description: trim・小文字化して検証する。
+        password:
+          type: string
+          format: password
+          minLength: 1
+          description: 空文字を拒否する。
+    User:
+      type: object
+      required:
+        - id
+        - name
+        - email
+        - role
+        - status
+        - created_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          $ref: "#/components/schemas/UserRole"
+        status:
+          $ref: "#/components/schemas/UserStatus"
+        created_at:
+          type: string
+          format: date-time
+    AuthUser:
+      type: object
+      required:
+        - id
+        - name
+        - email
+        - role
+        - status
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          $ref: "#/components/schemas/UserRole"
+        status:
+          $ref: "#/components/schemas/UserStatus"
+    UserDataResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: "#/components/schemas/User"
+    AuthResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - access_token
+            - token_type
+            - expires_in
+            - user
+          properties:
+            access_token:
+              type: string
+            token_type:
+              type: string
+              enum:
+                - Bearer
+            expires_in:
+              type: integer
+              format: int32
+              enum:
+                - 900
+            user:
+              $ref: "#/components/schemas/AuthUser"
+    RefreshResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - access_token
+            - token_type
+            - expires_in
+          properties:
+            access_token:
+              type: string
+            token_type:
+              type: string
+              enum:
+                - Bearer
+            expires_in:
+              type: integer
+              format: int32
+              enum:
+                - 900
+    ReasonRequest:
+      type: object
+      required:
+        - reason
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: 前後空白を除去後1〜500文字。
+    StrictReasonRequest:
+      type: object
+      required:
+        - reason
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: 前後空白を除去後1〜500文字。
+      additionalProperties: false
+      description: 管理者投稿の状態変更では未知JSONフィールドも拒否する。
+    AdminUserListItem:
+      type: object
+      required:
+        - id
+        - name
+        - email
+        - status
+        - created_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        status:
+          $ref: "#/components/schemas/UserStatus"
+        created_at:
+          type: string
+          format: date-time
+    AdminUserListResponse:
+      type: object
+      required:
+        - items
+        - next_cursor
+        - has_more
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminUserListItem"
+        next_cursor:
+          type: string
+          nullable: true
+        has_more:
+          type: boolean
+    AdminUserVideo:
+      type: object
+      required:
+        - id
+        - title
+        - processing_status
+        - publish_status
+        - created_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        title:
+          type: string
+        processing_status:
+          $ref: "#/components/schemas/VideoProcessingStatus"
+        publish_status:
+          $ref: "#/components/schemas/VideoPublishStatus"
+        created_at:
+          type: string
+          format: date-time
+    AdminUserDetailResponse:
+      type: object
+      required:
+        - id
+        - name
+        - email
+        - status
+        - created_at
+        - videos
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        status:
+          $ref: "#/components/schemas/UserStatus"
+        created_at:
+          type: string
+          format: date-time
+        videos:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminUserVideo"
+    AdminUserStatusResponse:
+      type: object
+      required:
+        - id
+        - status
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        status:
+          $ref: "#/components/schemas/UserStatus"
+        updated_at:
+          type: string
+          format: date-time
+    StartUploadRequest:
+      type: object
+      required:
+        - title
+        - category
+        - file_content_type
+        - file_size_bytes
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Validatorで前後空白を除去後1〜100文字。
+        description:
+          type: string
+          maxLength: 1000
+          description: 1000文字以内。Entity作成時に前後空白が除去される。
+        category:
+          $ref: "#/components/schemas/CategoryCode"
+        file_content_type:
+          type: string
+          enum:
+            - video/mp4
+            - video/quicktime
+        file_size_bytes:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 30000000
+    StartUploadVideo:
+      type: object
+      required:
+        - id
+        - title
+        - description
+        - category
+        - processing_status
+        - publish_status
+        - upload_expires_at
+        - created_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          $ref: "#/components/schemas/CategoryCode"
+        processing_status:
+          $ref: "#/components/schemas/VideoProcessingStatus"
+        publish_status:
+          $ref: "#/components/schemas/VideoPublishStatus"
+        upload_expires_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+    UploadInstruction:
+      type: object
+      required:
+        - method
+        - url
+        - headers
+        - expires_at
+      properties:
+        method:
+          type: string
+          enum:
+            - PUT
+        url:
+          type: string
+          format: uri
+          description: Object Storageへの期限付きUpload URL。
+        headers:
+          type: object
+          required:
+            - Content-Type
+          properties:
+            Content-Type:
+              type: string
+              enum:
+                - video/mp4
+                - video/quicktime
+          additionalProperties: false
+        expires_at:
+          type: string
+          format: date-time
+    StartUploadResponse:
+      type: object
+      required:
+        - video
+        - upload
+      properties:
+        video:
+          $ref: "#/components/schemas/StartUploadVideo"
+        upload:
+          $ref: "#/components/schemas/UploadInstruction"
+    VideoStateResponse:
+      type: object
+      required:
+        - id
+        - processing_status
+        - publish_status
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        processing_status:
+          $ref: "#/components/schemas/VideoProcessingStatus"
+        publish_status:
+          $ref: "#/components/schemas/VideoPublishStatus"
+    VideoAuthor:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        name:
+          type: string
+    PublicVideo:
+      type: object
+      required:
+        - id
+        - title
+        - description
+        - category
+        - author
+        - playback_url
+        - thumbnail_url
+        - like_count
+        - is_liked
+        - is_saved
+        - created_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          $ref: "#/components/schemas/CategoryCode"
+        author:
+          $ref: "#/components/schemas/VideoAuthor"
+        playback_url:
+          type: string
+          format: uri
+        thumbnail_url:
+          type: string
+          format: uri
+        like_count:
+          type: integer
+          format: int64
+          minimum: 0
+        is_liked:
+          type: boolean
+          description: ゲストはfalse。認証済みUserは本人のLike状態。
+        is_saved:
+          type: boolean
+          description: ゲストはfalse。認証済みUserは本人の保存状態。
+        created_at:
+          type: string
+          format: date-time
+    PublicVideoListResponse:
+      type: object
+      required:
+        - items
+        - result_type
+        - next_cursor
+        - has_more
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicVideo"
+        result_type:
+          $ref: "#/components/schemas/PublicSearchResultType"
+        next_cursor:
+          type: string
+          nullable: true
+        has_more:
+          type: boolean
+    SavedVideoListResponse:
+      type: object
+      required:
+        - items
+        - next_cursor
+        - has_more
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicVideo"
+        next_cursor:
+          type: string
+          nullable: true
+        has_more:
+          type: boolean
+      description: 保存一覧ではControllerのresult_typeはomitemptyにより出力されない。
+    OwnedVideo:
+      type: object
+      required:
+        - id
+        - title
+        - category
+        - processing_status
+        - publish_status
+        - thumbnail_url
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        title:
+          type: string
+        category:
+          $ref: "#/components/schemas/CategoryCode"
+        processing_status:
+          $ref: "#/components/schemas/VideoProcessingStatus"
+        publish_status:
+          $ref: "#/components/schemas/VideoPublishStatus"
+        thumbnail_url:
+          type: string
+          format: uri
+          nullable: true
+          description: readyかつprivate/publishedでOutputMetaがある場合のみ発行。hiddenではnull。
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    OwnedVideoListResponse:
+      type: object
+      required:
+        - items
+        - next_cursor
+        - has_more
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OwnedVideo"
+        next_cursor:
+          type: string
+          nullable: true
+        has_more:
+          type: boolean
+    OwnedVideoDetailResponse:
+      type: object
+      required:
+        - id
+        - title
+        - description
+        - category
+        - processing_status
+        - publish_status
+        - failure_code
+        - playback_url
+        - thumbnail_url
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          $ref: "#/components/schemas/CategoryCode"
+        processing_status:
+          $ref: "#/components/schemas/VideoProcessingStatus"
+        publish_status:
+          $ref: "#/components/schemas/VideoPublishStatus"
+        failure_code:
+          allOf:
+            - $ref: "#/components/schemas/VideoFailureCode"
+          nullable: true
+        playback_url:
+          type: string
+          format: uri
+          nullable: true
+          description: readyかつprivate/publishedの場合のみ返る。hiddenでは返さない。
+        thumbnail_url:
+          type: string
+          format: uri
+          nullable: true
+          description: readyかつprivate/publishedの場合のみ返る。hiddenでは返さない。
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    VideoLikeResponse:
+      type: object
+      required:
+        - video_id
+        - like_count
+        - is_liked
+      properties:
+        video_id:
+          type: integer
+          format: int64
+          minimum: 1
+        like_count:
+          type: integer
+          format: int64
+          minimum: 0
+        is_liked:
+          type: boolean
+    AdminVideoAuthor:
+      type: object
+      required:
+        - id
+        - name
+        - status
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        name:
+          type: string
+        status:
+          $ref: "#/components/schemas/UserStatus"
+    AdminVideoListItem:
+      type: object
+      required:
+        - id
+        - author
+        - title
+        - description
+        - category
+        - processing_status
+        - publish_status
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        author:
+          $ref: "#/components/schemas/AdminVideoAuthor"
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          $ref: "#/components/schemas/CategoryCode"
+        processing_status:
+          $ref: "#/components/schemas/VideoProcessingStatus"
+        publish_status:
+          $ref: "#/components/schemas/VideoPublishStatus"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    AdminVideoListResponse:
+      type: object
+      required:
+        - items
+        - next_cursor
+        - has_more
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminVideoListItem"
+        next_cursor:
+          type: string
+          nullable: true
+        has_more:
+          type: boolean
+    AdminVideoDetailResponse:
+      type: object
+      required:
+        - id
+        - author
+        - title
+        - description
+        - category
+        - processing_status
+        - publish_status
+        - playback_url
+        - thumbnail_url
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        author:
+          $ref: "#/components/schemas/AdminVideoAuthor"
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          $ref: "#/components/schemas/CategoryCode"
+        processing_status:
+          $ref: "#/components/schemas/VideoProcessingStatus"
+        publish_status:
+          $ref: "#/components/schemas/VideoPublishStatus"
+        playback_url:
+          type: string
+          format: uri
+          nullable: true
+          description: ready/publishedまたはready/hiddenでOutputMetaがある場合のみ発行。privateには発行しない。
+        thumbnail_url:
+          type: string
+          format: uri
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    AdminVideoStateResponse:
+      type: object
+      required:
+        - id
+        - processing_status
+        - publish_status
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        processing_status:
+          $ref: "#/components/schemas/VideoProcessingStatus"
+        publish_status:
+          $ref: "#/components/schemas/VideoPublishStatus"
+        updated_at:
+          type: string
+          format: date-time
+  responses:
+    ValidationFailed:
+      description: 400 validation_failed — 入力形式、Path/Query/Cursor等が不正。
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    Unauthorized:
+      description: 401 unauthorized — 認証情報がない、無効、期限切れ、または認証済みUserが利用不可。
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    InvalidCredentials:
+      description: 401 invalid_credentials — メールアドレスまたはパスワードが不正。
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    UserSuspended:
+      description: 403 user_suspended — ログインまたはRefresh対象Userが利用停止中。
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    CsrfInvalid:
+      description: 403 csrf_invalid — csrf_token CookieとX-CSRF-Tokenが不足または不一致。
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    AdminRequired:
+      description: 403 admin_required — 管理者権限が必要。
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    UserManagementForbidden:
+      description: 403 user_management_forbidden — 管理対象外User（admin等）への操作。
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    EmailAlreadyExists:
+      description: 409 email_already_exists — Email重複。
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    UserNotFound:
+      description: 404 user_not_found — 管理対象の一般Userが存在しない。
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    UserStatusConflict:
+      description: 409 user_status_conflict — User状態が操作条件と一致しない。
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    VideoNotFound:
+      description: 404 video_not_found — 対象動画が存在しない、削除済み、または公開API/Likeでは公開条件を満たさない。
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    VideoForbidden:
+      description: 403 video_forbidden — 動画操作権限がない場合のDomain Error。
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    VideoStateConflict:
+      description: 409 video_state_conflict — 動画の現在状態では操作できない。
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    VideoOwnerSuspended:
+      description: 409 video_owner_suspended — 投稿者が利用停止中のため管理者が公開再開できない。
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    IdempotencyConflict:
+      description: 409 idempotency_conflict — 同じIdempotency-Keyが異なる投稿入力で再利用された。
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    UploadExpired:
+      description: 409 upload_expired — 動画Upload期限切れ。
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    VideoSourceInvalid:
+      description: 409 video_source_invalid — Storage上の元動画が存在しない、サイズ/Content-Type等を確認できない。
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    RateLimitExceeded:
+      description: 429 rate_limit_exceeded — Rate Limit超過。
+      headers:
+        Retry-After:
+          description: 再試行までの秒数。
+          schema:
+            type: integer
+            minimum: 1
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    ServiceUnavailable:
+      description: 503 service_unavailable — Redis等のRate Limit基盤を利用できない。
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    InternalError:
+      description: 500 internal_error — 内部エラー。SQL、Stack Trace、Credential等は返さない。
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
