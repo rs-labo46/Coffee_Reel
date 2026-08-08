@@ -5,7 +5,7 @@ import { ApiClientError } from "../api/client";
 import { listReels, removeSavedVideo, saveVideo } from "../api/video";
 import { useAuth } from "../auth/useAuth";
 import ReelVideo from "../components/ReelVideo";
-import type { PublicVideo } from "../types/video";
+import type { PublicVideo, VideoLikeState } from "../types/video";
 
 const initialReelsPromises = new Map<string, ReturnType<typeof listReels>>();
 
@@ -64,9 +64,7 @@ export default function ReelPage() {
   const navigate = useNavigate();
   const { isAuthenticated, isLoading: isAuthLoading, logout, user } = useAuth();
   const visibilityRatiosRef = useRef<Map<number, number>>(new Map());
-  // ---追加---
   const logoutInFlightRef = useRef(false);
-  // ---追加---
   const loadMoreInFlightRef = useRef(false);
   const reelListRef = useRef<HTMLElement | null>(null);
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
@@ -78,9 +76,7 @@ export default function ReelPage() {
   const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
   const [savingVideoIDs, setSavingVideoIDs] = useState<Set<number>>(new Set());
-  // ---追加---
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-  // ---追加---
+  const [isLoggingOut, setIsLoggingOut] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [requestID, setRequestID] = useState<string>("");
 
@@ -224,6 +220,36 @@ export default function ReelPage() {
   }, [hasMore, loadMore]);
 
   // 未認証時はLoginへ移動し認証済み時は保存状態を切替
+  function handleLikeChange(state: VideoLikeState): void {
+    setVideos((currentVideos) =>
+      currentVideos.map((video) =>
+        video.id === state.video_id
+          ? {
+              ...video,
+              like_count: state.like_count,
+              is_liked: state.is_liked,
+            }
+          : video,
+      ),
+    );
+  }
+
+  function handleLikeNotFound(videoID: number): void {
+    visibilityRatiosRef.current.delete(videoID);
+    setVideos((currentVideos) =>
+      currentVideos.filter((video) => video.id !== videoID),
+    );
+    setActiveVideoID((currentVideoID) =>
+      currentVideoID === videoID ? null : currentVideoID,
+    );
+  }
+
+  function handleLikeError(error: unknown): void {
+    const errorView = errorViewOf(error, "いいね状態を更新できませんでした");
+    setErrorMessage(errorView.message);
+    setRequestID(errorView.requestID);
+  }
+
   async function handleToggleSaved(video: PublicVideo): Promise<void> {
     if (!isAuthenticated) {
       navigate("/login", { state: { from: "/" } });
@@ -287,7 +313,6 @@ export default function ReelPage() {
     }
   }
 
-  // ---追加---
   // Headerからログアウトし、認証情報を破棄してLogin画面へ移動
   async function handleLogout(): Promise<void> {
     if (logoutInFlightRef.current) {
@@ -311,7 +336,6 @@ export default function ReelPage() {
       setIsLoggingOut(false);
     }
   }
-  // ---追加---
 
   return (
     <main className="min-h-dvh bg-[#100b08] text-stone-100">
@@ -328,6 +352,14 @@ export default function ReelPage() {
             className="flex flex-wrap items-center justify-end gap-1 sm:gap-2"
             aria-label="メインメニュー"
           >
+            <Link
+              to="/search"
+              aria-label="検索"
+              title="検索"
+              className="rounded-full border border-white/15 px-3 py-2 text-xs font-black text-stone-200 transition hover:border-amber-300/50 hover:text-amber-200 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-amber-300 sm:px-4"
+            >
+              検索
+            </Link>
             {isAuthenticated ? (
               <>
                 <Link
@@ -358,7 +390,6 @@ export default function ReelPage() {
                 >
                   自分の投稿
                 </Link>
-                {/* ---追加--- */}
                 {user?.role === "admin" && (
                   <Link
                     to="/admin/users"
@@ -370,14 +401,12 @@ export default function ReelPage() {
                     <span className="hidden sm:inline">管理画面</span>
                   </Link>
                 )}
-                {/* ---追加--- */}
                 <Link
                   to="/videos/upload"
                   className="rounded-full bg-amber-300 px-3 py-2 text-xs font-black text-stone-950 transition hover:bg-amber-200 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-amber-300 sm:px-4"
                 >
                   投稿
                 </Link>
-                {/* ---追加--- */}
                 <button
                   type="button"
                   onClick={() => void handleLogout()}
@@ -386,7 +415,6 @@ export default function ReelPage() {
                 >
                   {isLoggingOut ? "ログアウト中" : "ログアウト"}
                 </button>
-                {/* ---追加--- */}
               </>
             ) : (
               <>
@@ -459,6 +487,9 @@ export default function ReelPage() {
               onToggleSaved={(targetVideo) =>
                 void handleToggleSaved(targetVideo)
               }
+              onLikeChange={handleLikeChange}
+              onLikeNotFound={handleLikeNotFound}
+              onLikeError={handleLikeError}
             />
           ))}
 

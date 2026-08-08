@@ -87,12 +87,9 @@ describe("動画API", () => {
 
     await expect(completeVideoUpload(10)).resolves.toEqual(videoState);
 
-    expect(apiRequestMock).toHaveBeenCalledWith(
-      "/videos/10/upload-complete",
-      {
-        method: "POST",
-      },
-    );
+    expect(apiRequestMock).toHaveBeenCalledWith("/videos/10/upload-complete", {
+      method: "POST",
+    });
   });
 
   it("公開一覧のCursorをURLエンコードして取得する", async () => {
@@ -106,6 +103,32 @@ describe("動画API", () => {
       "/videos?limit=50&cursor=cursor%2B%2F%3Dvalue",
       {
         method: "GET",
+      },
+    );
+  });
+
+  it("公開検索へTitle・Category・CursorをURL Queryとして送る", async () => {
+    const controller = new AbortController();
+    apiRequestMock.mockResolvedValue({
+      ...publicList,
+      result_type: "matched",
+    });
+
+    await listReels(
+      {
+        title: "ハンド ドリップ",
+        category: "brewing",
+        limit: 20,
+        cursor: "opaque+/=cursor",
+      },
+      controller.signal,
+    );
+
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      "/videos?limit=20&title=%E3%83%8F%E3%83%B3%E3%83%89+%E3%83%89%E3%83%AA%E3%83%83%E3%83%97&category=brewing&cursor=opaque%2B%2F%3Dcursor",
+      {
+        method: "GET",
+        signal: controller.signal,
       },
     );
   });
@@ -137,13 +160,9 @@ describe("動画API", () => {
     await listMyVideos();
     await listSavedVideos();
 
-    expect(apiRequestMock).toHaveBeenNthCalledWith(
-      1,
-      "/me/videos?limit=20",
-      {
-        method: "GET",
-      },
-    );
+    expect(apiRequestMock).toHaveBeenNthCalledWith(1, "/me/videos?limit=20", {
+      method: "GET",
+    });
     expect(apiRequestMock).toHaveBeenNthCalledWith(
       2,
       "/me/saved-videos?limit=20",
@@ -159,20 +178,12 @@ describe("動画API", () => {
     await setVideoPrivate(10);
     await republishVideo(10);
 
-    expect(apiRequestMock).toHaveBeenNthCalledWith(
-      1,
-      "/me/videos/10/private",
-      {
-        method: "PATCH",
-      },
-    );
-    expect(apiRequestMock).toHaveBeenNthCalledWith(
-      2,
-      "/me/videos/10/publish",
-      {
-        method: "PATCH",
-      },
-    );
+    expect(apiRequestMock).toHaveBeenNthCalledWith(1, "/me/videos/10/private", {
+      method: "PATCH",
+    });
+    expect(apiRequestMock).toHaveBeenNthCalledWith(2, "/me/videos/10/publish", {
+      method: "PATCH",
+    });
   });
 
   it("保存・保存解除・動画削除をBodyなしで呼ぶ", async () => {

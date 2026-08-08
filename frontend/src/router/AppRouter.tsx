@@ -1,25 +1,28 @@
 import { Route, Routes } from "react-router";
-import SignupPage from "../pages/SignupPage";
-import LoginPage from "../pages/LoginPage";
-import ProtectedRoute from "../auth/ProtectedRoute";
-import NotFoundPage from "../pages/NotFoundPage";
+
 import AdminRoute from "../auth/AdminRoute";
-import AdminUsersPage from "../pages/AdminUsersPage";
+import ProtectedRoute from "../auth/ProtectedRoute";
 import AdminUserDetailPage from "../pages/AdminUserDetailPage";
-
-import VideoUploadPage from "../pages/VideoUploadPage";
-import MyVideosPage from "../pages/MyVideosPage";
-import SavedVideosPage from "../pages/SavedVideosPage";
-import VideoDetailPage from "../pages/VideoDetailPage";
-import ReelPage from "../pages/ReelPage";
-import AdminVideosPage from "../pages/AdminVideosPage";
+import AdminUsersPage from "../pages/AdminUsersPage";
 import AdminVideoDetailPage from "../pages/AdminVideoDetailPage";
+import AdminVideosPage from "../pages/AdminVideosPage";
+import LoginPage from "../pages/LoginPage";
+import MyVideosPage from "../pages/MyVideosPage";
+import NotFoundPage from "../pages/NotFoundPage";
+import ReelPage from "../pages/ReelPage";
+import SavedVideosPage from "../pages/SavedVideosPage";
+import SearchPage from "../pages/SearchPage";
+import SignupPage from "../pages/SignupPage";
+import VideoDetailPage from "../pages/VideoDetailPage";
+import VideoUploadPage from "../pages/VideoUploadPage";
 
+// URL、認証保護、管理者保護、画面Componentを接続
 export default function AppRouter() {
   return (
     <Routes>
       <Route path="/" element={<ReelPage />} />
       <Route path="/reels" element={<ReelPage />} />
+      <Route path="/search" element={<SearchPage />} />
       <Route path="/videos/:video_id" element={<VideoDetailPage />} />
       <Route path="/signup" element={<SignupPage />} />
       <Route path="/login" element={<LoginPage />} />

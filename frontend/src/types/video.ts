@@ -72,6 +72,8 @@ export type VideoAuthor = {
   name: string;
 };
 
+export type PublicSearchResultType = "all" | "matched" | "similar";
+
 export type PublicVideo = {
   id: number;
   title: string;
@@ -80,6 +82,8 @@ export type PublicVideo = {
   author: VideoAuthor;
   playback_url: string;
   thumbnail_url: string;
+  like_count: number;
+  is_liked: boolean;
   is_saved: boolean;
   created_at: string;
 };
@@ -88,6 +92,20 @@ export type PublicVideoListResponse = {
   items: PublicVideo[];
   next_cursor: string | null;
   has_more: boolean;
+  result_type?: PublicSearchResultType;
+};
+
+export type PublicVideoSearchQuery = {
+  title?: string;
+  category?: CategoryCode;
+  limit?: number;
+  cursor?: string;
+};
+
+export type VideoLikeState = {
+  video_id: number;
+  like_count: number;
+  is_liked: boolean;
 };
 
 export type OwnedVideo = {

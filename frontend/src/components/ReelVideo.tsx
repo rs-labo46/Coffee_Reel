@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 
-import type { CategoryCode, PublicVideo } from "../types/video";
+import LikeButton from "./LikeButton";
+import type { CategoryCode, PublicVideo, VideoLikeState } from "../types/video";
 
 type ReelVideoProps = {
   video: PublicVideo;
@@ -11,6 +12,10 @@ type ReelVideoProps = {
   isSaving: boolean;
   onVisibilityChange: (videoID: number, intersectionRatio: number) => void;
   onToggleSaved: (video: PublicVideo) => void;
+
+  onLikeChange: (state: VideoLikeState) => void;
+  onLikeNotFound: (videoID: number) => void;
+  onLikeError: (error: unknown) => void;
 };
 
 // Category Codeをリール表示用の日本語へ変換
@@ -54,6 +59,10 @@ export default function ReelVideo({
   isSaving,
   onVisibilityChange,
   onToggleSaved,
+
+  onLikeChange,
+  onLikeNotFound,
+  onLikeError,
 }: ReelVideoProps) {
   const containerRef = useRef<HTMLElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -220,6 +229,17 @@ export default function ReelVideo({
               >
                 {isMuted ? "OFF" : "ON"}
               </button>
+
+              <LikeButton
+                videoID={video.id}
+                likeCount={video.like_count}
+                isLiked={video.is_liked}
+                isAuthenticated={isAuthenticated}
+                onChange={onLikeChange}
+                onNotFound={() => onLikeNotFound(video.id)}
+                onError={onLikeError}
+                className="min-w-20 border-white/20 bg-black/50 px-3 text-xs backdrop-blur-sm hover:bg-black/70"
+              />
 
               <button
                 type="button"

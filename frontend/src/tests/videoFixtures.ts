@@ -44,9 +44,7 @@ export function guestUser(
 }
 
 // 公開動画ResponseのFixtureを生成
-export function publicVideo(
-  overrides: Partial<PublicVideo> = {},
-): PublicVideo {
+export function publicVideo(overrides: Partial<PublicVideo> = {}): PublicVideo {
   return {
     id: 10,
     title: "ハンドドリップの蒸らし方",
@@ -58,6 +56,8 @@ export function publicVideo(
     },
     playback_url: "https://storage.example.com/video.mp4",
     thumbnail_url: "https://storage.example.com/thumbnail.jpg",
+    like_count: 0,
+    is_liked: false,
     is_saved: false,
     created_at: "2026-08-05T00:00:00Z",
     ...overrides,
@@ -65,9 +65,7 @@ export function publicVideo(
 }
 
 // 自分の投稿一覧ResponseのFixtureを生成
-export function ownedVideo(
-  overrides: Partial<OwnedVideo> = {},
-): OwnedVideo {
+export function ownedVideo(overrides: Partial<OwnedVideo> = {}): OwnedVideo {
   return {
     id: 10,
     title: "ハンドドリップの蒸らし方",

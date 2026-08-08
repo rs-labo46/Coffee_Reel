@@ -12,7 +12,8 @@ vi.mock("../auth/useAuth", () => ({
 }));
 
 const useAuthMock = vi.mocked(useAuth);
-const loginMock = vi.fn<(input: { email: string; password: string }) => Promise<void>>();
+const loginMock =
+  vi.fn<(input: { email: string; password: string }) => Promise<void>>();
 
 function renderLoginPage(initialEntry = "/login") {
   render(
@@ -127,5 +128,46 @@ describe("LoginPage", () => {
     expect(screen.getByRole("status")).toHaveTextContent(
       "会員登録が完了しました",
     );
+  });
+  it("LikeからLoginした場合は認証成功後に元の相対URLへ戻る", async () => {
+    loginMock.mockResolvedValue(undefined);
+
+    render(
+      <MemoryRouter
+        initialEntries={[
+          "/login?redirect=%2Fsearch%3Ftitle%3Ddrip%26category%3Dbrewing",
+        ]}
+      >
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/search" element={<p>検索遷移先</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const user = await enterLoginInput();
+    await user.click(screen.getByRole("button", { name: "ログイン" }));
+
+    expect(await screen.findByText("検索遷移先")).toBeInTheDocument();
+  });
+
+  it("外部URLやProtocol-relative URLはLogin後の遷移先に使用しない", async () => {
+    loginMock.mockResolvedValue(undefined);
+
+    render(
+      <MemoryRouter
+        initialEntries={["/login?redirect=%2F%2Fevil.example%2Fpath"]}
+      >
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/" element={<p>ホーム遷移先</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const user = await enterLoginInput();
+    await user.click(screen.getByRole("button", { name: "ログイン" }));
+
+    expect(await screen.findByText("ホーム遷移先")).toBeInTheDocument();
   });
 });

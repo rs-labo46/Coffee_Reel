@@ -26,12 +26,31 @@ function validateInput(email: string, password: string): string {
 
   return "";
 }
+function safeRedirectPath(value: string | null): string {
+  if (value === null || !value.startsWith("/") || value.startsWith("//")) {
+    return "/";
+  }
+
+  try {
+    const base = "https://coffee-reel.local";
+    const parsed = new URL(value, base);
+
+    if (parsed.origin !== base) {
+      return "/";
+    }
+
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return "/";
+  }
+}
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
   const locationState = location.state as LoginLocationState | null;
+  const redirect = new URLSearchParams(location.search).get("redirect");
 
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
@@ -64,7 +83,7 @@ export default function LoginPage() {
       });
 
       setPassword("");
-      navigate("/", { replace: true });
+      navigate(safeRedirectPath(redirect), { replace: true });
     } catch (error: unknown) {
       if (error instanceof ApiClientError) {
         setErrorMessage(error.message);

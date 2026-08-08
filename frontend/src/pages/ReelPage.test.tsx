@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { listReels, removeSavedVideo, saveVideo } from "../api/video";
 import { useAuth } from "../auth/useAuth";
 import { authenticatedUser, publicVideo } from "../tests/videoFixtures";
-import type { PublicVideo } from "../types/video";
+import type { PublicVideo, VideoLikeState } from "../types/video";
 import ReelPage from "./ReelPage";
 
 vi.mock("../api/video", () => ({
@@ -23,27 +23,53 @@ vi.mock("../components/ReelVideo", () => ({
     video,
     isActive,
     shouldPreload,
+    isAuthenticated,
     onVisibilityChange,
     onToggleSaved,
+    onLikeChange,
+    onLikeNotFound,
   }: {
     video: PublicVideo;
     isActive: boolean;
     shouldPreload: boolean;
+    isAuthenticated: boolean;
     onVisibilityChange: (videoID: number, ratio: number) => void;
     onToggleSaved: (video: PublicVideo) => void;
+    onLikeChange: (state: VideoLikeState) => void;
+    onLikeNotFound: (videoID: number) => void;
   }) => (
     <article
       data-testid={`reel-${video.id}`}
       data-active={String(isActive)}
       data-preload={String(shouldPreload)}
+      data-authenticated={String(isAuthenticated)}
     >
       <p>{video.title}</p>
       <p>{video.is_saved ? "saved" : "not-saved"}</p>
-      <button type="button" onClick={() => onVisibilityChange(video.id, 0.8)}>
+      <p>{`Like ${video.like_count} ${video.is_liked ? "liked" : "not-liked"}`}</p>
+      <button
+        type="button"
+        onClick={() => onVisibilityChange(video.id, 0.8)}
+      >
         visible-{video.id}
       </button>
       <button type="button" onClick={() => onToggleSaved(video)}>
         toggle-{video.id}
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          onLikeChange({
+            video_id: video.id,
+            like_count: video.like_count + 1,
+            is_liked: true,
+          })
+        }
+      >
+        like-{video.id}
+      </button>
+      <button type="button" onClick={() => onLikeNotFound(video.id)}>
+        like-not-found-{video.id}
       </button>
     </article>
   ),
@@ -54,7 +80,6 @@ const saveVideoMock = vi.mocked(saveVideo);
 const removeSavedVideoMock = vi.mocked(removeSavedVideo);
 const useAuthMock = vi.mocked(useAuth);
 
-// Promise ChainとReact State更新を完了
 async function flushAsync(): Promise<void> {
   await act(async () => {
     await Promise.resolve();
@@ -63,7 +88,6 @@ async function flushAsync(): Promise<void> {
   });
 }
 
-// リール画面をRouter内で描画
 function renderPage() {
   return render(
     <MemoryRouter initialEntries={["/"]}>
@@ -83,7 +107,23 @@ describe("ReelPage", () => {
     removeSavedVideoMock.mockReset();
   });
 
-  // ---追加---
+  it("検索画面への導線を表示する", async () => {
+    listReelsMock.mockResolvedValue({
+      items: [],
+      next_cursor: null,
+      has_more: false,
+      result_type: "all",
+    });
+
+    renderPage();
+    await flushAsync();
+
+    expect(screen.getByRole("link", { name: "検索" })).toHaveAttribute(
+      "href",
+      "/search",
+    );
+  });
+
   it("管理者には管理画面への導線をHeaderへ表示する", async () => {
     useAuthMock.mockReturnValue(
       authenticatedUser({
@@ -100,6 +140,7 @@ describe("ReelPage", () => {
       items: [],
       next_cursor: null,
       has_more: false,
+      result_type: "all",
     });
 
     renderPage();
@@ -116,6 +157,7 @@ describe("ReelPage", () => {
       items: [],
       next_cursor: null,
       has_more: false,
+      result_type: "all",
     });
 
     renderPage();
@@ -133,6 +175,7 @@ describe("ReelPage", () => {
       items: [],
       next_cursor: null,
       has_more: false,
+      result_type: "all",
     });
 
     renderPage();
@@ -158,6 +201,7 @@ describe("ReelPage", () => {
       items: [],
       next_cursor: null,
       has_more: false,
+      result_type: "all",
     });
 
     renderPage();
@@ -168,14 +212,15 @@ describe("ReelPage", () => {
     fireEvent.click(button);
 
     expect(logout).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("button", { name: "ログアウト中" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "ログアウト中" }),
+    ).toBeDisabled();
 
     await act(async () => {
       resolveLogout?.();
       await Promise.resolve();
     });
   });
-  // ---追加---
 
   it("表示中の1件だけをActiveにして次の1件だけを先読みする", async () => {
     listReelsMock.mockResolvedValue({
@@ -186,6 +231,7 @@ describe("ReelPage", () => {
       ],
       next_cursor: null,
       has_more: false,
+      result_type: "all",
     });
 
     renderPage();
@@ -225,6 +271,7 @@ describe("ReelPage", () => {
       items: [publicVideo({ id: 10, is_saved: false })],
       next_cursor: null,
       has_more: false,
+      result_type: "all",
     });
     saveVideoMock.mockResolvedValue(undefined);
     removeSavedVideoMock.mockResolvedValue(undefined);
@@ -245,5 +292,45 @@ describe("ReelPage", () => {
 
     expect(removeSavedVideoMock).toHaveBeenCalledWith(10);
     expect(screen.getByText("not-saved")).toBeInTheDocument();
+  });
+
+  it("Like成功時にBackendが返した件数と状態を対象リールへ反映する", async () => {
+    listReelsMock.mockResolvedValue({
+      items: [publicVideo({ id: 10, like_count: 4, is_liked: false })],
+      next_cursor: null,
+      has_more: false,
+      result_type: "all",
+    });
+
+    renderPage();
+    await flushAsync();
+
+    expect(screen.getByText("Like 4 not-liked")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "like-10" }));
+
+    expect(screen.getByText("Like 5 liked")).toBeInTheDocument();
+  });
+
+  it("Like時に404相当を通知された動画を一覧から除外する", async () => {
+    listReelsMock.mockResolvedValue({
+      items: [
+        publicVideo({ id: 10, title: "動画A" }),
+        publicVideo({ id: 11, title: "動画B" }),
+      ],
+      next_cursor: null,
+      has_more: false,
+      result_type: "all",
+    });
+
+    renderPage();
+    await flushAsync();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "like-not-found-10" }),
+    );
+
+    expect(screen.queryByText("動画A")).not.toBeInTheDocument();
+    expect(screen.getByText("動画B")).toBeInTheDocument();
   });
 });

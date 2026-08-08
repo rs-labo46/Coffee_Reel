@@ -14,6 +14,9 @@ const baseProps = {
   isSaving: false,
   onVisibilityChange: vi.fn(),
   onToggleSaved: vi.fn(),
+  onLikeChange: vi.fn(),
+  onLikeNotFound: vi.fn(),
+  onLikeError: vi.fn(),
 };
 
 // ReelVideoをRouter内で描画
@@ -30,8 +33,12 @@ function renderVideo(
 describe("ReelVideo", () => {
   beforeEach(() => {
     vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
-    vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => undefined);
-    vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => undefined);
+    vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(
+      () => undefined,
+    );
+    vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(
+      () => undefined,
+    );
   });
 
   it("Active動画だけを自動再生する", () => {
@@ -46,9 +53,8 @@ describe("ReelVideo", () => {
       isActive: false,
       shouldPreload: false,
     });
-    const videoElement = screen.getByLabelText(
-      "ハンドドリップの蒸らし方を再生",
-    );
+    const videoElement =
+      screen.getByLabelText("ハンドドリップの蒸らし方を再生");
 
     expect(HTMLMediaElement.prototype.pause).toHaveBeenCalled();
     expect(HTMLMediaElement.prototype.load).toHaveBeenCalled();
@@ -62,9 +68,8 @@ describe("ReelVideo", () => {
       shouldPreload: true,
     });
 
-    const videoElement = screen.getByLabelText(
-      "ハンドドリップの蒸らし方を再生",
-    );
+    const videoElement =
+      screen.getByLabelText("ハンドドリップの蒸らし方を再生");
 
     expect(videoElement).toHaveAttribute(
       "src",
@@ -89,7 +94,9 @@ describe("ReelVideo", () => {
   it("未認証時は保存ButtonをLogin表示にする", () => {
     renderVideo({ isAuthenticated: false });
 
-    expect(screen.getByRole("button", { name: "ログイン" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "ログイン" }),
+    ).toBeInTheDocument();
   });
 
   it("再生失敗時に再試行Buttonを表示する", async () => {
@@ -104,5 +111,14 @@ describe("ReelVideo", () => {
     await user.click(retryButton);
 
     expect(HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(2);
+  });
+  it("リールへLike件数と本人状態を表示する", () => {
+    renderVideo({
+      video: publicVideo({ like_count: 8, is_liked: true }),
+    });
+
+    expect(
+      screen.getByRole("button", { name: "いいねを解除 8件" }),
+    ).toHaveAttribute("aria-pressed", "true");
   });
 });

@@ -3,6 +3,7 @@ import type {
   OwnedVideoListResponse,
   PublicVideo,
   PublicVideoListResponse,
+  PublicVideoSearchQuery,
   StartVideoUploadInput,
   StartVideoUploadResponse,
   VideoListQuery,
@@ -40,18 +41,28 @@ export function completeVideoUpload(
   );
 }
 
-export function listReels(
-  query: VideoListQuery = {},
-): Promise<PublicVideoListResponse> {
-  return apiRequest<PublicVideoListResponse>(buildListPath(videosPath, query), {
-    method: "GET",
-  });
-}
-
 export function getVideoDetail(videoID: number): Promise<PublicVideo> {
   return apiRequest<PublicVideo>(`${videosPath}/${videoID}`, {
     method: "GET",
   });
+}
+
+export function listReels(
+  query: PublicVideoSearchQuery = {},
+  signal?: AbortSignal,
+): Promise<PublicVideoListResponse> {
+  const init: RequestInit = {
+    method: "GET",
+  };
+
+  if (signal !== undefined) {
+    init.signal = signal;
+  }
+
+  return apiRequest<PublicVideoListResponse>(
+    buildPublicListPath(videosPath, query),
+    init,
+  );
 }
 
 export function listMyVideos(
@@ -118,6 +129,29 @@ function changeVideoPublishStatus(
       method: "PATCH",
     },
   );
+}
+
+function buildPublicListPath(
+  path: string,
+  query: PublicVideoSearchQuery,
+): string {
+  const searchParams = new URLSearchParams({
+    limit: String(query.limit ?? defaultVideoListLimit),
+  });
+
+  if (query.title !== undefined && query.title !== "") {
+    searchParams.set("title", query.title);
+  }
+
+  if (query.category !== undefined) {
+    searchParams.set("category", query.category);
+  }
+
+  if (query.cursor !== undefined && query.cursor !== "") {
+    searchParams.set("cursor", query.cursor);
+  }
+
+  return `${path}?${searchParams.toString()}`;
 }
 
 function buildListPath(path: string, query: VideoListQuery): string {

@@ -4,7 +4,8 @@ import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { ApiClientError } from "../api/client";
 import { getVideoDetail, removeSavedVideo, saveVideo } from "../api/video";
 import { useAuth } from "../auth/useAuth";
-import type { CategoryCode, PublicVideo } from "../types/video";
+import LikeButton from "../components/LikeButton";
+import type { CategoryCode, PublicVideo, VideoLikeState } from "../types/video";
 
 const initialDetailPromises = new Map<
   string,
@@ -97,7 +98,7 @@ function errorViewOf(error: unknown): {
   };
 }
 
-// 公開動画詳細、再生、保存状態、保存操作を管理
+// 公開動画詳細、再生、保存状態、いいね状態を管理
 export default function VideoDetailPage() {
   const { video_id: rawVideoID } = useParams<{ video_id: string }>();
   const videoID = parseVideoID(rawVideoID);
@@ -171,7 +172,7 @@ export default function VideoDetailPage() {
 
     if (!isAuthenticated) {
       navigate("/login", {
-        state: { from: location.pathname },
+        state: { from: `${location.pathname}${location.search}` },
       });
       return;
     }
@@ -220,6 +221,39 @@ export default function VideoDetailPage() {
     }
   }
 
+  // PUT・DELETEのResponseをそのまま対象VideoのLike状態へ反映
+  function handleLikeChange(state: VideoLikeState): void {
+    setVideo((currentVideo) =>
+      currentVideo === null || currentVideo.id !== state.video_id
+        ? currentVideo
+        : {
+            ...currentVideo,
+            like_count: state.like_count,
+            is_liked: state.is_liked,
+          },
+    );
+    setErrorMessage("");
+    setRequestID("");
+  }
+
+  function handleLikeNotFound(): void {
+    if (requestIdentity === null) {
+      return;
+    }
+
+    setVideo(null);
+    setResolvedIdentity(null);
+    setFailedIdentity(requestIdentity);
+    setErrorMessage("動画が見つかりません");
+    setRequestID("");
+  }
+
+  function handleLikeError(error: unknown): void {
+    const errorView = errorViewOf(error);
+    setErrorMessage(errorView.message);
+    setRequestID(errorView.requestID);
+  }
+
   if (videoID === null) {
     return (
       <main className="grid min-h-dvh place-items-center bg-[#100b08] px-4 py-10 text-stone-100">
@@ -227,11 +261,9 @@ export default function VideoDetailPage() {
           <p className="text-xs font-black tracking-[0.22em] text-red-300 uppercase">
             Video unavailable
           </p>
-
           <h1 className="mt-4 text-3xl font-black text-white">
             動画が見つかりません
           </h1>
-
           <Link
             to="/"
             className="mt-7 inline-flex min-h-12 items-center justify-center rounded-2xl bg-amber-300 px-6 py-3 text-sm font-black text-stone-950 transition hover:bg-amber-200"
@@ -264,11 +296,14 @@ export default function VideoDetailPage() {
           <p className="text-xs font-black tracking-[0.22em] text-red-300 uppercase">
             Video unavailable
           </p>
-
           <h1 className="mt-4 text-3xl font-black text-white">
             {errorMessage || "動画が見つかりません"}
           </h1>
-
+          {requestID !== "" && (
+            <p className="mt-4 break-all text-xs font-bold text-stone-500">
+              Request ID: {requestID}
+            </p>
+          )}
           <Link
             to="/"
             className="mt-7 inline-flex min-h-12 items-center justify-center rounded-2xl bg-amber-300 px-6 py-3 text-sm font-black text-stone-950 transition hover:bg-amber-200"
@@ -303,7 +338,14 @@ export default function VideoDetailPage() {
             >
               リール
             </Link>
-
+            {/* ---追加--- */}
+            <Link
+              to="/search"
+              className="rounded-full border border-white/10 px-4 py-2 text-sm font-bold text-stone-200 transition hover:border-amber-300/50 hover:text-amber-200"
+            >
+              検索
+            </Link>
+            {/* ---追加--- */}
             {isAuthenticated && (
               <Link
                 to="/me/saved-videos"
@@ -321,7 +363,6 @@ export default function VideoDetailPage() {
             role="alert"
           >
             <p>{errorMessage}</p>
-
             {requestID !== "" && (
               <p className="mt-1 break-all text-xs text-red-200/70">
                 Request ID: {requestID}
@@ -349,7 +390,6 @@ export default function VideoDetailPage() {
               <span className="rounded-full bg-amber-300 px-3 py-1 text-xs font-black text-stone-950">
                 {categoryLabelOf(detail.category)}
               </span>
-
               <time className="text-xs font-bold text-stone-500">
                 {formatDate(detail.created_at)}
               </time>
@@ -369,18 +409,33 @@ export default function VideoDetailPage() {
               </p>
             )}
 
-            <button
-              type="button"
-              onClick={() => void handleToggleSaved()}
-              disabled={isSaving}
-              className="mt-7 inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-amber-300 px-5 py-3 text-sm font-black text-stone-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isSaving
-                ? "更新中"
-                : detail.is_saved
-                  ? "保存を解除"
-                  : "動画を保存"}
-            </button>
+            {/* ---追加--- */}
+            <div className="mt-7 grid gap-3 sm:grid-cols-2">
+              <LikeButton
+                videoID={detail.id}
+                likeCount={detail.like_count}
+                isLiked={detail.is_liked}
+                isAuthenticated={isAuthenticated}
+                onChange={handleLikeChange}
+                onNotFound={handleLikeNotFound}
+                onError={handleLikeError}
+                className="min-h-12 w-full rounded-2xl"
+              />
+
+              <button
+                type="button"
+                onClick={() => void handleToggleSaved()}
+                disabled={isSaving}
+                className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-amber-300 px-5 py-3 text-sm font-black text-stone-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isSaving
+                  ? "更新中"
+                  : detail.is_saved
+                    ? "保存を解除"
+                    : "動画を保存"}
+              </button>
+            </div>
+            {/* ---追加--- */}
 
             <div className="mt-6 overflow-hidden rounded-[1.5rem] border border-white/10 bg-black/20">
               <img
