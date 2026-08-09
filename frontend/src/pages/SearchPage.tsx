@@ -67,9 +67,10 @@ function categoryOf(value: string | null): CategoryCode | "" | null {
   }
 }
 
-function conditionsFromURL(
-  searchParams: URLSearchParams,
-): { conditions: SearchConditions; error: string } {
+function conditionsFromURL(searchParams: URLSearchParams): {
+  conditions: SearchConditions;
+  error: string;
+} {
   const title = (searchParams.get("title") ?? "").trim();
   const category = categoryOf(searchParams.get("category"));
 
@@ -155,9 +156,8 @@ function SearchPageContent({
   const [hasMore, setHasMore] = useState<boolean>(false);
   const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
-  const [validationMessage, setValidationMessage] = useState<string>(
-    urlValidationError,
-  );
+  const [validationMessage, setValidationMessage] =
+    useState<string>(urlValidationError);
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [requestID, setRequestID] = useState<string>("");
 
@@ -269,9 +269,7 @@ function SearchPageContent({
         controller.signal,
       );
 
-      setVideos((currentVideos) =>
-        appendVideos(currentVideos, response.items),
-      );
+      setVideos((currentVideos) => appendVideos(currentVideos, response.items));
       setResultType(requireResultType(response.result_type));
       setNextCursor(response.next_cursor);
       setHasMore(response.has_more);
@@ -326,42 +324,54 @@ function SearchPageContent({
     isAuthLoading || (urlValidationError === "" && isInitialLoading);
 
   return (
-    <main className="min-h-dvh bg-[#100b08] px-4 py-6 text-stone-100 sm:px-6 lg:px-10">
-      <div className="mx-auto w-full max-w-6xl">
-        <header className="flex flex-col gap-5 border-b border-white/10 pb-6 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-black tracking-[0.22em] text-amber-300 uppercase">
-              Search
-            </p>
-            <h1 className="mt-2 text-3xl font-black text-white sm:text-5xl">
-              動画を検索
-            </h1>
-          </div>
+    <main className="min-h-dvh bg-[#100b08] text-stone-100">
+      <header className="sticky top-0 z-30 border-b border-white/10 bg-[#100b08]/90 px-4 py-3 backdrop-blur-xl sm:px-6">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4">
+          <Link
+            to="/"
+            className="text-xs font-black tracking-[0.18em] text-amber-300 uppercase sm:text-sm sm:tracking-[0.2em]"
+          >
+            Coffee Reel
+          </Link>
 
-          <nav className="flex flex-wrap gap-3" aria-label="検索画面ナビゲーション">
+          <nav
+            className="flex flex-wrap items-center justify-end gap-2"
+            aria-label="検索画面ナビゲーション"
+          >
             <Link
               to="/"
-              className="rounded-full border border-white/15 px-4 py-2 text-sm font-black text-stone-200 transition hover:border-amber-300/50 hover:text-amber-200"
+              className="rounded-full border border-white/15 px-4 py-2 text-xs font-black text-stone-200 transition hover:border-amber-300/50 hover:text-amber-200 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
             >
               リール
             </Link>
             {isAuthenticated ? (
               <Link
                 to="/me/saved-videos"
-                className="rounded-full border border-white/15 px-4 py-2 text-sm font-black text-stone-200 transition hover:border-amber-300/50 hover:text-amber-200"
+                className="rounded-full border border-white/15 px-4 py-2 text-xs font-black text-stone-200 transition hover:bg-white/[0.06] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
               >
                 保存一覧
               </Link>
             ) : (
               <Link
                 to="/login"
-                className="rounded-full bg-amber-300 px-4 py-2 text-sm font-black text-stone-950 transition hover:bg-amber-200"
+                className="rounded-full bg-amber-300 px-4 py-2 text-xs font-black text-stone-950 transition hover:bg-amber-200 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
               >
                 ログイン
               </Link>
             )}
           </nav>
-        </header>
+        </div>
+      </header>
+
+      <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-10">
+        <section className="border-b border-white/10 pb-6">
+          <p className="text-xs font-black tracking-[0.22em] text-amber-300 uppercase">
+            Search
+          </p>
+          <h1 className="mt-2 text-3xl font-black text-white sm:text-5xl">
+            動画を検索
+          </h1>
+        </section>
 
         <section className="mt-7 rounded-[2rem] border border-white/10 bg-white/[0.05] p-5 shadow-xl shadow-black/15 sm:p-7">
           <form
@@ -370,7 +380,10 @@ function SearchPageContent({
             noValidate
           >
             <div>
-              <label htmlFor="search-title" className="text-sm font-black text-stone-200">
+              <label
+                htmlFor="search-title"
+                className="text-sm font-black text-stone-200"
+              >
                 タイトル
               </label>
               <input
@@ -387,7 +400,10 @@ function SearchPageContent({
             </div>
 
             <div>
-              <label htmlFor="search-category" className="text-sm font-black text-stone-200">
+              <label
+                htmlFor="search-category"
+                className="text-sm font-black text-stone-200"
+              >
                 カテゴリー
               </label>
               <select
@@ -448,7 +464,7 @@ function SearchPageContent({
           </div>
         )}
 
-        {resultType === "similar" && (
+        {resultType === "similar" && videos.length > 0 && (
           <div className="mt-6 rounded-2xl border border-amber-300/25 bg-amber-300/10 px-4 py-3 text-sm font-bold text-amber-100">
             一致する動画が見つからなかったため、近い動画を表示しています
           </div>
@@ -480,7 +496,9 @@ function SearchPageContent({
                 ☕
               </p>
               <h3 className="mt-4 text-2xl font-black text-white">
-                該当する動画はありません
+                {resultType === "similar"
+                  ? "一致する動画も、近い動画も見つかりませんでした"
+                  : "該当する動画はありません"}
               </h3>
             </div>
           ) : (
@@ -529,7 +547,8 @@ export default function SearchPage() {
   const [searchParams] = useSearchParams();
   const { isAuthenticated, isLoading: isAuthLoading, user } = useAuth();
   const parsed = conditionsFromURL(searchParams);
-  const authKey = isAuthenticated && user !== null ? `user:${user.id}` : "guest";
+  const authKey =
+    isAuthenticated && user !== null ? `user:${user.id}` : "guest";
   const queryKey = `${authKey}|${searchParams.toString()}`;
 
   return (

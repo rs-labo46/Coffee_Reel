@@ -606,7 +606,7 @@ func (r *videoRepository) updateOwnedVideo(ctx context.Context, userID, videoID 
 	var output entity.Video
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var video entity.Video
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND user_id = ? AND deleted_at IS NULL", videoID, userID).Take(&video).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND deleted_at IS NULL", videoID).Take(&video).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return entity.ErrVideoNotFound
 			}
@@ -638,7 +638,7 @@ func (r *videoRepository) RepublishByOwner(ctx context.Context, userID, videoID 
 			return fmt.Errorf("lock owner for republish: %w", err)
 		}
 		var video entity.Video
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND user_id = ? AND deleted_at IS NULL", videoID, userID).Take(&video).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND deleted_at IS NULL", videoID).Take(&video).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return entity.ErrVideoNotFound
 			}
@@ -662,7 +662,7 @@ func (r *videoRepository) RepublishByOwner(ctx context.Context, userID, videoID 
 func (r *videoRepository) DeleteByOwner(ctx context.Context, userID, videoID uint64, now time.Time) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var video entity.Video
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND user_id = ? AND deleted_at IS NULL", videoID, userID).Take(&video).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND deleted_at IS NULL", videoID).Take(&video).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return entity.ErrVideoNotFound
 			}

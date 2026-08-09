@@ -3,6 +3,7 @@ package router
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -522,6 +523,42 @@ func TestRouterAppliesCommonMiddleware(t *testing.T) {
 		}
 		if controllerCalled {
 			t.Fatal("controller received an oversized body")
+		}
+
+		var body struct {
+			Status    int    `json:"status"`
+			Code      string `json:"code"`
+			Message   string `json:"message"`
+			RequestID string `json:"request_id"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+			t.Fatalf("decode body limit error response: %v", err)
+		}
+		if body.Status != http.StatusRequestEntityTooLarge {
+			t.Fatalf(
+				"error status=%d, want 413, body=%s",
+				body.Status,
+				rec.Body.String(),
+			)
+		}
+		if body.Code == "" {
+			t.Fatalf("error code is empty: body=%s", rec.Body.String())
+		}
+		if body.Message == "" {
+			t.Fatalf("error message is empty: body=%s", rec.Body.String())
+		}
+
+		requestID := rec.Header().Get(echo.HeaderXRequestID)
+		if requestID == "" {
+			t.Fatal("request ID header was not set")
+		}
+		if body.RequestID != requestID {
+			t.Fatalf(
+				"error request_id=%q, want %q, body=%s",
+				body.RequestID,
+				requestID,
+				rec.Body.String(),
+			)
 		}
 	})
 }

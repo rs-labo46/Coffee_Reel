@@ -66,7 +66,7 @@ func NewRouter(
 		AllowCredentials: true,
 	}))
 
-	e.Use(echomw.BodyLimit("65536B"))
+	e.Use(middleware.BodyLimit())
 
 	e.GET("/health", healthController.Check)
 

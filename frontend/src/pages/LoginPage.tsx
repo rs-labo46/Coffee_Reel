@@ -7,8 +7,7 @@ import { useAuth } from "../auth/useAuth";
 const maxEmailLength = 254;
 
 const inputClass =
-  "mt-2 w-full rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3.5 text-[15px] text-stone-950 outline-none transition placeholder:text-stone-500 hover:border-white/20 focus:border-amber-300/70 focus:ring-4 focus:ring-amber-300/10 disabled:cursor-not-allowed disabled:opacity-60";
-
+  "mt-2 w-full rounded-2xl border border-stone-300/90 bg-white/80 px-4 py-3.5 text-[15px] text-stone-950 outline-none transition placeholder:text-stone-400 hover:border-stone-400 focus:border-amber-700 focus:ring-4 focus:ring-amber-700/10 disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-500";
 type LoginLocationState = {
   registrationCompleted?: boolean;
 };

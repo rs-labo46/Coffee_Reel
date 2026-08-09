@@ -74,7 +74,7 @@ func (r *userRepository) Update(ctx context.Context, user *entity.User) error {
 	if user == nil {
 		return fmt.Errorf("user is required")
 	}
-	result := r.db.WithContext(ctx).Model(&entity.User{}).Where("id = ?", user.ID).Select("status", "token_version", "updated_at").Updates(user)
+	result := r.db.WithContext(ctx).Model(&entity.User{}).Where("id = ?", user.ID).Select("status", "token_version", "updated_at").UpdateColumns(user)
 
 	if result.Error != nil {
 		return fmt.Errorf("update user: %w", result.Error)

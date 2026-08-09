@@ -74,6 +74,22 @@ describe("SearchPage", () => {
     );
   });
 
+  it("検索画面の固定Headerからリールへ戻れる", async () => {
+    listReelsMock.mockResolvedValue(response());
+
+    renderPage();
+
+    await screen.findByText("ハンドドリップの蒸らし方");
+    expect(screen.getByRole("link", { name: "Coffee Reel" })).toHaveAttribute(
+      "href",
+      "/",
+    );
+    expect(screen.getByRole("link", { name: "リール" })).toHaveAttribute(
+      "href",
+      "/",
+    );
+  });
+
   it("URL QueryからTitleとCategoryをフォームへ復元する", async () => {
     listReelsMock.mockResolvedValue(
       response({ result_type: "matched" }),
@@ -176,8 +192,15 @@ describe("SearchPage", () => {
     renderPage("/search?title=notfound");
 
     expect(
-      await screen.findByText("該当する動画はありません"),
+      await screen.findByText(
+        "一致する動画も、近い動画も見つかりませんでした",
+      ),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "一致する動画が見つからなかったため、近い動画を表示しています",
+      ),
+    ).not.toBeInTheDocument();
     expect(listReelsMock).toHaveBeenCalledTimes(1);
   });
 
