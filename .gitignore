@@ -1,4 +1,4 @@
-
 .env
-
-backend.zip
+.env.*
+!.env.example
+.DS_Store

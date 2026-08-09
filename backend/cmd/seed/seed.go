@@ -163,11 +163,6 @@ func main() {
 		len(publicVideos),
 		len(definitions)-len(publicVideos),
 	)
-	log.Printf(
-		"seed login: %s / %s",
-		seedUserEmail(1),
-		seedPassword,
-	)
 }
 
 func ensureSeedUsers(
