@@ -291,7 +291,6 @@ func (r *videoRepository) FindPublicByID(ctx context.Context, videoID uint64, vi
 		return nil, fmt.Errorf("find public video: %w", err)
 	}
 
-	item.CreatedAt = item.CreatedAt
 	return &item, nil
 }
 
@@ -360,10 +359,6 @@ func (r *videoRepository) ListPublic(ctx context.Context, input PublicVideoListI
 	hasMore := len(items) > input.Limit
 	if hasMore {
 		items = items[:input.Limit]
-	}
-
-	for i := range items {
-		items[i].CreatedAt = items[i].CreatedAt
 	}
 
 	page := PublicVideoPage{
@@ -586,12 +581,6 @@ func (r *videoRepository) ListOwned(
 	hasMore := len(items) > limit
 	if hasMore {
 		items = items[:limit]
-	}
-
-	for i := range items {
-		items[i].UploadExpiresAt = items[i].UploadExpiresAt
-		items[i].CreatedAt = items[i].CreatedAt
-		items[i].UpdatedAt = items[i].UpdatedAt
 	}
 
 	page := OwnedVideoPage{

@@ -4,6 +4,8 @@ info:
   title: Coffee Reel API
   version: 1.0.0
 tags:
+  - name: System
+    description: デプロイ先がAPIと必須依存先の正常性を確認するための運用API。
   - name: Auth
     description: 会員登録、ログイン、Token再発行、ログアウト、現在ユーザー取得。
   - name: Admin Users
@@ -17,6 +19,30 @@ tags:
   - name: Likes
     description: 公開動画へのいいね・いいね解除。
 paths:
+  /health:
+    get:
+      tags:
+        - System
+      summary: ヘルスチェック
+      description: PostgreSQL、Redis、Object Storageへの接続を3秒以内で確認する。認証は不要で、依存先のいずれかが利用できない場合は内部エラー詳細を公開せず503を返す。
+      operationId: healthCheck
+      responses:
+        "200":
+          description: APIと必須依存先が利用可能。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: ok
+        "503":
+          description: PostgreSQL、Redis、Object Storageのいずれかが利用できない、または確認がタイムアウトした。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: unavailable
   /signup:
     post:
       tags:
@@ -881,6 +907,17 @@ components:
         type: string
         minLength: 1
   schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+            - unavailable
+          description: okはAPIと必須依存先が利用可能、unavailableは少なくとも1つの必須依存先を利用できない状態。
     UserRole:
       type: string
       enum:

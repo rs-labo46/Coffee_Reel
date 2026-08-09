@@ -26,6 +26,7 @@ const (
 )
 
 type IObjectStorageRepository interface {
+	CheckHealth(ctx context.Context) error
 	CreateUploadURL(ctx context.Context, objectKey, contentType string, ttl time.Duration) (UploadTarget, error)
 	Exists(ctx context.Context, objectKey string) (bool, error)
 	Stat(ctx context.Context, objectKey string) (StoredObjectInfo, error)
@@ -131,6 +132,17 @@ func NewObjectStorageRepository(ctx context.Context, storageConfig ObjectStorage
 		client:        client,
 		presigner:     s3.NewPresignClient(presignClient),
 	}, nil
+}
+
+func (r *objectStorageRepository) CheckHealth(ctx context.Context) error {
+	_, err := r.client.HeadBucket(ctx, &s3.HeadBucketInput{
+		Bucket: aws.String(r.bucket),
+	})
+	if err != nil {
+		return storageUnavailable("check object storage bucket", err)
+	}
+
+	return nil
 }
 
 func validateStorageEndpoint(raw string, requireHTTPS bool) (*url.URL, error) {

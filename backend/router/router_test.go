@@ -322,6 +322,7 @@ func newTestRouter(
 		appmiddleware.NewCSRFMiddleware(tokens),
 		appmiddleware.NewRateLimitMiddleware(rateLimits),
 		"http://localhost:3000",
+		&healthControllerStub{},
 		AdminComponents{
 			Controller: &adminControllerStub{},
 			Middleware: appmiddleware.NewAdminMiddleware(),

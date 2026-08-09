@@ -27,6 +27,7 @@ func NewRouter(
 	csrfMiddleware *middleware.CSRFMiddleware,
 	rateLimitMiddleware *middleware.RateLimitMiddleware,
 	frontendURL string,
+	healthController controller.IHealthController,
 	adminComponents AdminComponents,
 	videoComponents ...VideoComponents,
 ) *echo.Echo {
@@ -66,6 +67,8 @@ func NewRouter(
 	}))
 
 	e.Use(echomw.BodyLimit("65536B"))
+
+	e.GET("/health", healthController.Check)
 
 	e.POST("/signup", userController.SignUp, rateLimitMiddleware.Signup)
 	e.POST("/login", userController.Login, rateLimitMiddleware.LoginIP)

@@ -147,7 +147,6 @@ func (v *adminVideoValidator) ValidateListQuery(rawLimit string, rawCursor strin
 			entity.ErrCursorInvalid
 	}
 
-	cursor.CreatedAt = cursor.CreatedAt
 	input.Cursor = &cursor
 
 	return input, nil

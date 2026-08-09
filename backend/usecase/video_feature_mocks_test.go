@@ -239,6 +239,10 @@ type objectStorageRepositoryMock struct {
 	listManagedObjectsFunc func(context.Context, *string, int32) (repository.ManagedObjectPage, error)
 }
 
+func (m *objectStorageRepositoryMock) CheckHealth(context.Context) error {
+	return nil
+}
+
 func (m *objectStorageRepositoryMock) CreateUploadURL(ctx context.Context, objectKey, contentType string, ttl time.Duration) (repository.UploadTarget, error) {
 	if m.createUploadURLFunc == nil {
 		panic("unexpected ObjectStorageRepository.CreateUploadURL call")

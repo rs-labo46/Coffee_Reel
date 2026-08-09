@@ -125,11 +125,6 @@ func (r *adminVideoRepository) List(ctx context.Context, limit int, cursor *Admi
 		items = items[:limit]
 	}
 
-	for index := range items {
-		items[index].CreatedAt = items[index].CreatedAt
-		items[index].UpdatedAt = items[index].UpdatedAt
-	}
-
 	result := AdminVideoListResult{
 		Items:   items,
 		HasMore: hasMore,
@@ -184,9 +179,6 @@ func (r *adminVideoRepository) FindByID(ctx context.Context, videoID uint64) (*A
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, fmt.Errorf("find admin video output meta: %w", err)
 	}
-
-	detail.CreatedAt = detail.CreatedAt
-	detail.UpdatedAt = detail.UpdatedAt
 
 	return &detail, nil
 }

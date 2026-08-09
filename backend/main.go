@@ -61,6 +61,8 @@ func main() {
 		log.Fatal(err)
 	}
 
+	healthRepository := repository.NewHealthRepository(postgresDB, redisClient, storageRepository)
+
 	userRepository := repository.NewUserRepository(postgresDB)
 	refreshTokenRepository := repository.NewRefreshTokenRepository(postgresDB)
 	rateLimitRepository := repository.NewRateLimitRepository(redisClient)
@@ -103,6 +105,7 @@ func main() {
 		log.Fatal(err)
 	}
 
+	healthUsecase := usecase.NewHealthUsecase(healthRepository)
 	videoLikeUsecase := usecase.NewVideoLikeUsecase(videoLikeRepository)
 
 	savedVideoUsecase, err := usecase.NewSavedVideoUsecase(savedVideoRepository, storageRepository, usecase.SavedVideoUsecaseConfig{
@@ -134,6 +137,7 @@ func main() {
 	adminUserController := controller.NewAdminUserController(adminUserUsecase, adminUserValidator)
 	adminVideoController := controller.NewAdminVideoController(adminVideoUsecase, adminVideoValidator)
 	videoController := controller.NewVideoController(videoUsecase, videoValidator)
+	healthController := controller.NewHealthController(healthUsecase)
 	videoLikeController := controller.NewVideoLikeController(videoLikeUsecase, videoValidator)
 	savedVideoController := controller.NewSavedVideoController(savedVideoUsecase, videoValidator)
 
@@ -149,6 +153,7 @@ func main() {
 		csrfMiddleware,
 		rateLimitMiddleware,
 		requiredEnv("FE_URL"),
+		healthController,
 		router.AdminComponents{
 			Controller:      adminUserController,
 			VideoController: adminVideoController,

@@ -102,7 +102,6 @@ func (v *adminUserValidator) ValidateUserListQuery(rawLimit, rawCursor string) (
 		return usecase.AdminUserListInput{}, entity.ErrInvalidInput
 	}
 
-	cursor.CreatedAt = cursor.CreatedAt
 	input.Cursor = &cursor
 
 	return input, nil
