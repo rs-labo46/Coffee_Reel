@@ -66,8 +66,16 @@ var seedCategories = []entity.CategoryCode{
 }
 
 func main() {
-	if isProductionEnvironment() {
-		log.Fatal("seed cannot run in production")
+	production := isProductionEnvironment()
+
+	if production && !productionSeedAllowed() {
+		log.Fatal(
+			"seed cannot run in production without ALLOW_PRODUCTION_SEED=true",
+		)
+	}
+
+	if production {
+		log.Println("production seed explicitly enabled")
 	}
 
 	ctx := context.Background()
@@ -948,6 +956,15 @@ func isProductionEnvironment() bool {
 
 	return environment == "production" ||
 		environment == "prod"
+}
+
+func productionSeedAllowed() bool {
+	return strings.EqualFold(
+		strings.TrimSpace(
+			os.Getenv("ALLOW_PRODUCTION_SEED"),
+		),
+		"true",
+	)
 }
 
 func requiredEnv(name string) string {
