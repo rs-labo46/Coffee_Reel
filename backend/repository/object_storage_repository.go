@@ -150,14 +150,17 @@ func validateStorageEndpoint(raw string, requireHTTPS bool) (*url.URL, error) {
 	if err != nil || endpointURL.Host == "" || (endpointURL.Scheme != "http" && endpointURL.Scheme != "https") {
 		return nil, fmt.Errorf("object storage endpoint is invalid")
 	}
-	if endpointURL.User != nil || endpointURL.RawQuery != "" || endpointURL.Fragment != "" || (endpointURL.Path != "" && endpointURL.Path != "/") {
-		return nil, fmt.Errorf("object storage endpoint must not contain credentials, query, fragment, or path")
+
+	if endpointURL.User != nil || endpointURL.RawQuery != "" || endpointURL.Fragment != "" {
+		return nil, fmt.Errorf("object storage endpoint must not contain credentials, query, or fragment")
 	}
+
 	if requireHTTPS && endpointURL.Scheme != "https" {
 		return nil, fmt.Errorf("object storage endpoint must use HTTPS")
 	}
 
-	endpointURL.Path = ""
+	endpointURL.Path = strings.TrimRight(endpointURL.Path, "/")
+
 	return endpointURL, nil
 }
 
