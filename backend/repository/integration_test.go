@@ -80,6 +80,9 @@ func openPostgresIntegrationDB(t *testing.T) *gorm.DB {
 	if err := migrate.MigrateAdminAuditLogs(db); err != nil {
 		t.Fatalf("MigrateAdminAuditLogs: %v", err)
 	}
+	if err := migrate.MigrateVideos(db); err != nil {
+		t.Fatalf("MigrateVideos: %v", err)
+	}
 
 	t.Cleanup(func() {
 		_ = testSQL.Close()
