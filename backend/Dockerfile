@@ -24,6 +24,9 @@ FROM worker AS render
 RUN go build -trimpath -o /usr/local/bin/coffee-reel-api . \
     && go build -trimpath -o /usr/local/bin/coffee-reel-worker ./cmd/worker
 
+COPY render-start.sh /usr/local/bin/render-start.sh
+RUN chmod +x /usr/local/bin/render-start.sh
+
 EXPOSE 10000
 
-CMD ["/usr/local/bin/coffee-reel-api"]
+CMD ["/usr/local/bin/render-start.sh"]
