@@ -21,7 +21,8 @@ CMD ["go", "run", "./cmd/worker"]
 
 FROM worker AS render
 
-RUN go build -trimpath -o /usr/local/bin/coffee-reel-api .
+RUN go build -trimpath -o /usr/local/bin/coffee-reel-api . \
+    && go build -trimpath -o /usr/local/bin/coffee-reel-worker ./cmd/worker
 
 EXPOSE 10000
 
