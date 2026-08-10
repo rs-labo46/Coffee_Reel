@@ -61,6 +61,8 @@ paths:
           $ref: "#/components/responses/ValidationFailed"
         "409":
           $ref: "#/components/responses/EmailAlreadyExists"
+        "413":
+          $ref: "#/components/responses/RequestTooLarge"
         "429":
           $ref: "#/components/responses/RateLimitExceeded"
         "500":
@@ -93,6 +95,8 @@ paths:
           $ref: "#/components/responses/InvalidCredentials"
         "403":
           $ref: "#/components/responses/UserSuspended"
+        "413":
+          $ref: "#/components/responses/RequestTooLarge"
         "429":
           $ref: "#/components/responses/RateLimitExceeded"
         "500":
@@ -261,6 +265,8 @@ paths:
           $ref: "#/components/responses/UserNotFound"
         "409":
           $ref: "#/components/responses/UserStatusConflict"
+        "413":
+          $ref: "#/components/responses/RequestTooLarge"
         "500":
           $ref: "#/components/responses/InternalError"
       parameters:
@@ -301,6 +307,8 @@ paths:
           $ref: "#/components/responses/UserNotFound"
         "409":
           $ref: "#/components/responses/UserStatusConflict"
+        "413":
+          $ref: "#/components/responses/RequestTooLarge"
         "500":
           $ref: "#/components/responses/InternalError"
       parameters:
@@ -392,6 +400,8 @@ paths:
           $ref: "#/components/responses/VideoNotFound"
         "409":
           $ref: "#/components/responses/VideoStateConflict"
+        "413":
+          $ref: "#/components/responses/RequestTooLarge"
         "500":
           $ref: "#/components/responses/InternalError"
       parameters:
@@ -432,6 +442,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+        "413":
+          $ref: "#/components/responses/RequestTooLarge"
         "500":
           $ref: "#/components/responses/InternalError"
       parameters:
@@ -464,6 +476,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "409":
           $ref: "#/components/responses/IdempotencyConflict"
+        "413":
+          $ref: "#/components/responses/RequestTooLarge"
         "429":
           $ref: "#/components/responses/RateLimitExceeded"
         "500":
@@ -547,6 +561,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+        "413":
+          $ref: "#/components/responses/RequestTooLarge"
         "429":
           $ref: "#/components/responses/RateLimitExceeded"
         "500":
@@ -740,6 +756,8 @@ paths:
           $ref: "#/components/responses/ValidationFailed"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/VideoForbidden"
         "404":
           $ref: "#/components/responses/VideoNotFound"
         "409":
@@ -768,6 +786,8 @@ paths:
           $ref: "#/components/responses/ValidationFailed"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/VideoForbidden"
         "404":
           $ref: "#/components/responses/VideoNotFound"
         "409":
@@ -796,6 +816,8 @@ paths:
           $ref: "#/components/responses/ValidationFailed"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/VideoForbidden"
         "404":
           $ref: "#/components/responses/VideoNotFound"
         "409":
@@ -1813,6 +1835,12 @@ components:
             $ref: "#/components/schemas/ApiError"
     VideoSourceInvalid:
       description: 409 video_source_invalid — Storage上の元動画が存在しない、サイズ/Content-Type等を確認できない。
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    RequestTooLarge:
+      description: 413 request_too_large — Request Bodyが65,536 bytesを超過。
       content:
         application/json:
           schema:
