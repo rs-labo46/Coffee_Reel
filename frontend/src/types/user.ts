@@ -29,6 +29,7 @@ export type AuthResponse = {
     access_token: string;
     token_type: "Bearer";
     expires_in: number;
+    csrf_token: string;
     user: User;
   };
 };
@@ -38,6 +39,13 @@ export type RefreshResponse = {
     access_token: string;
     token_type: "Bearer";
     expires_in: number;
+    csrf_token: string;
+  };
+};
+
+export type CSRFResponse = {
+  data: {
+    csrf_token: string;
   };
 };
 

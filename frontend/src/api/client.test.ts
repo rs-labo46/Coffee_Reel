@@ -1,12 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ApiClientError, apiRequest } from "./client";
 import {
-  ApiClientError,
-  apiRequest,
-} from "./client";
-import {
-  clearAccessToken,
+  clearAuthTokens,
+  getCSRFToken,
   setAccessToken,
+  setCSRFToken,
 } from "../auth/tokenStore";
 
 type FetchFunction = (
@@ -27,14 +26,16 @@ function noContentResponse(): Response {
   return new Response(null, { status: 204 });
 }
 
-function requestHeaders(call: [RequestInfo | URL, RequestInit?] | undefined): Headers {
+function requestHeaders(
+  call: [RequestInfo | URL, RequestInit?] | undefined,
+): Headers {
   return new Headers(call?.[1]?.headers);
 }
 
 describe("API Client", () => {
   beforeEach(() => {
-    clearAccessToken();
-    document.cookie = "csrf_token=; Max-Age=0; Path=/";
+    clearAuthTokens();
+    vi.unstubAllGlobals();
   });
 
   it("認証RequestへAuthorization HeaderとCookie送信設定を付ける", async () => {
@@ -66,8 +67,9 @@ describe("API Client", () => {
     );
   });
 
-  it("CSRF対象RequestへCookie値をHeaderとして設定する", async () => {
-    document.cookie = "csrf_token=csrf-value; Path=/";
+  it("CSRF対象Requestへメモリ上のTokenをHeaderとして設定する", async () => {
+    setCSRFToken("memory-csrf");
+    document.cookie = "csrf_token=cookie-csrf; Path=/";
 
     const fetchMock = vi.fn<FetchFunction>().mockResolvedValue(noContentResponse());
     vi.stubGlobal("fetch", fetchMock);
@@ -83,13 +85,35 @@ describe("API Client", () => {
     );
 
     expect(requestHeaders(fetchMock.mock.calls[0]).get("X-CSRF-Token")).toBe(
-      "csrf-value",
+      "memory-csrf",
     );
   });
 
-  it("401受信時にRefreshし、新しいAccess Tokenで元Requestを1回再送する", async () => {
+  it("CSRF Tokenがメモリにない場合はRequestを送信しない", async () => {
+    const fetchMock = vi.fn<FetchFunction>();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      apiRequest<void>(
+        "/logout",
+        { method: "POST" },
+        {
+          auth: false,
+          csrf: true,
+          retryOnUnauthorized: false,
+        },
+      ),
+    ).rejects.toMatchObject({
+      status: 403,
+      code: "csrf_invalid",
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("401受信時にRefreshし、新しいAccess TokenとCSRF Tokenで状態を更新して元Requestを1回再送する", async () => {
     setAccessToken("old-token");
-    document.cookie = "csrf_token=csrf-value; Path=/";
+    setCSRFToken("old-csrf");
 
     const fetchMock = vi.fn<FetchFunction>(async (input, init) => {
       const url = String(input);
@@ -101,6 +125,7 @@ describe("API Client", () => {
             access_token: "new-token",
             token_type: "Bearer",
             expires_in: 900,
+            csrf_token: "new-csrf",
           },
         });
       }
@@ -130,23 +155,22 @@ describe("API Client", () => {
     expect(response.data.ok).toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(3);
 
-    const refreshCall = fetchMock.mock.calls.find(
-      ([input]) => String(input).endsWith("/refresh"),
+    const refreshCall = fetchMock.mock.calls.find(([input]) =>
+      String(input).endsWith("/refresh"),
     );
     expect(refreshCall).toBeDefined();
-    expect(requestHeaders(refreshCall).get("X-CSRF-Token")).toBe(
-      "csrf-value",
-    );
+    expect(requestHeaders(refreshCall).get("X-CSRF-Token")).toBe("old-csrf");
 
     const retryCall = fetchMock.mock.calls[2];
     expect(requestHeaders(retryCall).get("Authorization")).toBe(
       "Bearer new-token",
     );
+    expect(getCSRFToken()).toBe("new-csrf");
   });
 
   it("複数Requestが同時に401でもRefresh Requestを1回だけ実行する", async () => {
     setAccessToken("old-token");
-    document.cookie = "csrf_token=csrf-value; Path=/";
+    setCSRFToken("csrf-value");
 
     let refreshCount = 0;
 
@@ -163,6 +187,7 @@ describe("API Client", () => {
             access_token: "new-token",
             token_type: "Bearer",
             expires_in: 900,
+            csrf_token: "new-csrf",
           },
         });
       }
@@ -196,7 +221,7 @@ describe("API Client", () => {
 
   it("Refresh後の再送も401なら再Refreshせず終了する", async () => {
     setAccessToken("old-token");
-    document.cookie = "csrf_token=csrf-value; Path=/";
+    setCSRFToken("csrf-value");
 
     const fetchMock = vi
       .fn<FetchFunction>()
@@ -214,6 +239,7 @@ describe("API Client", () => {
             access_token: "new-token",
             token_type: "Bearer",
             expires_in: 900,
+            csrf_token: "new-csrf",
           },
         }),
       )
@@ -227,9 +253,7 @@ describe("API Client", () => {
       );
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(
-      apiRequest("/protected", { method: "GET" }),
-    ).rejects.toMatchObject({
+    await expect(apiRequest("/protected", { method: "GET" })).rejects.toMatchObject({
       status: 401,
       code: "unauthorized",
       requestId: "req-retry",

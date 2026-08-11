@@ -1,36 +1,42 @@
-// Access Tokenが変更されたときに呼び出すListenerの型。
-// 現在のAccess Token、または未認証のnullを受け取る。
 type AccessTokenListener = (accessToken: string | null) => void;
 
-// Access Tokenをブラウザの永続Storageへ保存せず、メモリ上だけで保持する。
 let accessToken: string | null = null;
+let csrfToken: string | null = null;
 
-// Access Tokenの変更を監視しているListenerを重複なく保持する。
 const listeners = new Set<AccessTokenListener>();
 
-// 現在メモリ上に保持しているAccess Tokenを取得する。
 export function getAccessToken(): string | null {
   return accessToken;
 }
 
-// 新しいAccess Tokenをメモリへ保存し、登録済みListenerへ変更を通知する。
-export function setAccessToken(nextAccessToken: string): void {
-  accessToken = nextAccessToken;
-  notifyListeners();
+export function setAccessToken(token: string): void {
+  accessToken = token;
+  notifyAccessToken();
 }
 
-// Access Tokenをメモリから削除し、未認証状態になったことをListenerへ通知する。
 export function clearAccessToken(): void {
-  if (accessToken === null) {
-    return;
-  }
-
   accessToken = null;
-  notifyListeners();
+  notifyAccessToken();
 }
 
-// Access Tokenの変更を監視するListenerを登録する。
-// 戻り値の関数を実行すると、そのListenerの登録を解除できる。
+export function getCSRFToken(): string | null {
+  return csrfToken;
+}
+
+export function setCSRFToken(token: string): void {
+  csrfToken = token;
+}
+
+export function clearCSRFToken(): void {
+  csrfToken = null;
+}
+
+export function clearAuthTokens(): void {
+  accessToken = null;
+  csrfToken = null;
+  notifyAccessToken();
+}
+
 export function subscribeAccessToken(
   listener: AccessTokenListener,
 ): () => void {
@@ -41,8 +47,7 @@ export function subscribeAccessToken(
   };
 }
 
-// 登録済みの全Listenerへ、現在のAccess Tokenを通知する。
-function notifyListeners(): void {
+function notifyAccessToken(): void {
   for (const listener of listeners) {
     listener(accessToken);
   }

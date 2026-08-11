@@ -18,6 +18,7 @@ type IUserController interface {
 	Refresh(c echo.Context) error
 	Logout(c echo.Context) error
 	Me(c echo.Context) error
+	CSRF(c echo.Context) error
 }
 
 type CookieConfig struct {
@@ -72,6 +73,7 @@ type authData struct {
 	AccessToken string           `json:"access_token"`
 	TokenType   string           `json:"token_type"`
 	ExpiresIn   int              `json:"expires_in"`
+	CSRFToken   string           `json:"csrf_token"`
 	User        authUserResponse `json:"user"`
 }
 
@@ -83,6 +85,15 @@ type refreshData struct {
 	AccessToken string `json:"access_token"`
 	TokenType   string `json:"token_type"`
 	ExpiresIn   int    `json:"expires_in"`
+	CSRFToken   string `json:"csrf_token"`
+}
+
+type csrfResponse struct {
+	Data csrfData `json:"data"`
+}
+
+type csrfData struct {
+	CSRFToken string `json:"csrf_token"`
 }
 
 type apiErrorResponse struct {
@@ -169,7 +180,13 @@ func (u *userController) Login(c echo.Context) error {
 	u.setAuthCookies(c, result.AuthTokens)
 
 	return c.JSON(http.StatusOK, authResponse{
-		Data: authData{AccessToken: result.AccessToken, TokenType: "Bearer", ExpiresIn: accessTokenExpiresIn, User: newAuthUserResponse(result.User)},
+		Data: authData{
+			AccessToken: result.AccessToken,
+			TokenType:   "Bearer",
+			ExpiresIn:   accessTokenExpiresIn,
+			CSRFToken:   result.CSRFToken,
+			User:        newAuthUserResponse(result.User),
+		},
 	})
 }
 
@@ -191,7 +208,12 @@ func (u *userController) Refresh(c echo.Context) error {
 	u.setAuthCookies(c, tokens)
 
 	return c.JSON(http.StatusOK, refreshResponse{
-		Data: refreshData{AccessToken: tokens.AccessToken, TokenType: "Bearer", ExpiresIn: accessTokenExpiresIn},
+		Data: refreshData{
+			AccessToken: tokens.AccessToken,
+			TokenType:   "Bearer",
+			ExpiresIn:   accessTokenExpiresIn,
+			CSRFToken:   tokens.CSRFToken,
+		},
 	})
 }
 
@@ -223,18 +245,89 @@ func (u *userController) Me(c echo.Context) error {
 	return c.JSON(http.StatusOK, userDataResponse{Data: newUserResponse(user)})
 }
 
+// Browser再読み込み時にCSRF CookieとHeaderを再同期するためのTokenを発行する。
+func (u *userController) CSRF(c echo.Context) error {
+	result, err := u.users.IssueCSRFToken()
+	if err != nil {
+		return writeError(c, err)
+	}
+
+	u.setCSRFCookie(c, result.Token, result.ExpiresAt)
+
+	return c.JSON(http.StatusOK, csrfResponse{
+		Data: csrfData{CSRFToken: result.Token},
+	})
+}
+
 // LoginまたはRefresh成功時に、Refresh Token CookieとCSRF Cookieを設定する。
 func (u *userController) setAuthCookies(c echo.Context, tokens usecase.AuthTokens) {
-	c.SetCookie(&http.Cookie{Name: refreshCookieName, Value: tokens.RefreshToken, Path: cookiePath, Expires: tokens.RefreshTokenExpiresAt, MaxAge: cookieMaxAge, Secure: u.cookies.Secure, HttpOnly: true, SameSite: http.SameSiteLaxMode})
-	c.SetCookie(&http.Cookie{Name: csrfCookieName, Value: tokens.CSRFToken, Path: cookiePath, Domain: u.cookies.CSRFDomain, Expires: tokens.RefreshTokenExpiresAt, MaxAge: cookieMaxAge, Secure: u.cookies.Secure, HttpOnly: false, SameSite: http.SameSiteLaxMode})
+	sameSite := u.cookieSameSite()
+
+	c.SetCookie(&http.Cookie{
+		Name:     refreshCookieName,
+		Value:    tokens.RefreshToken,
+		Path:     cookiePath,
+		Expires:  tokens.RefreshTokenExpiresAt,
+		MaxAge:   cookieMaxAge,
+		Secure:   u.cookies.Secure,
+		HttpOnly: true,
+		SameSite: sameSite,
+	})
+
+	u.setCSRFCookie(c, tokens.CSRFToken, tokens.RefreshTokenExpiresAt)
+}
+
+func (u *userController) setCSRFCookie(c echo.Context, token string, expiresAt time.Time) {
+	c.SetCookie(&http.Cookie{
+		Name:     csrfCookieName,
+		Value:    token,
+		Path:     cookiePath,
+		Domain:   u.cookies.CSRFDomain,
+		Expires:  expiresAt,
+		MaxAge:   cookieMaxAge,
+		Secure:   u.cookies.Secure,
+		HttpOnly: true,
+		SameSite: u.cookieSameSite(),
+	})
 }
 
 // 認証Cookieを発行時と同じ属性で期限切れにし、Browserから削除する。
 func (u *userController) clearAuthCookies(c echo.Context) {
 	expiresAt := time.Unix(0, 0)
+	sameSite := u.cookieSameSite()
 
-	c.SetCookie(&http.Cookie{Name: refreshCookieName, Value: "", Path: cookiePath, Expires: expiresAt, MaxAge: -1, Secure: u.cookies.Secure, HttpOnly: true, SameSite: http.SameSiteLaxMode})
-	c.SetCookie(&http.Cookie{Name: csrfCookieName, Value: "", Path: cookiePath, Domain: u.cookies.CSRFDomain, Expires: expiresAt, MaxAge: -1, Secure: u.cookies.Secure, HttpOnly: false, SameSite: http.SameSiteLaxMode})
+	c.SetCookie(&http.Cookie{
+		Name:     refreshCookieName,
+		Value:    "",
+		Path:     cookiePath,
+		Expires:  expiresAt,
+		MaxAge:   -1,
+		Secure:   u.cookies.Secure,
+		HttpOnly: true,
+		SameSite: sameSite,
+	})
+
+	c.SetCookie(&http.Cookie{
+		Name:     csrfCookieName,
+		Value:    "",
+		Path:     cookiePath,
+		Domain:   u.cookies.CSRFDomain,
+		Expires:  expiresAt,
+		MaxAge:   -1,
+		Secure:   u.cookies.Secure,
+		HttpOnly: true,
+		SameSite: sameSite,
+	})
+}
+
+// HTTPS本番環境ではCross-Site通信にCookieを送信できるようSameSite=Noneを使用する。
+// ローカルHTTP環境ではSecure Cookieを使用できないためSameSite=Laxを維持する。
+func (u *userController) cookieSameSite() http.SameSite {
+	if u.cookies.Secure {
+		return http.SameSiteNoneMode
+	}
+
+	return http.SameSiteLaxMode
 }
 
 // Domain Errorを利用者へ返す。HTTP Statusと共通API Errorへ変換する。

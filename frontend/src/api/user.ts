@@ -1,5 +1,6 @@
 import type {
   AuthResponse,
+  CSRFResponse,
   LoginInput,
   MeResponse,
   SignUpInput,
@@ -33,6 +34,20 @@ export function login(input: LoginInput): Promise<AuthResponse> {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(input),
+    },
+    {
+      auth: false,
+      retryOnUnauthorized: false,
+    },
+  );
+}
+
+// Reload後にRefreshへ必要なCSRF TokenをBackendから取得する。
+export function fetchCSRFToken(): Promise<CSRFResponse> {
+  return apiRequest<CSRFResponse>(
+    "/csrf",
+    {
+      method: "GET",
     },
     {
       auth: false,
