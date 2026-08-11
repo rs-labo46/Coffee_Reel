@@ -3,6 +3,7 @@ package router
 import (
 	"coffee-reel/controller"
 	"coffee-reel/middleware"
+	"log"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -43,7 +44,7 @@ func NewRouter(
 			req := c.Request()
 
 			if req.URL.Path == "/health" && req.URL.Query().Get("debug_ip") == "1" {
-				e.Logger.Infof(
+				log.Printf(
 					"ip-debug remote_addr=%q x_forwarded_for=%q x_real_ip=%q cf_connecting_ip=%q cf_ray=%q rndr_id=%q user_agent=%q",
 					req.RemoteAddr,
 					req.Header.Get("X-Forwarded-For"),
