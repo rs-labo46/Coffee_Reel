@@ -133,8 +133,8 @@ func (u *userController) SignUp(c echo.Context) error {
 	if err != nil {
 		return writeError(c, err)
 	}
-	user, err := u.users.SignUp(c.Request().Context(), name, email, password)
 
+	user, err := u.users.SignUp(c.Request().Context(), name, email, password)
 	if err != nil {
 		return writeError(c, err)
 	}
@@ -202,6 +202,7 @@ func (u *userController) Refresh(c echo.Context) error {
 		if errors.Is(err, entity.ErrRefreshTokenReused) {
 			u.clearAuthCookies(c)
 		}
+
 		return writeError(c, err)
 	}
 
@@ -237,12 +238,13 @@ func (u *userController) Logout(c echo.Context) error {
 // Auth MiddlewareがContextへ保存した認証済みUserを返す。
 func (u *userController) Me(c echo.Context) error {
 	user, ok := c.Get(userContextKey).(*entity.User)
-
 	if !ok || user == nil {
 		return writeError(c, entity.ErrUnauthorized)
 	}
 
-	return c.JSON(http.StatusOK, userDataResponse{Data: newUserResponse(user)})
+	return c.JSON(http.StatusOK, userDataResponse{
+		Data: newUserResponse(user),
+	})
 }
 
 // Browser再読み込み時にCSRF CookieとHeaderを再同期するためのTokenを発行する。
@@ -255,7 +257,9 @@ func (u *userController) CSRF(c echo.Context) error {
 	u.setCSRFCookie(c, result.Token, result.ExpiresAt)
 
 	return c.JSON(http.StatusOK, csrfResponse{
-		Data: csrfData{CSRFToken: result.Token},
+		Data: csrfData{
+			CSRFToken: result.Token,
+		},
 	})
 }
 
@@ -264,14 +268,15 @@ func (u *userController) setAuthCookies(c echo.Context, tokens usecase.AuthToken
 	sameSite := u.cookieSameSite()
 
 	c.SetCookie(&http.Cookie{
-		Name:     refreshCookieName,
-		Value:    tokens.RefreshToken,
-		Path:     cookiePath,
-		Expires:  tokens.RefreshTokenExpiresAt,
-		MaxAge:   cookieMaxAge,
-		Secure:   u.cookies.Secure,
-		HttpOnly: true,
-		SameSite: sameSite,
+		Name:        refreshCookieName,
+		Value:       tokens.RefreshToken,
+		Path:        cookiePath,
+		Expires:     tokens.RefreshTokenExpiresAt,
+		MaxAge:      cookieMaxAge,
+		Secure:      u.cookies.Secure,
+		HttpOnly:    true,
+		SameSite:    sameSite,
+		Partitioned: u.cookies.Secure,
 	})
 
 	u.setCSRFCookie(c, tokens.CSRFToken, tokens.RefreshTokenExpiresAt)
@@ -279,15 +284,16 @@ func (u *userController) setAuthCookies(c echo.Context, tokens usecase.AuthToken
 
 func (u *userController) setCSRFCookie(c echo.Context, token string, expiresAt time.Time) {
 	c.SetCookie(&http.Cookie{
-		Name:     csrfCookieName,
-		Value:    token,
-		Path:     cookiePath,
-		Domain:   u.cookies.CSRFDomain,
-		Expires:  expiresAt,
-		MaxAge:   cookieMaxAge,
-		Secure:   u.cookies.Secure,
-		HttpOnly: true,
-		SameSite: u.cookieSameSite(),
+		Name:        csrfCookieName,
+		Value:       token,
+		Path:        cookiePath,
+		Domain:      u.cookies.CSRFDomain,
+		Expires:     expiresAt,
+		MaxAge:      cookieMaxAge,
+		Secure:      u.cookies.Secure,
+		HttpOnly:    true,
+		SameSite:    u.cookieSameSite(),
+		Partitioned: u.cookies.Secure,
 	})
 }
 
@@ -297,30 +303,33 @@ func (u *userController) clearAuthCookies(c echo.Context) {
 	sameSite := u.cookieSameSite()
 
 	c.SetCookie(&http.Cookie{
-		Name:     refreshCookieName,
-		Value:    "",
-		Path:     cookiePath,
-		Expires:  expiresAt,
-		MaxAge:   -1,
-		Secure:   u.cookies.Secure,
-		HttpOnly: true,
-		SameSite: sameSite,
+		Name:        refreshCookieName,
+		Value:       "",
+		Path:        cookiePath,
+		Expires:     expiresAt,
+		MaxAge:      -1,
+		Secure:      u.cookies.Secure,
+		HttpOnly:    true,
+		SameSite:    sameSite,
+		Partitioned: u.cookies.Secure,
 	})
 
 	c.SetCookie(&http.Cookie{
-		Name:     csrfCookieName,
-		Value:    "",
-		Path:     cookiePath,
-		Domain:   u.cookies.CSRFDomain,
-		Expires:  expiresAt,
-		MaxAge:   -1,
-		Secure:   u.cookies.Secure,
-		HttpOnly: true,
-		SameSite: sameSite,
+		Name:        csrfCookieName,
+		Value:       "",
+		Path:        cookiePath,
+		Domain:      u.cookies.CSRFDomain,
+		Expires:     expiresAt,
+		MaxAge:      -1,
+		Secure:      u.cookies.Secure,
+		HttpOnly:    true,
+		SameSite:    sameSite,
+		Partitioned: u.cookies.Secure,
 	})
 }
 
 // HTTPS本番環境ではCross-Site通信にCookieを送信できるようSameSite=Noneを使用する。
+// Cross-Site CookieはPartitioned CookieとしてTop-Level Site単位に分離する。
 // ローカルHTTP環境ではSecure Cookieを使用できないためSameSite=Laxを維持する。
 func (u *userController) cookieSameSite() http.SameSite {
 	if u.cookies.Secure {
@@ -362,7 +371,12 @@ func writeError(c echo.Context, err error) error {
 
 // HTTP Status、Error Code、Message、Request IDを共通エラー形式で返す。
 func writeAPIError(c echo.Context, status int, code string, message string) error {
-	return c.JSON(status, apiErrorResponse{Status: status, Code: code, Message: message, RequestID: requestID(c)})
+	return c.JSON(status, apiErrorResponse{
+		Status:    status,
+		Code:      code,
+		Message:   message,
+		RequestID: requestID(c),
+	})
 }
 
 // ResponseまたはRequest HeaderからRequest IDを取得する。
@@ -376,10 +390,23 @@ func requestID(c echo.Context) string {
 
 // User Entityから会員登録・Me用の安全なResponseを作成する。
 func newUserResponse(user *entity.User) userResponse {
-	return userResponse{ID: user.ID, Name: user.Name, Email: user.Email, Role: user.Role, Status: user.Status, CreatedAt: user.CreatedAt}
+	return userResponse{
+		ID:        user.ID,
+		Name:      user.Name,
+		Email:     user.Email,
+		Role:      user.Role,
+		Status:    user.Status,
+		CreatedAt: user.CreatedAt,
+	}
 }
 
 // User EntityからLogin Response用のUser情報を作成する。
 func newAuthUserResponse(user *entity.User) authUserResponse {
-	return authUserResponse{ID: user.ID, Name: user.Name, Email: user.Email, Role: user.Role, Status: user.Status}
+	return authUserResponse{
+		ID:     user.ID,
+		Name:   user.Name,
+		Email:  user.Email,
+		Role:   user.Role,
+		Status: user.Status,
+	}
 }
