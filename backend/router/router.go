@@ -32,7 +32,13 @@ func NewRouter(
 	videoComponents ...VideoComponents,
 ) *echo.Echo {
 	e := echo.New()
-	e.IPExtractor = echo.ExtractIPDirect()
+
+	e.IPExtractor = echo.ExtractIPFromXFFHeader(
+		echo.TrustLoopback(true),
+		echo.TrustLinkLocal(true),
+		echo.TrustPrivateNet(true),
+	)
+
 	e.Use(echomw.Recover())
 	e.Use(echomw.RequestID())
 	e.Use(echomw.Logger())
@@ -70,31 +76,68 @@ func NewRouter(
 
 	e.GET("/health", healthController.Check)
 
+	e.GET("/csrf", userController.CSRF)
 	e.POST("/signup", userController.SignUp, rateLimitMiddleware.Signup)
 	e.POST("/login", userController.Login, rateLimitMiddleware.LoginIP)
-	e.POST("/refresh", userController.Refresh, rateLimitMiddleware.Refresh, csrfMiddleware.Validate)
-	e.POST("/logout", userController.Logout, csrfMiddleware.Validate)
-	e.GET("/me", userController.Me, authMiddleware.Authenticate)
+	e.POST(
+		"/refresh",
+		userController.Refresh,
+		rateLimitMiddleware.Refresh,
+		csrfMiddleware.Validate,
+	)
+	e.POST(
+		"/logout",
+		userController.Logout,
+		csrfMiddleware.Validate,
+	)
+	e.GET(
+		"/me",
+		userController.Me,
+		authMiddleware.Authenticate,
+	)
 
-	adminGroup := e.Group("/admin", authMiddleware.Authenticate, adminComponents.Middleware.Authorize)
-	adminGroup.GET("/users", adminComponents.Controller.ListUsers)
-	adminGroup.GET("/users/:user_id", adminComponents.Controller.GetUserDetail)
-	adminGroup.PATCH("/users/:user_id/suspend", adminComponents.Controller.SuspendUser)
-	adminGroup.PATCH("/users/:user_id/resume", adminComponents.Controller.ResumeUser)
+	adminGroup := e.Group(
+		"/admin",
+		authMiddleware.Authenticate,
+		adminComponents.Middleware.Authorize,
+	)
+
+	adminGroup.GET(
+		"/users",
+		adminComponents.Controller.ListUsers,
+	)
+
+	adminGroup.GET(
+		"/users/:user_id",
+		adminComponents.Controller.GetUserDetail,
+	)
+
+	adminGroup.PATCH(
+		"/users/:user_id/suspend",
+		adminComponents.Controller.SuspendUser,
+	)
+
+	adminGroup.PATCH(
+		"/users/:user_id/resume",
+		adminComponents.Controller.ResumeUser,
+	)
 
 	if adminComponents.VideoController != nil {
 		adminGroup.GET(
 			"/videos",
 			adminComponents.VideoController.List,
 		)
+
 		adminGroup.GET(
 			"/videos/:video_id",
 			adminComponents.VideoController.Detail,
 		)
+
 		adminGroup.PATCH(
 			"/videos/:video_id/hide",
 			adminComponents.VideoController.Hide,
 		)
+
 		adminGroup.PATCH(
 			"/videos/:video_id/restore",
 			adminComponents.VideoController.Restore,
@@ -102,7 +145,12 @@ func NewRouter(
 	}
 
 	if len(videoComponents) == 1 {
-		registerVideoRoutes(e, videoComponents[0], authMiddleware, rateLimitMiddleware)
+		registerVideoRoutes(
+			e,
+			videoComponents[0],
+			authMiddleware,
+			rateLimitMiddleware,
+		)
 	}
 
 	return e
@@ -114,23 +162,91 @@ func registerVideoRoutes(
 	auth *middleware.AuthMiddleware,
 	rateLimits *middleware.RateLimitMiddleware,
 ) {
-	e.POST("/videos", components.Controller.StartUpload, auth.Authenticate, rateLimits.VideoStart)
-	e.POST("/videos/:video_id/upload-complete", components.Controller.CompleteUpload, auth.Authenticate, rateLimits.VideoComplete)
-	e.GET("/videos", components.Controller.ListReels, auth.OptionalAuthenticate)
-	e.GET("/videos/:video_id", components.Controller.Detail, auth.OptionalAuthenticate)
+	e.POST(
+		"/videos",
+		components.Controller.StartUpload,
+		auth.Authenticate,
+		rateLimits.VideoStart,
+	)
+
+	e.POST(
+		"/videos/:video_id/upload-complete",
+		components.Controller.CompleteUpload,
+		auth.Authenticate,
+		rateLimits.VideoComplete,
+	)
+
+	e.GET(
+		"/videos",
+		components.Controller.ListReels,
+		auth.OptionalAuthenticate,
+	)
+
+	e.GET(
+		"/videos/:video_id",
+		components.Controller.Detail,
+		auth.OptionalAuthenticate,
+	)
 
 	if components.LikeController != nil {
-		e.PUT("/videos/:video_id/like", components.LikeController.Like, auth.Authenticate)
-		e.DELETE("/videos/:video_id/like", components.LikeController.Unlike, auth.Authenticate)
+		e.PUT(
+			"/videos/:video_id/like",
+			components.LikeController.Like,
+			auth.Authenticate,
+		)
+
+		e.DELETE(
+			"/videos/:video_id/like",
+			components.LikeController.Unlike,
+			auth.Authenticate,
+		)
 	}
 
-	e.GET("/me/videos", components.Controller.ListMine, auth.Authenticate)
-	e.GET("/me/videos/:video_id", components.Controller.MineDetail, auth.Authenticate)
-	e.PATCH("/me/videos/:video_id/private", components.Controller.SetPrivate, auth.Authenticate)
-	e.PATCH("/me/videos/:video_id/publish", components.Controller.Republish, auth.Authenticate)
-	e.DELETE("/me/videos/:video_id", components.Controller.Delete, auth.Authenticate)
+	e.GET(
+		"/me/videos",
+		components.Controller.ListMine,
+		auth.Authenticate,
+	)
 
-	e.PUT("/videos/:video_id/saved", components.SavedController.Save, auth.Authenticate)
-	e.DELETE("/videos/:video_id/saved", components.SavedController.Remove, auth.Authenticate)
-	e.GET("/me/saved-videos", components.SavedController.List, auth.Authenticate)
+	e.GET(
+		"/me/videos/:video_id",
+		components.Controller.MineDetail,
+		auth.Authenticate,
+	)
+
+	e.PATCH(
+		"/me/videos/:video_id/private",
+		components.Controller.SetPrivate,
+		auth.Authenticate,
+	)
+
+	e.PATCH(
+		"/me/videos/:video_id/publish",
+		components.Controller.Republish,
+		auth.Authenticate,
+	)
+
+	e.DELETE(
+		"/me/videos/:video_id",
+		components.Controller.Delete,
+		auth.Authenticate,
+	)
+
+	e.PUT(
+		"/videos/:video_id/saved",
+		components.SavedController.Save,
+		auth.Authenticate,
+	)
+
+	e.DELETE(
+		"/videos/:video_id/saved",
+		components.SavedController.Remove,
+		auth.Authenticate,
+	)
+
+	e.GET(
+		"/me/saved-videos",
+		components.SavedController.List,
+		auth.Authenticate,
+	)
 }

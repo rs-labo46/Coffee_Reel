@@ -15,6 +15,7 @@ type IUserUsecase interface {
 	Logout(ctx context.Context, plainRefreshToken string) error
 	GetMe(ctx context.Context, userID uint64) (*entity.User, error)
 	ValidateTokenVersion(user *entity.User, tokenVersion uint64) error
+	IssueCSRFToken() (CSRFTokenResult, error)
 }
 
 const refreshTokenLifetime = 7 * 24 * time.Hour
@@ -24,6 +25,11 @@ type AuthTokens struct {
 	RefreshToken          string
 	CSRFToken             string
 	RefreshTokenExpiresAt time.Time
+}
+
+type CSRFTokenResult struct {
+	Token     string
+	ExpiresAt time.Time
 }
 
 type userUsecase struct {
@@ -199,6 +205,19 @@ func (u *userUsecase) ValidateTokenVersion(user *entity.User, tokenVersion uint6
 		return entity.ErrUnauthorized
 	}
 	return nil
+}
+
+// Browser再読み込み時にCSRF CookieとHeaderを再同期するためのCSRF Tokenを発行する。
+func (u *userUsecase) IssueCSRFToken() (CSRFTokenResult, error) {
+	token, err := u.tokens.GenerateCSRFToken()
+	if err != nil {
+		return CSRFTokenResult{}, err
+	}
+
+	return CSRFTokenResult{
+		Token:     token,
+		ExpiresAt: time.Now().Add(refreshTokenLifetime),
+	}, nil
 }
 
 // Access Token、Refresh Token、CSRF TokenとDB保存用のRefreshToken Entityを生成する。

@@ -132,25 +132,41 @@ func TestUserControllerLoginSuccessSetsSecureCookieContractWithoutReturningRefre
 	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
 		t.Fatalf("json.Unmarshal() error = %v", err)
 	}
-	if response.Data.AccessToken != "access-token" || response.Data.TokenType != "Bearer" || response.Data.ExpiresIn != 900 {
+	if response.Data.AccessToken != "access-token" || response.Data.TokenType != "Bearer" || response.Data.ExpiresIn != 900 || response.Data.CSRFToken != "csrf-secret" {
 		t.Fatalf("response = %+v", response)
 	}
 	if response.Data.User.Role != entity.RoleUser || response.Data.User.Status != entity.StatusActive {
 		t.Fatalf("user response = %+v", response.Data.User)
 	}
-	for _, secret := range []string{"refresh-secret", "csrf-secret", "PasswordHash", "token_version"} {
+	for _, secret := range []string{"refresh-secret", "PasswordHash", "token_version"} {
 		if strings.Contains(rec.Body.String(), secret) {
 			t.Fatalf("login JSON leaks %q: %s", secret, rec.Body.String())
 		}
 	}
 
 	refreshCookie := cookieByName(t, rec, refreshCookieName)
-	if refreshCookie.Value != "refresh-secret" || !refreshCookie.HttpOnly || !refreshCookie.Secure || refreshCookie.Path != "/" || refreshCookie.SameSite != http.SameSiteLaxMode || refreshCookie.MaxAge != cookieMaxAge || !refreshCookie.Expires.Equal(expiresAt) {
+	if refreshCookie.Value != "refresh-secret" || !refreshCookie.HttpOnly || !refreshCookie.Secure || refreshCookie.Path != "/" || refreshCookie.SameSite != http.SameSiteNoneMode || refreshCookie.MaxAge != cookieMaxAge || !refreshCookie.Expires.Equal(expiresAt) {
 		t.Fatalf("refresh cookie = %+v", refreshCookie)
 	}
 	csrfCookie := cookieByName(t, rec, csrfCookieName)
-	if csrfCookie.Value != "csrf-secret" || csrfCookie.HttpOnly || !csrfCookie.Secure || csrfCookie.Path != "/" || csrfCookie.Domain != "example.com" || csrfCookie.SameSite != http.SameSiteLaxMode || csrfCookie.MaxAge != cookieMaxAge || !csrfCookie.Expires.Equal(expiresAt) {
+	if csrfCookie.Value != "csrf-secret" || !csrfCookie.HttpOnly || !csrfCookie.Secure || csrfCookie.Path != "/" || csrfCookie.Domain != "example.com" || csrfCookie.SameSite != http.SameSiteNoneMode || csrfCookie.MaxAge != cookieMaxAge || !csrfCookie.Expires.Equal(expiresAt) {
 		t.Fatalf("csrf cookie = %+v", csrfCookie)
+	}
+}
+
+func TestUserControllerCookieSameSiteUsesLaxWithoutSecure(t *testing.T) {
+	controller := &userController{cookies: CookieConfig{Secure: false}}
+
+	if got := controller.cookieSameSite(); got != http.SameSiteLaxMode {
+		t.Fatalf("cookieSameSite() = %v, want %v", got, http.SameSiteLaxMode)
+	}
+}
+
+func TestUserControllerCookieSameSiteUsesNoneWithSecure(t *testing.T) {
+	controller := &userController{cookies: CookieConfig{Secure: true}}
+
+	if got := controller.cookieSameSite(); got != http.SameSiteNoneMode {
+		t.Fatalf("cookieSameSite() = %v, want %v", got, http.SameSiteNoneMode)
 	}
 }
 
@@ -197,6 +213,48 @@ func TestUserControllerLoginRateLimitStorageFailureReturnsGeneric503(t *testing.
 	}
 }
 
+func TestUserControllerCSRFIssuesCookieAndResponseToken(t *testing.T) {
+	controller := NewUserController(
+		&userUsecaseMock{},
+		&rateLimitUsecaseMock{},
+		&userValidatorMock{},
+		CookieConfig{Secure: true, CSRFDomain: "example.com"},
+	)
+	c, rec := newControllerContext(http.MethodGet, "/csrf", "")
+
+	if err := controller.CSRF(c); err != nil {
+		t.Fatalf("CSRF() error = %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var response csrfResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	if response.Data.CSRFToken != "bootstrap-csrf" {
+		t.Fatalf("response = %+v", response)
+	}
+
+	csrfCookie := cookieByName(t, rec, csrfCookieName)
+	if csrfCookie.Value != "bootstrap-csrf" ||
+		!csrfCookie.HttpOnly ||
+		!csrfCookie.Secure ||
+		csrfCookie.Path != "/" ||
+		csrfCookie.Domain != "example.com" ||
+		csrfCookie.SameSite != http.SameSiteNoneMode ||
+		csrfCookie.MaxAge != cookieMaxAge {
+		t.Fatalf("csrf cookie = %+v", csrfCookie)
+	}
+
+	for _, cookie := range rec.Result().Cookies() {
+		if cookie.Name == refreshCookieName {
+			t.Fatalf("CSRF bootstrap must not issue refresh cookie: %+v", cookie)
+		}
+	}
+}
+
 func TestUserControllerRefreshSuccessRotatesBothCookies(t *testing.T) {
 	expiresAt := time.Now().Add(7 * 24 * time.Hour).Truncate(time.Second)
 	users := &userUsecaseMock{refreshFunc: func(_ context.Context, token string) (usecase.AuthTokens, error) {
@@ -219,11 +277,11 @@ func TestUserControllerRefreshSuccessRotatesBothCookies(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
 		t.Fatalf("json.Unmarshal() error = %v", err)
 	}
-	if response.Data.AccessToken != "new-access" || response.Data.TokenType != "Bearer" || response.Data.ExpiresIn != 900 {
+	if response.Data.AccessToken != "new-access" || response.Data.TokenType != "Bearer" || response.Data.ExpiresIn != 900 || response.Data.CSRFToken != "new-csrf" {
 		t.Fatalf("response = %+v", response)
 	}
-	if strings.Contains(rec.Body.String(), "new-refresh") || strings.Contains(rec.Body.String(), "new-csrf") {
-		t.Fatalf("refresh response leaks cookie token: %s", rec.Body.String())
+	if strings.Contains(rec.Body.String(), "new-refresh") {
+		t.Fatalf("refresh response leaks refresh token: %s", rec.Body.String())
 	}
 	if cookieByName(t, rec, refreshCookieName).Value != "new-refresh" || cookieByName(t, rec, csrfCookieName).Value != "new-csrf" {
 		t.Fatal("refresh did not rotate both authentication cookies")

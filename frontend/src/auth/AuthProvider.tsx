@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { AuthState, LoginInput, User } from "../types/user";
 import {
+  fetchCSRFToken,
   getMe,
   login as requestLogin,
   logout as requestLogout,
 } from "../api/user";
 import {
-  clearAccessToken,
+  clearAuthTokens,
   setAccessToken,
+  setCSRFToken,
   subscribeAccessToken,
 } from "./tokenStore";
 import { AuthContext, type AuthContextValue } from "./authContext";
@@ -78,7 +80,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return;
         }
 
-        clearAccessToken();
+        clearAuthTokens();
         setState({
           user: null,
           accessToken: null,
@@ -96,6 +98,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const response = await requestLogin(input);
 
     authRevisionRef.current += 1;
+    setCSRFToken(response.data.csrf_token);
     setAccessToken(response.data.access_token);
     setState({
       user: response.data.user,
@@ -110,7 +113,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     await requestLogout();
 
-    clearAccessToken();
+    clearAuthTokens();
     setState({
       user: null,
       accessToken: null,
@@ -129,6 +132,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 }
 
 async function restoreSession(): Promise<RestoredSession> {
+  const csrfResponse = await fetchCSRFToken();
+  setCSRFToken(csrfResponse.data.csrf_token);
+
   const accessToken = await refreshAccessToken();
   const response = await getMe();
 

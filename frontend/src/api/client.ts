@@ -1,7 +1,9 @@
 import {
-  clearAccessToken,
+  clearAuthTokens,
   getAccessToken,
+  getCSRFToken,
   setAccessToken,
+  setCSRFToken,
 } from "../auth/tokenStore";
 import type { ApiErrorResponse, RefreshResponse } from "../types/user";
 
@@ -13,7 +15,6 @@ if (typeof rawApiURL !== "string" || rawApiURL.trim() === "") {
 
 const apiURL = rawApiURL.replace(/\/+$/, "");
 const refreshPath = "/refresh";
-const csrfCookieName = "csrf_token";
 const csrfHeaderName = "X-CSRF-Token";
 
 let refreshPromise: Promise<string> | null = null;
@@ -55,7 +56,6 @@ function isApiErrorResponse(value: unknown): value is ApiErrorResponse {
   );
 }
 
-// unknown型の値が、Access Token再発行APIの正常Response形式かどうか
 function isRefreshResponse(value: unknown): value is RefreshResponse {
   if (!isRecord(value) || !isRecord(value.data)) {
     return false;
@@ -65,11 +65,12 @@ function isRefreshResponse(value: unknown): value is RefreshResponse {
     typeof value.data.access_token === "string" &&
     value.data.access_token !== "" &&
     value.data.token_type === "Bearer" &&
-    typeof value.data.expires_in === "number"
+    typeof value.data.expires_in === "number" &&
+    typeof value.data.csrf_token === "string" &&
+    value.data.csrf_token !== ""
   );
 }
 
-//Response Bodyを文字列として読み取り、JSONへ変換
 async function readJSON(response: Response): Promise<unknown> {
   const text = await response.text();
 
@@ -88,7 +89,8 @@ async function readJSON(response: Response): Promise<unknown> {
   }
 }
 
-// 共通Header、Cookie送信、Authorization Header、Response解析、Backend ErrorのApiClientError変換
+// VITE_API_URLで指定したBackendへ直接Requestを送信する。
+// Cross-SiteのRefresh Token Cookieを送信するためcredentialsをincludeに固定する。
 async function sendRequest<T>(
   path: string,
   init: RequestInit,
@@ -154,7 +156,8 @@ async function sendRequest<T>(
   return body as T;
 }
 
-// Backend APIを呼び出す共通関数。認証が必要なRequestへAccess Tokenを付け、401時はTokenを再発行して1回だけ再送する。
+// Backend API共通処理。
+// 認証が必要なRequestにはAccess Tokenを設定し、401時のみRefresh後に1回再送する。
 export async function apiRequest<T>(
   path: string,
   init: RequestInit,
@@ -162,6 +165,7 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const usesAuth = options.auth !== false;
   const tokenUsed = usesAuth ? getAccessToken() : null;
+
   const requestInit = options.csrf === true ? addCSRFHeader(init) : init;
 
   try {
@@ -191,7 +195,7 @@ export async function apiRequest<T>(
   }
 }
 
-// Access Token再発行処理を開始する。既に再発行中の場合は、同じPromiseを返してRefresh Requestの重複を防ぐ。
+// 同時に複数Requestが401になってもRefresh APIを1回だけ実行する。
 export function refreshAccessToken(): Promise<string> {
   if (refreshPromise !== null) {
     return refreshPromise;
@@ -204,12 +208,11 @@ export function refreshAccessToken(): Promise<string> {
   return refreshPromise;
 }
 
-// CSRF CookieとRefresh Token Cookieを使用して、新しいAccess Tokenを取得する。成功時はToken Storeへ保存し、認証失敗時は保持中のAccess Tokenを削除する。
+// メモリ上のCSRF TokenとHttpOnly Refresh Token Cookieを利用してAccess Tokenを再発行する。
 async function requestNewAccessToken(): Promise<string> {
-  const csrfToken = readCookie(csrfCookieName);
+  if (getCSRFToken() === null) {
+    clearAuthTokens();
 
-  if (csrfToken === "") {
-    clearAccessToken();
     throw new ApiClientError(
       403,
       "csrf_invalid",
@@ -220,7 +223,9 @@ async function requestNewAccessToken(): Promise<string> {
   try {
     const response = await sendRequest<RefreshResponse>(
       refreshPath,
-      addCSRFHeader({ method: "POST" }),
+      addCSRFHeader({
+        method: "POST",
+      }),
       null,
     );
 
@@ -233,6 +238,7 @@ async function requestNewAccessToken(): Promise<string> {
     }
 
     setAccessToken(response.data.access_token);
+    setCSRFToken(response.data.csrf_token);
 
     return response.data.access_token;
   } catch (error: unknown) {
@@ -240,14 +246,14 @@ async function requestNewAccessToken(): Promise<string> {
       error instanceof ApiClientError &&
       (error.status === 401 || error.status === 403)
     ) {
-      clearAccessToken();
+      clearAuthTokens();
     }
 
     throw error;
   }
 }
 
-// 再発行したAccess Tokenを使用して、元のRequestを1回だけ再送する。再送後も401の場合はAccess Tokenを削除し、それ以上の再試行は行わない。
+// Refresh後のAccess Tokenで元Requestを1回だけ再送する。
 async function retryRequest<T>(
   path: string,
   init: RequestInit,
@@ -257,18 +263,18 @@ async function retryRequest<T>(
     return await sendRequest<T>(path, init, accessToken);
   } catch (error: unknown) {
     if (error instanceof ApiClientError && error.status === 401) {
-      clearAccessToken();
+      clearAuthTokens();
     }
 
     throw error;
   }
 }
 
-// CSRF Cookieの値をRequest Headerへ設定する。RefreshとLogoutのようなCookie認証APIで使用する。
+// Backend Responseから取得してメモリ保持しているCSRF TokenをHeaderへ設定する。
 function addCSRFHeader(init: RequestInit): RequestInit {
-  const csrfToken = readCookie(csrfCookieName);
+  const csrfToken = getCSRFToken();
 
-  if (csrfToken === "") {
+  if (csrfToken === null) {
     throw new ApiClientError(
       403,
       "csrf_invalid",
@@ -277,30 +283,11 @@ function addCSRFHeader(init: RequestInit): RequestInit {
   }
 
   const headers = new Headers(init.headers);
+
   headers.set(csrfHeaderName, csrfToken);
 
   return {
     ...init,
     headers,
   };
-}
-
-// document.cookieから指定したCookieの値を取得する。HttpOnly CookieはJavaScriptから読めないため、CSRF Cookieの取得にだけ使用する。
-function readCookie(name: string): string {
-  if (typeof document === "undefined") {
-    return "";
-  }
-
-  const cookieName = `${encodeURIComponent(name)}=`;
-  const cookies = document.cookie.split(";");
-
-  for (const cookie of cookies) {
-    const value = cookie.trim();
-
-    if (value.startsWith(cookieName)) {
-      return decodeURIComponent(value.slice(cookieName.length));
-    }
-  }
-
-  return "";
 }
