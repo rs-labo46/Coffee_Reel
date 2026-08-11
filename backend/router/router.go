@@ -35,6 +35,30 @@ func NewRouter(
 	e.IPExtractor = echo.ExtractIPDirect()
 	e.Use(echomw.Recover())
 	e.Use(echomw.RequestID())
+
+	// Render経由で実際に届くClient IP関連Headerを確認するための一時診断。
+	// Authorization、Cookie、Token、Request Bodyはログへ出さない。
+	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			req := c.Request()
+
+			if req.URL.Path == "/health" && req.URL.Query().Get("debug_ip") == "1" {
+				e.Logger.Infof(
+					"ip-debug remote_addr=%q x_forwarded_for=%q x_real_ip=%q cf_connecting_ip=%q cf_ray=%q rndr_id=%q user_agent=%q",
+					req.RemoteAddr,
+					req.Header.Get("X-Forwarded-For"),
+					req.Header.Get("X-Real-IP"),
+					req.Header.Get("CF-Connecting-IP"),
+					req.Header.Get("CF-Ray"),
+					req.Header.Get("Rndr-Id"),
+					req.UserAgent(),
+				)
+			}
+
+			return next(c)
+		}
+	})
+
 	e.Use(echomw.Logger())
 
 	e.Use(echomw.SecureWithConfig(echomw.SecureConfig{
