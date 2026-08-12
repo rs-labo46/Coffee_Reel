@@ -31,7 +31,6 @@ type IVideoUsecase interface {
 
 const (
 	videoObjectRandomBytes = 16
-	maxVideoSizeBytes      = 30_000_000
 )
 
 type VideoUsecaseConfig struct {
@@ -348,7 +347,7 @@ func (u *videoUsecase) CompleteUpload(ctx context.Context, actor *entity.User, v
 	if err != nil {
 		return VideoStateResult{}, err
 	}
-	if objectInfo.SizeBytes < 1 || objectInfo.SizeBytes > maxVideoSizeBytes || !isAllowedSourceContentType(objectInfo.ContentType) {
+	if objectInfo.SizeBytes < 1 || objectInfo.SizeBytes > entity.MaxSourceVideoSizeBytes || !isAllowedSourceContentType(objectInfo.ContentType) {
 		return VideoStateResult{}, entity.ErrVideoSourceInvalid
 	}
 
@@ -635,7 +634,7 @@ func (u *videoUsecase) Delete(ctx context.Context, actor *entity.User, videoID u
 }
 
 func validateStartUploadInput(input StartUploadInput, idempotencyKey string) error {
-	if strings.TrimSpace(idempotencyKey) == "" || !input.Category.IsValid() || !isAllowedSourceContentType(input.ContentType) || input.DeclaredSize < 1 || input.DeclaredSize > maxVideoSizeBytes {
+	if strings.TrimSpace(idempotencyKey) == "" || !input.Category.IsValid() || !isAllowedSourceContentType(input.ContentType) || input.DeclaredSize < 1 || input.DeclaredSize > entity.MaxSourceVideoSizeBytes {
 		return entity.ErrInvalidInput
 	}
 	if strings.TrimSpace(input.Title) == "" {

@@ -246,7 +246,7 @@ func TestVideoUsecaseCompleteUploadRejectsMissingOrInvalidStoredObject(t *testin
 	}{
 		{name: "missing", err: entity.ErrObjectNotFound},
 		{name: "empty", info: repository.StoredObjectInfo{SizeBytes: 0, ContentType: "video/mp4"}},
-		{name: "too large", info: repository.StoredObjectInfo{SizeBytes: maxVideoSizeBytes + 1, ContentType: "video/mp4"}},
+		{name: "too large", info: repository.StoredObjectInfo{SizeBytes: entity.MaxSourceVideoSizeBytes + 1, ContentType: "video/mp4"}},
 		{name: "unsupported content type", info: repository.StoredObjectInfo{SizeBytes: 100, ContentType: "video/webm"}},
 	}
 

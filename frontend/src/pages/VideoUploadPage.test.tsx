@@ -159,7 +159,47 @@ describe("VideoUploadPage", () => {
     );
   });
 
-  it("30MBを超える動画をAPI送信前に拒否する", async () => {
+  it("39,062,300 bytesの動画を投稿開始へ渡せる", async () => {
+    const user = userEvent.setup();
+    mockVideoMetadata();
+    startVideoUploadMock.mockResolvedValue(startUploadResponse());
+    uploadVideoMock.mockResolvedValue(undefined);
+    completeVideoUploadMock.mockResolvedValue({
+      id: 10,
+      processing_status: "uploaded",
+      publish_status: "private",
+    });
+
+    renderPage();
+    await user.type(screen.getByLabelText("タイトル"), "圧縮対象テスト");
+
+    const largeFile = new File(["video"], "large.mp4", {
+      type: "video/mp4",
+      lastModified: 1,
+    });
+    Object.defineProperty(largeFile, "size", {
+      configurable: true,
+      value: 39_062_300,
+    });
+
+    fireEvent.change(screen.getByLabelText("動画ファイル"), {
+      target: {
+        files: [largeFile],
+      },
+    });
+
+    expect(await screen.findByText("2.0秒")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "動画を投稿" }));
+
+    expect(startVideoUploadMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        file_size_bytes: 39_062_300,
+      }),
+      expect.any(String),
+    );
+  });
+
+  it("50MBを超える動画をAPI送信前に拒否する", async () => {
     renderPage();
 
     const oversizedFile = new File(["video"], "large.mp4", {
@@ -167,7 +207,7 @@ describe("VideoUploadPage", () => {
     });
     Object.defineProperty(oversizedFile, "size", {
       configurable: true,
-      value: 30_000_001,
+      value: 50_000_001,
     });
 
     fireEvent.change(screen.getByLabelText("動画ファイル"), {
@@ -177,7 +217,7 @@ describe("VideoUploadPage", () => {
     });
 
     expect(
-      await screen.findByText("動画の容量は30MB以下にしてください"),
+      await screen.findByText("動画の容量は50MB以下にしてください"),
     ).toBeInTheDocument();
     expect(startVideoUploadMock).not.toHaveBeenCalled();
   });

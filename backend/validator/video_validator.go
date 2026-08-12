@@ -16,11 +16,10 @@ import (
 )
 
 const (
-	defaultVideoListLimit           = 20
-	maxVideoListLimit               = 100
-	maxVideoTitleLength             = 100
-	maxVideoDescriptionLength       = 1000
-	maxVideoDeclaredSizeBytes int64 = 30_000_000
+	defaultVideoListLimit     = 20
+	maxVideoListLimit         = 100
+	maxVideoTitleLength       = 100
+	maxVideoDescriptionLength = 1000
 )
 
 type VideoValidatorConfig struct {
@@ -101,7 +100,7 @@ func (v *videoValidator) ValidateStartUpload(title, description, category, conte
 	}
 
 	if declaredSize < 1 ||
-		declaredSize > maxVideoDeclaredSizeBytes {
+		declaredSize > entity.MaxSourceVideoSizeBytes {
 		return usecase.StartUploadInput{}, entity.ErrInvalidInput
 	}
 

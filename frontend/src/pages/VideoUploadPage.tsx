@@ -15,7 +15,7 @@ import type { CategoryCode, VideoFileContentType } from "../types/video";
 
 const maxTitleLength = 100;
 const maxDescriptionLength = 1000;
-const maxFileSizeBytes = 30_000_000;
+const maxFileSizeBytes = 50_000_000;
 const maxDurationSeconds = 10;
 const maxVideoWidth = 1080;
 const maxVideoHeight = 1920;
@@ -124,7 +124,7 @@ function validateSelectedVideo(
   }
 
   if (file.size > maxFileSizeBytes) {
-    return "動画の容量は30MB以下にしてください";
+    return "動画の容量は50MB以下にしてください";
   }
 
   if (contentType === null) {
@@ -334,7 +334,7 @@ export default function VideoUploadPage() {
     }
 
     if (file.size > maxFileSizeBytes) {
-      setErrorMessage("動画の容量は30MB以下にしてください");
+      setErrorMessage("動画の容量は50MB以下にしてください");
       event.target.value = "";
       return;
     }
@@ -572,7 +572,7 @@ export default function VideoUploadPage() {
                       動画を選択するとPreviewを表示
                     </p>
                     <p className="mt-2 text-xs leading-6 text-stone-500">
-                      MP4 / MOV・最大10秒・最大30MB・1080×1920以下・9:16
+                      MP4 / MOV・最大10秒・最大50MB・1080×1920以下・9:16
                     </p>
                   </div>
                 </div>

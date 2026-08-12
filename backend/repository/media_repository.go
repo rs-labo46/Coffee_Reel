@@ -125,6 +125,7 @@ func (r *mediaRepository) Transcode(ctx context.Context, inputPath, outputPath s
 		return entity.ErrInvalidInput
 	}
 
+	// Web配信用はCRF 23を基準にし、ピークBitrateを3Mbpsへ抑える。
 	args := []string{
 		"-nostdin",
 		"-hide_banner",
@@ -135,7 +136,12 @@ func (r *mediaRepository) Transcode(ctx context.Context, inputPath, outputPath s
 		"-vf", "scale=720:1280:flags=lanczos,fps=30",
 		"-c:v", "libx264",
 		"-preset", "medium",
+		"-crf", "23",
+		"-maxrate", "3000k",
+		"-bufsize", "6000k",
 		"-pix_fmt", "yuv420p",
+		"-map_metadata", "-1",
+		"-map_chapters", "-1",
 		"-movflags", "+faststart",
 	}
 
@@ -416,7 +422,7 @@ func sourceMetaFromProbe(probe ffprobeOutput, detectedMIME string) (entity.Sourc
 		meta.AudioCodec = strings.ToLower(strings.TrimSpace(audio.CodecName))
 	}
 
-	if meta.SizeBytes > 30_000_000 {
+	if meta.SizeBytes > entity.MaxSourceVideoSizeBytes {
 		return entity.SourceVideoMeta{}, &MediaError{
 			Code:      entity.VideoFailureSizeExceeded,
 			Retryable: false,
