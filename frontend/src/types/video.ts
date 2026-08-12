@@ -98,6 +98,7 @@ export type PublicVideoListResponse = {
 export type PublicVideoSearchQuery = {
   title?: string;
   category?: CategoryCode;
+  author_id?: number;
   limit?: number;
   cursor?: string;
 };

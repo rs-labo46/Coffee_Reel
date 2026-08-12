@@ -6,6 +6,7 @@ import AdminUserDetailPage from "../pages/AdminUserDetailPage";
 import AdminUsersPage from "../pages/AdminUsersPage";
 import AdminVideoDetailPage from "../pages/AdminVideoDetailPage";
 import AdminVideosPage from "../pages/AdminVideosPage";
+import AuthorVideosPage from "../pages/AuthorVideosPage";
 import LoginPage from "../pages/LoginPage";
 import MyVideosPage from "../pages/MyVideosPage";
 import NotFoundPage from "../pages/NotFoundPage";
@@ -23,6 +24,10 @@ export default function AppRouter() {
       <Route path="/" element={<ReelPage />} />
       <Route path="/reels" element={<ReelPage />} />
       <Route path="/search" element={<SearchPage />} />
+      <Route
+        path="/videos/author/:author_id"
+        element={<AuthorVideosPage />}
+      />
       <Route path="/videos/:video_id" element={<VideoDetailPage />} />
       <Route path="/signup" element={<SignupPage />} />
       <Route path="/login" element={<LoginPage />} />

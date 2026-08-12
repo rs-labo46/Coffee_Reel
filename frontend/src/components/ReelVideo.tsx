@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 
+import BookmarkIcon from "./BookmarkIcon";
 import LikeButton from "./LikeButton";
 import type { CategoryCode, PublicVideo, VideoLikeState } from "../types/video";
 
@@ -203,7 +204,13 @@ export default function ReelVideo({
                 <span className="rounded-full bg-amber-300 px-3 py-1 text-stone-950">
                   {categoryLabelOf(video.category)}
                 </span>
-                <span className="text-stone-200">{video.author.name}</span>
+                <Link
+                  to={`/videos/author/${video.author.id}`}
+                  aria-label={`${video.author.name}の公開動画を見る`}
+                  className="text-stone-200 transition hover:text-amber-200"
+                >
+                  {video.author.name}
+                </Link>
               </div>
 
               <Link
@@ -224,10 +231,39 @@ export default function ReelVideo({
               <button
                 type="button"
                 onClick={handleToggleMuted}
-                className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-black/50 text-xs font-black text-white backdrop-blur-sm transition hover:bg-black/70"
+                className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-black/50 text-white backdrop-blur-sm transition hover:bg-black/70"
                 aria-label={isMuted ? "音声をオン" : "音声をオフ"}
               >
-                {isMuted ? "OFF" : "ON"}
+                {isMuted ? (
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-5 w-5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M11 5 6.5 9H3v6h3.5l4.5 4V5Z" />
+                    <path d="M4 4 20 20" />
+                  </svg>
+                ) : (
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-5 w-5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M11 5 6.5 9H3v6h3.5l4.5 4V5Z" />
+                    <path d="M15 9.5a4 4 0 0 1 0 5" />
+                    <path d="M17.5 7a7.5 7.5 0 0 1 0 10" />
+                  </svg>
+                )}
               </button>
 
               <LikeButton
@@ -238,7 +274,7 @@ export default function ReelVideo({
                 onChange={onLikeChange}
                 onNotFound={() => onLikeNotFound(video.id)}
                 onError={onLikeError}
-                className="min-w-20 border-white/20 bg-black/50 px-3 text-xs backdrop-blur-sm hover:bg-black/70"
+                className="h-11 w-11 border-white/20 bg-black/50 backdrop-blur-sm hover:bg-black/70"
               />
 
               <button
@@ -246,15 +282,23 @@ export default function ReelVideo({
                 onClick={() => onToggleSaved(video)}
                 disabled={isSaving}
                 aria-pressed={video.is_saved}
-                className="inline-flex min-h-11 min-w-20 items-center justify-center rounded-full border border-white/20 bg-black/50 px-4 text-xs font-black text-white backdrop-blur-sm transition hover:bg-black/70 disabled:cursor-not-allowed disabled:opacity-50"
+                aria-busy={isSaving}
+                aria-label={
+                  isSaving
+                    ? "保存を更新中"
+                    : video.is_saved
+                      ? "保存を解除"
+                      : isAuthenticated
+                        ? "保存"
+                        : "ログインして保存"
+                }
+                className={`grid h-11 w-11 place-items-center rounded-full border bg-black/50 text-white backdrop-blur-sm transition hover:bg-black/70 disabled:cursor-not-allowed disabled:opacity-50 ${
+                  video.is_saved
+                    ? "border-amber-300/60 text-amber-300"
+                    : "border-white/20"
+                }`}
               >
-                {isSaving
-                  ? "更新中"
-                  : video.is_saved
-                    ? "保存済み"
-                    : isAuthenticated
-                      ? "保存"
-                      : "ログイン"}
+                <BookmarkIcon filled={video.is_saved} />
               </button>
             </div>
           </div>

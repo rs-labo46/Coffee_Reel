@@ -126,6 +126,7 @@ type PublicVideoCursor struct {
 type PublicVideoListInput struct {
 	Title        string
 	Category     *entity.CategoryCode
+	AuthorID     *uint64
 	Limit        int
 	Cursor       *PublicVideoCursor
 	ViewerUserID *uint64
@@ -318,6 +319,10 @@ func (r *videoRepository) ListPublic(ctx context.Context, input PublicVideoListI
 		query = query.Where("videos.category = ?", *input.Category)
 	}
 
+	if input.AuthorID != nil {
+		query = query.Where("videos.user_id = ?", *input.AuthorID)
+	}
+
 	if input.SearchMode == PublicVideoSearchMatched && input.Title != "" {
 		query = query.Where(
 			"LOWER(videos.title) LIKE ? ESCAPE '\\'",
@@ -383,6 +388,9 @@ func validatePublicVideoListInput(input PublicVideoListInput) error {
 		return entity.ErrInvalidInput
 	}
 	if input.Category != nil && !input.Category.IsValid() {
+		return entity.ErrInvalidInput
+	}
+	if input.AuthorID != nil && *input.AuthorID == 0 {
 		return entity.ErrInvalidInput
 	}
 

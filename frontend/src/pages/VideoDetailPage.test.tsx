@@ -58,7 +58,9 @@ describe("VideoDetailPage", () => {
     await flushAsync();
 
     expect(screen.getByRole("heading", { name: "ハンドドリップの蒸らし方" })).toBeInTheDocument();
-    expect(screen.getByText("コーヒー太郎")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "コーヒー太郎の公開動画を見る" }),
+    ).toHaveAttribute("href", "/videos/author/1");
     expect(screen.getByText("抽出")).toBeInTheDocument();
     expect(screen.getByText("30秒蒸らしてからゆっくり注ぎます")).toBeInTheDocument();
     expect(screen.getByText("保存一覧")).toHaveAttribute(
@@ -100,7 +102,11 @@ describe("VideoDetailPage", () => {
     renderDetail("22");
     await flushAsync();
 
-    fireEvent.click(screen.getByRole("button", { name: "動画を保存" }));
+    const saveButton = screen.getByRole("button", { name: "動画を保存" });
+    expect(saveButton).toHaveTextContent("");
+    expect(saveButton.querySelector("svg")).not.toBeNull();
+
+    fireEvent.click(saveButton);
     await flushAsync();
 
     expect(saveVideoMock).toHaveBeenCalledWith(22);

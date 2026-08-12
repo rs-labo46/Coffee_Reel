@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { ApiClientError } from "../api/client";
 import { getVideoDetail, removeSavedVideo, saveVideo } from "../api/video";
 import { useAuth } from "../auth/useAuth";
+import BookmarkIcon from "../components/BookmarkIcon";
 import LikeButton from "../components/LikeButton";
 import type { CategoryCode, PublicVideo, VideoLikeState } from "../types/video";
 
@@ -399,9 +400,13 @@ export default function VideoDetailPage() {
               {detail.title}
             </h1>
 
-            <p className="mt-4 text-sm font-black text-amber-200">
+            <Link
+              to={`/videos/author/${detail.author.id}`}
+              aria-label={`${detail.author.name}の公開動画を見る`}
+              className="mt-4 inline-block text-sm font-black text-amber-200 transition hover:text-amber-100"
+            >
               {detail.author.name}
-            </p>
+            </Link>
 
             {detail.description !== "" && (
               <p className="mt-5 whitespace-pre-wrap break-words text-sm leading-7 text-stone-300">
@@ -410,7 +415,7 @@ export default function VideoDetailPage() {
             )}
 
             {/* ---追加--- */}
-            <div className="mt-7 grid gap-3 sm:grid-cols-2">
+            <div className="mt-7 flex items-center gap-3">
               <LikeButton
                 videoID={detail.id}
                 likeCount={detail.like_count}
@@ -419,20 +424,29 @@ export default function VideoDetailPage() {
                 onChange={handleLikeChange}
                 onNotFound={handleLikeNotFound}
                 onError={handleLikeError}
-                className="min-h-12 w-full rounded-2xl"
+                className="h-12 w-12 rounded-2xl"
               />
 
               <button
                 type="button"
                 onClick={() => void handleToggleSaved()}
                 disabled={isSaving}
-                className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-amber-300 px-5 py-3 text-sm font-black text-stone-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
+                aria-pressed={detail.is_saved}
+                aria-busy={isSaving}
+                aria-label={
+                  isSaving
+                    ? "保存を更新中"
+                    : detail.is_saved
+                      ? "保存を解除"
+                      : "動画を保存"
+                }
+                className={`grid h-12 w-12 place-items-center rounded-2xl border transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                  detail.is_saved
+                    ? "border-amber-300 bg-amber-300 text-stone-950 hover:bg-amber-200"
+                    : "border-white/15 bg-black/20 text-stone-100 hover:border-amber-300/50 hover:bg-amber-300/10"
+                }`}
               >
-                {isSaving
-                  ? "更新中"
-                  : detail.is_saved
-                    ? "保存を解除"
-                    : "動画を保存"}
+                <BookmarkIcon filled={detail.is_saved} />
               </button>
             </div>
             {/* ---追加--- */}

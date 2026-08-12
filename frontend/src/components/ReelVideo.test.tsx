@@ -79,6 +79,35 @@ describe("ReelVideo", () => {
     expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
   });
 
+  it("投稿者名から投稿者の公開動画一覧へ移動できる", () => {
+    renderVideo();
+
+    expect(
+      screen.getByRole("link", { name: "コーヒー太郎の公開動画を見る" }),
+    ).toHaveAttribute("href", "/videos/author/1");
+  });
+
+  it("音声ON/OFFをSVGアイコンだけで切り替える", async () => {
+    const user = userEvent.setup();
+
+    renderVideo();
+
+    const videoElement =
+      screen.getByLabelText("ハンドドリップの蒸らし方を再生");
+    const mutedButton = screen.getByRole("button", { name: "音声をオン" });
+
+    expect(videoElement).toHaveProperty("muted", true);
+    expect(mutedButton).toHaveTextContent("");
+    expect(mutedButton.querySelector("svg")).not.toBeNull();
+
+    await user.click(mutedButton);
+
+    const unmutedButton = screen.getByRole("button", { name: "音声をオフ" });
+    expect(videoElement).toHaveProperty("muted", false);
+    expect(unmutedButton).toHaveTextContent("");
+    expect(unmutedButton.querySelector("svg")).not.toBeNull();
+  });
+
   it("保存Buttonから対象動画を親処理へ渡す", async () => {
     const user = userEvent.setup();
     const onToggleSaved = vi.fn();
@@ -86,17 +115,21 @@ describe("ReelVideo", () => {
 
     renderVideo({ video, onToggleSaved });
 
-    await user.click(screen.getByRole("button", { name: "保存" }));
+    const saveButton = screen.getByRole("button", { name: "保存" });
+    expect(saveButton).toHaveTextContent("");
+    expect(saveButton.querySelector("svg")).not.toBeNull();
+
+    await user.click(saveButton);
 
     expect(onToggleSaved).toHaveBeenCalledWith(video);
   });
 
-  it("未認証時は保存ButtonをLogin表示にする", () => {
+  it("未認証時も保存操作をIconだけで表示する", () => {
     renderVideo({ isAuthenticated: false });
 
-    expect(
-      screen.getByRole("button", { name: "ログイン" }),
-    ).toBeInTheDocument();
+    const saveButton = screen.getByRole("button", { name: "ログインして保存" });
+    expect(saveButton).toHaveTextContent("");
+    expect(saveButton.querySelector("svg")).not.toBeNull();
   });
 
   it("再生失敗時に再試行Buttonを表示する", async () => {

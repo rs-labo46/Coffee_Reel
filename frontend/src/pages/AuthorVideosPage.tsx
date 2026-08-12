@@ -1,38 +1,37 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router";
+import { Link, useParams } from "react-router";
 
 import { ApiClientError } from "../api/client";
-import { listSavedVideos, removeSavedVideo } from "../api/video";
+import { listReels } from "../api/video";
 import { useAuth } from "../auth/useAuth";
-import BookmarkIcon from "../components/BookmarkIcon";
+import LikeButton from "../components/LikeButton";
 import VideoCard from "../components/VideoCard";
-import type { PublicVideo } from "../types/video";
+import type { PublicVideo, VideoLikeState } from "../types/video";
 
-const initialSavedVideoPromises = new Map<
-  number,
-  ReturnType<typeof listSavedVideos>
+const initialAuthorVideoPromises = new Map<
+  string,
+  ReturnType<typeof listReels>
 >();
 
-// React StrictModeの再実行中にUser単位の初回保存一覧Requestを共有
-function requestInitialSavedVideos(
-  userID: number,
-): ReturnType<typeof listSavedVideos> {
-  const existingPromise = initialSavedVideoPromises.get(userID);
+function requestInitialAuthorVideos(
+  requestKey: string,
+  authorID: number,
+): ReturnType<typeof listReels> {
+  const existingPromise = initialAuthorVideoPromises.get(requestKey);
 
   if (existingPromise !== undefined) {
     return existingPromise;
   }
 
-  const request = listSavedVideos().finally(() => {
-    initialSavedVideoPromises.delete(userID);
+  const request = listReels({ author_id: authorID }).finally(() => {
+    initialAuthorVideoPromises.delete(requestKey);
   });
-  initialSavedVideoPromises.set(userID, request);
+  initialAuthorVideoPromises.set(requestKey, request);
 
   return request;
 }
 
-// Cursor追加取得結果をID重複なしで結合
-function appendSavedVideos(
+function appendVideos(
   currentVideos: PublicVideo[],
   nextVideos: PublicVideo[],
 ): PublicVideo[] {
@@ -44,7 +43,19 @@ function appendSavedVideos(
   ];
 }
 
-// API Errorを保存一覧画面用Messageへ変換
+function parseAuthorID(rawAuthorID: string | undefined): number | null {
+  if (rawAuthorID === undefined || !/^\d+$/.test(rawAuthorID)) {
+    return null;
+  }
+
+  const authorID = Number(rawAuthorID);
+  if (!Number.isSafeInteger(authorID) || authorID < 1) {
+    return null;
+  }
+
+  return authorID;
+}
+
 function errorViewOf(
   error: unknown,
   fallbackMessage: string,
@@ -65,38 +76,39 @@ function errorViewOf(
   };
 }
 
-// 自分の保存動画、Cursor追加取得、保存解除を管理
-export default function SavedVideosPage() {
-  const { user } = useAuth();
+type AuthorVideosPageContentProps = {
+  authorID: number;
+  isAuthenticated: boolean;
+  requestKey: string;
+};
+
+function AuthorVideosPageContent({
+  authorID,
+  isAuthenticated,
+  requestKey,
+}: AuthorVideosPageContentProps) {
   const loadMoreInFlightRef = useRef(false);
-  const removingVideoIDsRef = useRef<Set<number>>(new Set());
 
   const [videos, setVideos] = useState<PublicVideo[]>([]);
+  const [authorName, setAuthorName] = useState<string>("");
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState<boolean>(false);
   const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
-  const [removingVideoIDs, setRemovingVideoIDs] = useState<Set<number>>(
-    new Set(),
-  );
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [requestID, setRequestID] = useState<string>("");
 
-  // 認証Userの保存一覧先頭Pageを取得
   useEffect(() => {
-    if (user === null) {
-      return;
-    }
-
     let isActive = true;
 
-    requestInitialSavedVideos(user.id)
+    requestInitialAuthorVideos(requestKey, authorID)
       .then((response) => {
         if (!isActive) {
           return;
         }
 
         setVideos(response.items);
+        setAuthorName(response.items[0]?.author.name ?? "");
         setNextCursor(response.next_cursor);
         setHasMore(response.has_more);
       })
@@ -107,7 +119,7 @@ export default function SavedVideosPage() {
 
         const errorView = errorViewOf(
           error,
-          "保存した動画を取得できませんでした",
+          "投稿者の公開動画を取得できませんでした",
         );
         setErrorMessage(errorView.message);
         setRequestID(errorView.requestID);
@@ -121,9 +133,8 @@ export default function SavedVideosPage() {
     return () => {
       isActive = false;
     };
-  }, [user]);
+  }, [authorID, requestKey]);
 
-  // 次Cursorを使って保存一覧を追加取得
   async function handleLoadMore(): Promise<void> {
     if (!hasMore || nextCursor === null || loadMoreInFlightRef.current) {
       return;
@@ -135,19 +146,19 @@ export default function SavedVideosPage() {
     setRequestID("");
 
     try {
-      const response = await listSavedVideos({
+      const response = await listReels({
+        author_id: authorID,
         cursor: nextCursor,
       });
-
       setVideos((currentVideos) =>
-        appendSavedVideos(currentVideos, response.items),
+        appendVideos(currentVideos, response.items),
       );
       setNextCursor(response.next_cursor);
       setHasMore(response.has_more);
     } catch (error: unknown) {
       const errorView = errorViewOf(
         error,
-        "次の保存動画を取得できませんでした",
+        "次の公開動画を取得できませんでした",
       );
       setErrorMessage(errorView.message);
       setRequestID(errorView.requestID);
@@ -157,41 +168,30 @@ export default function SavedVideosPage() {
     }
   }
 
-  // 保存解除成功後に対象Videoを一覧から除外
-  async function handleRemoveSaved(videoID: number): Promise<void> {
-    if (removingVideoIDsRef.current.has(videoID)) {
-      return;
-    }
+  function handleLikeChange(state: VideoLikeState): void {
+    setVideos((currentVideos) =>
+      currentVideos.map((video) =>
+        video.id === state.video_id
+          ? {
+              ...video,
+              like_count: state.like_count,
+              is_liked: state.is_liked,
+            }
+          : video,
+      ),
+    );
+  }
 
-    removingVideoIDsRef.current.add(videoID);
+  function handleLikeNotFound(videoID: number): void {
+    setVideos((currentVideos) =>
+      currentVideos.filter((video) => video.id !== videoID),
+    );
+  }
 
-    setRemovingVideoIDs((currentIDs) => {
-      const nextIDs = new Set(currentIDs);
-      nextIDs.add(videoID);
-      return nextIDs;
-    });
-    setErrorMessage("");
-    setRequestID("");
-
-    try {
-      await removeSavedVideo(videoID);
-
-      setVideos((currentVideos) =>
-        currentVideos.filter((video) => video.id !== videoID),
-      );
-    } catch (error: unknown) {
-      const errorView = errorViewOf(error, "動画の保存を解除できませんでした");
-      setErrorMessage(errorView.message);
-      setRequestID(errorView.requestID);
-    } finally {
-      removingVideoIDsRef.current.delete(videoID);
-
-      setRemovingVideoIDs((currentIDs) => {
-        const nextIDs = new Set(currentIDs);
-        nextIDs.delete(videoID);
-        return nextIDs;
-      });
-    }
+  function handleLikeError(error: unknown): void {
+    const errorView = errorViewOf(error, "いいね状態を更新できませんでした");
+    setErrorMessage(errorView.message);
+    setRequestID(errorView.requestID);
   }
 
   return (
@@ -200,17 +200,16 @@ export default function SavedVideosPage() {
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-xs font-black tracking-[0.2em] text-amber-300 uppercase">
-              Saved videos
+              Author videos
             </p>
-
             <h1 className="mt-2 text-3xl font-black text-white sm:text-4xl">
-              保存した動画
+              {authorName === "" ? "投稿者の公開動画" : authorName}
             </h1>
           </div>
 
           <nav
             className="flex flex-wrap items-center gap-3"
-            aria-label="保存一覧ナビゲーション"
+            aria-label="投稿者動画一覧ナビゲーション"
           >
             <Link
               to="/"
@@ -218,12 +217,11 @@ export default function SavedVideosPage() {
             >
               リール
             </Link>
-
             <Link
-              to="/me/videos"
+              to="/search"
               className="rounded-full border border-white/10 px-4 py-2 text-sm font-bold text-stone-200 transition hover:border-amber-300/50 hover:text-amber-200"
             >
-              自分の投稿
+              検索
             </Link>
           </nav>
         </header>
@@ -234,7 +232,6 @@ export default function SavedVideosPage() {
             role="alert"
           >
             <p>{errorMessage}</p>
-
             {requestID !== "" && (
               <p className="mt-1 break-all text-xs text-red-200/70">
                 Request ID: {requestID}
@@ -249,53 +246,40 @@ export default function SavedVideosPage() {
             role="status"
           >
             <span className="h-5 w-5 animate-spin rounded-full border-2 border-amber-300 border-t-transparent" />
-            保存した動画を読み込んでいます
+            投稿者の公開動画を読み込んでいます
           </div>
-        ) : videos.length === 0 ? (
+        ) : videos.length === 0 && errorMessage === "" ? (
           <section className="mt-10 rounded-[2rem] border border-white/10 bg-white/[0.05] px-6 py-14 text-center">
             <p className="text-4xl" aria-hidden="true">
               ☕
             </p>
-
             <h2 className="mt-4 text-2xl font-black text-white">
-              保存した動画はまだありません
+              公開動画はありません
             </h2>
-            <Link
-              to="/"
-              className="mt-7 inline-flex min-h-12 items-center justify-center rounded-2xl bg-amber-300 px-6 py-3 text-sm font-black text-stone-950 transition hover:bg-amber-200"
-            >
-              リールを見る
-            </Link>
           </section>
         ) : (
           <section
             className="mt-8 grid gap-5 lg:grid-cols-2"
-            aria-label="保存した動画一覧"
+            aria-label="投稿者の公開動画一覧"
           >
-            {videos.map((video) => {
-              const isRemoving = removingVideoIDs.has(video.id);
-
-              return (
-                <VideoCard
-                  key={video.id}
-                  video={video}
-                  to={`/videos/${video.id}`}
-                  action={
-                    <button
-                      type="button"
-                      onClick={() => void handleRemoveSaved(video.id)}
-                      disabled={isRemoving}
-                      aria-pressed="true"
-                      aria-busy={isRemoving}
-                      aria-label={isRemoving ? "保存を解除中" : "保存を解除"}
-                      className="grid h-10 w-10 place-items-center rounded-full border border-red-300/30 text-red-100 transition hover:bg-red-300/10 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <BookmarkIcon filled className="h-4 w-4" />
-                    </button>
-                  }
-                />
-              );
-            })}
+            {videos.map((video) => (
+              <VideoCard
+                key={video.id}
+                video={video}
+                to={`/videos/${video.id}`}
+                action={
+                  <LikeButton
+                    videoID={video.id}
+                    likeCount={video.like_count}
+                    isLiked={video.is_liked}
+                    isAuthenticated={isAuthenticated}
+                    onChange={handleLikeChange}
+                    onNotFound={() => handleLikeNotFound(video.id)}
+                    onError={handleLikeError}
+                  />
+                }
+              />
+            ))}
           </section>
         )}
 
@@ -313,5 +297,58 @@ export default function SavedVideosPage() {
         )}
       </div>
     </main>
+  );
+}
+
+function AuthorRouteError() {
+  return (
+    <main className="min-h-dvh bg-[#100b08] px-4 py-6 text-stone-100 sm:px-6 lg:px-10">
+      <div className="mx-auto w-full max-w-5xl">
+        <div
+          className="rounded-2xl border border-red-300/25 bg-red-400/10 px-4 py-3 text-sm font-bold text-red-100"
+          role="alert"
+        >
+          投稿者IDが正しくありません
+        </div>
+        <Link
+          to="/"
+          className="mt-6 inline-flex rounded-full border border-white/10 px-4 py-2 text-sm font-bold text-stone-200 transition hover:border-amber-300/50 hover:text-amber-200"
+        >
+          リールへ戻る
+        </Link>
+      </div>
+    </main>
+  );
+}
+
+export default function AuthorVideosPage() {
+  const { author_id: rawAuthorID } = useParams<{ author_id: string }>();
+  const authorID = parseAuthorID(rawAuthorID);
+  const { isAuthenticated, isLoading: isAuthLoading, user } = useAuth();
+
+  if (isAuthLoading) {
+    return (
+      <main className="grid min-h-dvh place-items-center bg-[#100b08] text-stone-300">
+        <p role="status" className="text-sm font-bold">
+          読み込んでいます
+        </p>
+      </main>
+    );
+  }
+
+  if (authorID === null) {
+    return <AuthorRouteError />;
+  }
+
+  const authKey = isAuthenticated && user !== null ? `user:${user.id}` : "guest";
+  const requestKey = `${authKey}|author:${authorID}`;
+
+  return (
+    <AuthorVideosPageContent
+      key={requestKey}
+      authorID={authorID}
+      isAuthenticated={isAuthenticated}
+      requestKey={requestKey}
+    />
   );
 }

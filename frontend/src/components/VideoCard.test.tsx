@@ -16,11 +16,15 @@ describe("VideoCard", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText("コーヒー太郎")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "コーヒー太郎の公開動画を見る" }),
+    ).toHaveAttribute("href", "/videos/author/1");
     expect(
       screen.getByText("30秒蒸らしてからゆっくり注ぎます"),
     ).toBeInTheDocument();
-    expect(screen.getByText("保存済み")).toBeInTheDocument();
+    const savedStatus = screen.getByLabelText("保存済み");
+    expect(savedStatus).toHaveTextContent("");
+    expect(savedStatus.querySelector("svg")).not.toBeNull();
     expect(
       screen.getByRole("link", { name: "ハンドドリップの蒸らし方" }),
     ).toHaveAttribute("href", "/videos/10");
