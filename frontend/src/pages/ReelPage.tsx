@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router";
 import { ApiClientError } from "../api/client";
 import { listReels, removeSavedVideo, saveVideo } from "../api/video";
 import { useAuth } from "../auth/useAuth";
+import BookmarkIcon from "../components/BookmarkIcon";
 import ReelVideo from "../components/ReelVideo";
 import type { PublicVideo, VideoLikeState } from "../types/video";
 
@@ -368,18 +369,7 @@ export default function ReelPage() {
                   title="保存一覧"
                   className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/15 text-stone-200 transition hover:bg-white/[0.06] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-amber-300 sm:flex sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2"
                 >
-                  <svg
-                    aria-hidden="true"
-                    viewBox="0 0 24 24"
-                    className="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-4-6 4V4.5Z" />
-                  </svg>
+                  <BookmarkIcon className="h-4 w-4" />
                   <span className="hidden text-xs font-black sm:inline">
                     保存一覧
                   </span>

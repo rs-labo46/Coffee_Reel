@@ -132,6 +132,56 @@ func TestVideoControllerListReelsGuestSearchReturnsResultTypeAndLikeState(t *tes
 	}
 }
 
+func TestVideoControllerListReelsPassesAuthorID(t *testing.T) {
+	videos := &videoUsecaseControllerMock{listReelsFunc: func(_ context.Context, viewer *entity.User, input usecase.PublicVideoListInput) (usecase.PublicVideoListResult, error) {
+		if viewer != nil {
+			t.Fatalf("viewer = %#v, want guest", viewer)
+		}
+		if input.AuthorID == nil || *input.AuthorID != 42 || input.Limit != 20 {
+			t.Fatalf("input = %#v", input)
+		}
+		if input.Title != "" || input.Category != nil {
+			t.Fatalf("unexpected search filters = %#v", input)
+		}
+		return usecase.PublicVideoListResult{ResultType: usecase.PublicSearchAll}, nil
+	}}
+	controller := NewVideoController(videos, newSearchLikeVideoValidator(t))
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/videos?author_id=42", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	if err := controller.ListReels(c); err != nil {
+		t.Fatalf("ListReels() error = %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestVideoControllerListReelsRejectsInvalidAuthorID(t *testing.T) {
+	called := false
+	videos := &videoUsecaseControllerMock{listReelsFunc: func(context.Context, *entity.User, usecase.PublicVideoListInput) (usecase.PublicVideoListResult, error) {
+		called = true
+		return usecase.PublicVideoListResult{}, nil
+	}}
+	controller := NewVideoController(videos, newSearchLikeVideoValidator(t))
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/videos?author_id=0", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	if err := controller.ListReels(c); err != nil {
+		t.Fatalf("ListReels() error = %v", err)
+	}
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body=%s", rec.Code, rec.Body.String())
+	}
+	if called {
+		t.Fatal("usecase was called for invalid author_id")
+	}
+}
+
 func TestVideoControllerDetailReturnsLikeAndSavedState(t *testing.T) {
 	createdAt := time.Date(2026, 8, 8, 13, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 	videos := &videoUsecaseControllerMock{getDetailFunc: func(_ context.Context, viewer *entity.User, videoID uint64) (usecase.PublicVideoResult, error) {

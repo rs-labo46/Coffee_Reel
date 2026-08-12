@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router";
 
 import type { CategoryCode, OwnedVideo, PublicVideo } from "../types/video";
+import BookmarkIcon from "./BookmarkIcon";
 import VideoStatusBadge from "./VideoStatusBadge";
 
 type VideoCardProps = {
@@ -113,9 +114,13 @@ export default function VideoCard({ video, to, action }: VideoCardProps) {
             )}
 
             {!ownedVideo && (
-              <p className="mt-2 text-sm font-bold text-stone-400">
+              <Link
+                to={`/videos/author/${video.author.id}`}
+                aria-label={`${video.author.name}の公開動画を見る`}
+                className="mt-2 inline-block text-sm font-bold text-stone-400 transition hover:text-amber-200"
+              >
                 {video.author.name}
-              </p>
+              </Link>
             )}
           </div>
 
@@ -138,7 +143,12 @@ export default function VideoCard({ video, to, action }: VideoCardProps) {
         )}
 
         {!ownedVideo && video.is_saved && (
-          <p className="mt-3 text-xs font-black text-amber-300">保存済み</p>
+          <span
+            aria-label="保存済み"
+            className="mt-3 inline-flex w-fit text-amber-300"
+          >
+            <BookmarkIcon filled className="h-4 w-4" />
+          </span>
         )}
 
         {action !== undefined && <div className="mt-auto pt-5">{action}</div>}

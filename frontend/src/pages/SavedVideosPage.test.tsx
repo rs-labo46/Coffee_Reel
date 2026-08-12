@@ -107,7 +107,11 @@ describe("SavedVideosPage", () => {
     renderPage();
     await flushAsync();
 
-    fireEvent.click(screen.getByRole("button", { name: "保存を解除" }));
+    const removeButton = screen.getByRole("button", { name: "保存を解除" });
+    expect(removeButton).toHaveTextContent("");
+    expect(removeButton.querySelector("svg")).not.toBeNull();
+
+    fireEvent.click(removeButton);
     await flushAsync();
 
     expect(removeSavedVideoMock).toHaveBeenCalledWith(12);

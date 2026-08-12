@@ -119,6 +119,7 @@ type PublicVideoCursor struct {
 type PublicVideoListInput struct {
 	Title    string
 	Category *entity.CategoryCode
+	AuthorID *uint64
 	Limit    int
 	Cursor   *PublicVideoCursor
 }
@@ -368,7 +369,7 @@ func (u *videoUsecase) ListReels(ctx context.Context, viewer *entity.User, input
 		return PublicVideoListResult{}, err
 	}
 
-	filterHash, err := publicVideoFilterHash(input.Title, input.Category)
+	filterHash, err := publicVideoFilterHashWithAuthor(input.Title, input.Category, input.AuthorID)
 	if err != nil {
 		return PublicVideoListResult{}, err
 	}
@@ -650,6 +651,9 @@ func validatePublicVideoListInput(input PublicVideoListInput) error {
 	if input.Category != nil && !input.Category.IsValid() {
 		return entity.ErrInvalidInput
 	}
+	if input.AuthorID != nil && *input.AuthorID == 0 {
+		return entity.ErrInvalidInput
+	}
 	if input.Cursor != nil {
 		if !input.Cursor.ResultType.IsValid() ||
 			input.Cursor.CreatedAt.IsZero() ||
@@ -712,6 +716,33 @@ func publicVideoFilterHash(title string, category *entity.CategoryCode) (string,
 	return hex.EncodeToString(sum[:]), nil
 }
 
+func publicVideoFilterHashWithAuthor(title string, category *entity.CategoryCode, authorID *uint64) (string, error) {
+	if authorID == nil {
+		return publicVideoFilterHash(title, category)
+	}
+
+	type filterPayload struct {
+		Title    string `json:"title"`
+		Category string `json:"category"`
+		AuthorID uint64 `json:"author_id"`
+	}
+
+	categoryValue := ""
+	if category != nil {
+		categoryValue = string(*category)
+	}
+	payload, err := json.Marshal(filterPayload{
+		Title:    title,
+		Category: categoryValue,
+		AuthorID: *authorID,
+	})
+	if err != nil {
+		return "", fmt.Errorf("encode public video filter: %w", err)
+	}
+	sum := sha256.Sum256(payload)
+	return hex.EncodeToString(sum[:]), nil
+}
+
 func repositoryPublicVideoListInput(
 	input PublicVideoListInput,
 	viewerID *uint64,
@@ -732,6 +763,7 @@ func repositoryPublicVideoListInput(
 	return repository.PublicVideoListInput{
 		Title:        input.Title,
 		Category:     input.Category,
+		AuthorID:     input.AuthorID,
 		Limit:        input.Limit,
 		Cursor:       cursor,
 		ViewerUserID: viewerID,

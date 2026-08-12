@@ -107,6 +107,19 @@ describe("動画API", () => {
     );
   });
 
+  it("投稿者IDを公開一覧Queryとして送る", async () => {
+    apiRequestMock.mockResolvedValue(publicList);
+
+    await listReels({ author_id: 42 });
+
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      "/videos?limit=20&author_id=42",
+      {
+        method: "GET",
+      },
+    );
+  });
+
   it("公開検索へTitle・Category・CursorをURL Queryとして送る", async () => {
     const controller = new AbortController();
     apiRequestMock.mockResolvedValue({

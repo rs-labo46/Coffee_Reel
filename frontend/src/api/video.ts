@@ -147,6 +147,10 @@ function buildPublicListPath(
     searchParams.set("category", query.category);
   }
 
+  if (query.author_id !== undefined) {
+    searchParams.set("author_id", String(query.author_id));
+  }
+
   if (query.cursor !== undefined && query.cursor !== "") {
     searchParams.set("cursor", query.cursor);
   }

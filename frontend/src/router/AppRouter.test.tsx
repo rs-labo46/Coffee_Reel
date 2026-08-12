@@ -13,6 +13,10 @@ vi.mock("../pages/SearchPage", () => ({
   default: () => <p>SearchPage</p>,
 }));
 
+vi.mock("../pages/AuthorVideosPage", () => ({
+  default: () => <p>AuthorVideosPage</p>,
+}));
+
 vi.mock("../pages/VideoDetailPage", () => ({
   default: () => <p>VideoDetailPage</p>,
 }));
@@ -114,6 +118,11 @@ describe("AppRouter", () => {
   it("/searchへSearchPageを接続する", () => {
     renderRoute("/search?title=drip");
     expect(screen.getByText("SearchPage")).toBeInTheDocument();
+  });
+
+  it("/videos/author/:author_idへAuthorVideosPageを接続する", () => {
+    renderRoute("/videos/author/10");
+    expect(screen.getByText("AuthorVideosPage")).toBeInTheDocument();
   });
 
   it("/videos/:video_idへVideoDetailPageを接続する", () => {

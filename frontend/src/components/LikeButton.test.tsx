@@ -91,6 +91,8 @@ describe("LikeButton", () => {
       name: "ログインしていいね 12件",
     });
     expect(button).toHaveAttribute("aria-pressed", "false");
+    expect(button).toHaveTextContent("");
+    expect(button.querySelector("svg")).not.toBeNull();
 
     await user.click(button);
 

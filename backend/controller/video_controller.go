@@ -118,6 +118,7 @@ type ownedVideoListResponse struct {
 type publicVideoListRequest struct {
 	Title    string `query:"title"`
 	Category string `query:"category"`
+	AuthorID string `query:"author_id"`
 	Limit    string `query:"limit"`
 	Cursor   string `query:"cursor"`
 }
@@ -245,6 +246,7 @@ func (v *videoController) ListReels(c echo.Context) error {
 	query := c.QueryParams()
 	_, titleSpecified := query["title"]
 	_, categorySpecified := query["category"]
+	_, authorIDSpecified := query["author_id"]
 
 	input, err := v.validator.ValidatePublicListQuery(
 		req.Title,
@@ -256,6 +258,14 @@ func (v *videoController) ListReels(c echo.Context) error {
 	)
 	if err != nil {
 		return writeVideoError(c, err)
+	}
+
+	if authorIDSpecified {
+		authorID, err := v.validator.ValidateVideoID(req.AuthorID)
+		if err != nil {
+			return writeVideoError(c, err)
+		}
+		input.AuthorID = &authorID
 	}
 
 	result, err := v.videos.ListReels(
