@@ -277,8 +277,9 @@ func TestVideoValidatorValidateStartUploadDeclaredSizeBoundaries(t *testing.T) {
 		{name: "negative", size: -1, wantError: true},
 		{name: "zero", size: 0, wantError: true},
 		{name: "minimum", size: 1},
-		{name: "maximum", size: 30_000_000},
-		{name: "over maximum", size: 30_000_001, wantError: true},
+		{name: "39.1MB input", size: 39_062_300},
+		{name: "maximum", size: entity.MaxSourceVideoSizeBytes},
+		{name: "over maximum", size: entity.MaxSourceVideoSizeBytes + 1, wantError: true},
 	}
 
 	for _, tt := range tests {

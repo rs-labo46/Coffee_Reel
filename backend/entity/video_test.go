@@ -237,7 +237,7 @@ func TestSourceVideoMetaValidate(t *testing.T) {
 	}{
 		{name: "mismatched mime and container", edit: func(meta *SourceVideoMeta) { meta.MIMEType = "video/quicktime" }},
 		{name: "size zero", edit: func(meta *SourceVideoMeta) { meta.SizeBytes = 0 }},
-		{name: "size exceeded", edit: func(meta *SourceVideoMeta) { meta.SizeBytes = 30_000_001 }},
+		{name: "size exceeded", edit: func(meta *SourceVideoMeta) { meta.SizeBytes = MaxSourceVideoSizeBytes + 1 }},
 		{name: "duration zero", edit: func(meta *SourceVideoMeta) { meta.DurationMillis = 0 }},
 		{name: "duration exceeded", edit: func(meta *SourceVideoMeta) { meta.DurationMillis = 10_001 }},
 		{name: "width exceeded", edit: func(meta *SourceVideoMeta) { meta.Width = 1081 }},
@@ -258,6 +258,12 @@ func TestSourceVideoMetaValidate(t *testing.T) {
 				t.Fatalf("expected ErrVideoSourceInvalid, got %v", err)
 			}
 		})
+	}
+
+	largeValid := validSourceMeta()
+	largeValid.SizeBytes = 39_062_300
+	if err := largeValid.Validate(); err != nil {
+		t.Fatalf("39,062,300-byte source was rejected: %v", err)
 	}
 
 	mov := validSourceMeta()

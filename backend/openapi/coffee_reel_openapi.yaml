@@ -1306,7 +1306,7 @@ components:
           type: integer
           format: int64
           minimum: 1
-          maximum: 30000000
+          maximum: 50000000
     StartUploadVideo:
       type: object
       required:

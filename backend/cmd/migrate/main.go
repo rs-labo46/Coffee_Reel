@@ -41,6 +41,9 @@ func main() {
 	if err := migrate.MigrateVideoSourceMetas(postgresDB); err != nil {
 		log.Fatal(err)
 	}
+	if err := migrate.MigrateVideoSourceSizeLimit(postgresDB); err != nil {
+		log.Fatal(err)
+	}
 	if err := migrate.MigrateVideoOutputMetas(postgresDB); err != nil {
 		log.Fatal(err)
 	}

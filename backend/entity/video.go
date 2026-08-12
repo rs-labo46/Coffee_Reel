@@ -9,6 +9,10 @@ import (
 type VideoProcessingStatus string
 
 const (
+	MaxSourceVideoSizeBytes int64 = 50_000_000
+)
+
+const (
 	VideoProcessingUploading  VideoProcessingStatus = "uploading"
 	VideoProcessingExpired    VideoProcessingStatus = "expired"
 	VideoProcessingUploaded   VideoProcessingStatus = "uploaded"
@@ -307,7 +311,7 @@ func (m SourceVideoMeta) Validate() error {
 	if !validFormat {
 		return ErrVideoSourceInvalid
 	}
-	if m.SizeBytes < 1 || m.SizeBytes > 30_000_000 || m.DurationMillis < 1 || m.DurationMillis > 10_000 {
+	if m.SizeBytes < 1 || m.SizeBytes > MaxSourceVideoSizeBytes || m.DurationMillis < 1 || m.DurationMillis > 10_000 {
 		return ErrVideoSourceInvalid
 	}
 	if m.Width < 1 || m.Width > 1080 || m.Height < 1 || m.Height > 1920 || m.Width*16 != m.Height*9 {

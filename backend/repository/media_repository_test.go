@@ -202,7 +202,12 @@ func TestMediaRepositoryTranscode(t *testing.T) {
 			"-vf", "scale=720:1280:flags=lanczos,fps=30",
 			"-c:v", "libx264",
 			"-preset", "medium",
+			"-crf", "23",
+			"-maxrate", "3000k",
+			"-bufsize", "6000k",
 			"-pix_fmt", "yuv420p",
+			"-map_metadata", "-1",
+			"-map_chapters", "-1",
 			"-movflags", "+faststart",
 			"-map", "0:a:0?",
 			"-c:a", "aac",
@@ -502,7 +507,7 @@ func TestMediaRepositoryRunProbe(t *testing.T) {
 func TestSourceMetaFromProbe(t *testing.T) {
 	t.Run("仕様上限と同じ値を許可する", func(t *testing.T) {
 		probe := validMP4ProbeOutput()
-		probe.Format.Size = "30000000"
+		probe.Format.Size = "50000000"
 		probe.Format.Duration = "10.000"
 		probe.Streams[0].Width = 1080
 		probe.Streams[0].Height = 1920
@@ -512,7 +517,7 @@ func TestSourceMetaFromProbe(t *testing.T) {
 		if err != nil {
 			t.Fatalf("sourceMetaFromProbe() error = %v", err)
 		}
-		if meta.SizeBytes != 30_000_000 || meta.DurationMillis != 10_000 || meta.FrameRate != 60 {
+		if meta.SizeBytes != 50_000_000 || meta.DurationMillis != 10_000 || meta.FrameRate != 60 {
 			t.Fatalf("meta = %#v", meta)
 		}
 	})
@@ -597,10 +602,10 @@ func TestSourceMetaFromProbe(t *testing.T) {
 			wantCode: entity.VideoFailureCorrupt,
 		},
 		{
-			name:     "30MBを超える",
+			name:     "50MBを超える",
 			mimeType: "video/mp4",
 			mutate: func(probe *ffprobeOutput) {
-				probe.Format.Size = "30000001"
+				probe.Format.Size = "50000001"
 			},
 			wantCode: entity.VideoFailureSizeExceeded,
 		},
