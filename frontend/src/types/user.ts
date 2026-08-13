@@ -40,6 +40,7 @@ export type RefreshResponse = {
     token_type: "Bearer";
     expires_in: number;
     csrf_token: string;
+    user: User;
   };
 };
 

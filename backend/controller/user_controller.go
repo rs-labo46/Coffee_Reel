@@ -82,10 +82,11 @@ type refreshResponse struct {
 }
 
 type refreshData struct {
-	AccessToken string `json:"access_token"`
-	TokenType   string `json:"token_type"`
-	ExpiresIn   int    `json:"expires_in"`
-	CSRFToken   string `json:"csrf_token"`
+	AccessToken string           `json:"access_token"`
+	TokenType   string           `json:"token_type"`
+	ExpiresIn   int              `json:"expires_in"`
+	CSRFToken   string           `json:"csrf_token"`
+	User        authUserResponse `json:"user"`
 }
 
 type csrfResponse struct {
@@ -197,7 +198,7 @@ func (u *userController) Refresh(c echo.Context) error {
 		return writeError(c, entity.ErrRefreshTokenMissing)
 	}
 
-	tokens, err := u.users.Refresh(c.Request().Context(), cookie.Value)
+	result, err := u.users.Refresh(c.Request().Context(), cookie.Value)
 	if err != nil {
 		if errors.Is(err, entity.ErrRefreshTokenReused) {
 			u.clearAuthCookies(c)
@@ -206,14 +207,15 @@ func (u *userController) Refresh(c echo.Context) error {
 		return writeError(c, err)
 	}
 
-	u.setAuthCookies(c, tokens)
+	u.setAuthCookies(c, result.AuthTokens)
 
 	return c.JSON(http.StatusOK, refreshResponse{
 		Data: refreshData{
-			AccessToken: tokens.AccessToken,
+			AccessToken: result.AccessToken,
 			TokenType:   "Bearer",
 			ExpiresIn:   accessTokenExpiresIn,
-			CSRFToken:   tokens.CSRFToken,
+			CSRFToken:   result.CSRFToken,
+			User:        newAuthUserResponse(result.User),
 		},
 	})
 }

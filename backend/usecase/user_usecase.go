@@ -11,7 +11,7 @@ import (
 type IUserUsecase interface {
 	SignUp(ctx context.Context, name, email, password string) (*entity.User, error)
 	Login(ctx context.Context, email, password string) (LoginResult, error)
-	Refresh(ctx context.Context, plainRefreshToken string) (AuthTokens, error)
+	Refresh(ctx context.Context, plainRefreshToken string) (RefreshResult, error)
 	Logout(ctx context.Context, plainRefreshToken string) error
 	GetMe(ctx context.Context, userID uint64) (*entity.User, error)
 	ValidateTokenVersion(user *entity.User, tokenVersion uint64) error
@@ -39,6 +39,11 @@ type userUsecase struct {
 }
 
 type LoginResult struct {
+	User *entity.User
+	AuthTokens
+}
+
+type RefreshResult struct {
 	User *entity.User
 	AuthTokens
 }
@@ -110,9 +115,9 @@ func (u *userUsecase) Login(ctx context.Context, email, password string) (LoginR
 }
 
 // Refresh Tokenの状態とUser状態を確認し、同じFamilyでTokenをローテーションする。
-func (u *userUsecase) Refresh(ctx context.Context, plainRefreshToken string) (AuthTokens, error) {
+func (u *userUsecase) Refresh(ctx context.Context, plainRefreshToken string) (RefreshResult, error) {
 	if plainRefreshToken == "" {
-		return AuthTokens{},
+		return RefreshResult{},
 			entity.ErrRefreshTokenMissing
 	}
 
@@ -122,47 +127,47 @@ func (u *userUsecase) Refresh(ctx context.Context, plainRefreshToken string) (Au
 
 	currentToken, err := u.refreshTokens.FindByTokenHash(ctx, tokenHash)
 	if err != nil {
-		return AuthTokens{}, err
+		return RefreshResult{}, err
 	}
 
 	now := time.Now()
 
 	switch {
 	case currentToken.IsExpired(now):
-		return AuthTokens{},
+		return RefreshResult{},
 			entity.ErrRefreshTokenExpired
 
 	case currentToken.RevokedAt != nil:
-		return AuthTokens{},
+		return RefreshResult{},
 			entity.ErrRefreshTokenRevoked
 
 	case currentToken.UsedAt != nil:
 		if err := u.refreshTokens.RevokeFamilyAndIncrementTokenVersion(ctx, currentToken.UserID, currentToken.FamilyID, now); err != nil {
-			return AuthTokens{}, err
+			return RefreshResult{}, err
 		}
 
-		return AuthTokens{},
+		return RefreshResult{},
 			entity.ErrRefreshTokenReused
 	}
 
 	user, err := u.users.FindByID(ctx, currentToken.UserID)
 	if err != nil {
-		return AuthTokens{}, err
+		return RefreshResult{}, err
 	}
 
 	if !user.IsActive() {
-		return AuthTokens{}, entity.ErrUserSuspended
+		return RefreshResult{}, entity.ErrUserSuspended
 	}
 
 	authTokens, nextToken, err := u.issueTokens(user, currentToken.FamilyID, now)
 	if err != nil {
-		return AuthTokens{}, err
+		return RefreshResult{}, err
 	}
 
 	if err := u.refreshTokens.Rotate(ctx, tokenHash, nextToken, now); err != nil {
-		return AuthTokens{}, err
+		return RefreshResult{}, err
 	}
-	return authTokens, nil
+	return RefreshResult{User: user, AuthTokens: authTokens}, nil
 }
 
 // Refresh TokenからFamily IDを取得し、同じログイン系列を一括失効する。

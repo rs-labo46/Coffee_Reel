@@ -4,7 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { listReels, removeSavedVideo, saveVideo } from "../api/video";
 import { useAuth } from "../auth/useAuth";
-import { authenticatedUser, publicVideo } from "../tests/videoFixtures";
+import {
+  authenticatedUser,
+  guestUser,
+  publicVideo,
+} from "../tests/videoFixtures";
 import type { PublicVideo, VideoLikeState } from "../types/video";
 import ReelPage from "./ReelPage";
 
@@ -47,10 +51,7 @@ vi.mock("../components/ReelVideo", () => ({
       <p>{video.title}</p>
       <p>{video.is_saved ? "saved" : "not-saved"}</p>
       <p>{`Like ${video.like_count} ${video.is_liked ? "liked" : "not-liked"}`}</p>
-      <button
-        type="button"
-        onClick={() => onVisibilityChange(video.id, 0.8)}
-      >
+      <button type="button" onClick={() => onVisibilityChange(video.id, 0.8)}>
         visible-{video.id}
       </button>
       <button type="button" onClick={() => onToggleSaved(video)}>
@@ -105,6 +106,22 @@ describe("ReelPage", () => {
     listReelsMock.mockReset();
     saveVideoMock.mockReset();
     removeSavedVideoMock.mockReset();
+  });
+
+  it("認証復元中でも公開リール取得を開始して先に表示する", async () => {
+    useAuthMock.mockReturnValue(guestUser({ isLoading: true }));
+    listReelsMock.mockResolvedValue({
+      items: [publicVideo({ id: 10, title: "先に表示する動画" })],
+      next_cursor: null,
+      has_more: false,
+      result_type: "all",
+    });
+
+    renderPage();
+    await flushAsync();
+
+    expect(listReelsMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("先に表示する動画")).toBeInTheDocument();
   });
 
   it("検索画面への導線を表示する", async () => {
@@ -212,9 +229,7 @@ describe("ReelPage", () => {
     fireEvent.click(button);
 
     expect(logout).toHaveBeenCalledTimes(1);
-    expect(
-      screen.getByRole("button", { name: "ログアウト中" }),
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "ログアウト中" })).toBeDisabled();
 
     await act(async () => {
       resolveLogout?.();
@@ -326,9 +341,7 @@ describe("ReelPage", () => {
     renderPage();
     await flushAsync();
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "like-not-found-10" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "like-not-found-10" }));
 
     expect(screen.queryByText("動画A")).not.toBeInTheDocument();
     expect(screen.getByText("動画B")).toBeInTheDocument();

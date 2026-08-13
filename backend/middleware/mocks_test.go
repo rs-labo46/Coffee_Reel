@@ -11,7 +11,7 @@ import (
 type userUsecaseMock struct {
 	signUpFunc               func(context.Context, string, string, string) (*entity.User, error)
 	loginFunc                func(context.Context, string, string) (usecase.LoginResult, error)
-	refreshFunc              func(context.Context, string) (usecase.AuthTokens, error)
+	refreshFunc              func(context.Context, string) (usecase.RefreshResult, error)
 	logoutFunc               func(context.Context, string) error
 	getMeFunc                func(context.Context, uint64) (*entity.User, error)
 	validateTokenVersionFunc func(*entity.User, uint64) error
@@ -46,7 +46,7 @@ func (m *userUsecaseMock) Login(
 func (m *userUsecaseMock) Refresh(
 	ctx context.Context,
 	token string,
-) (usecase.AuthTokens, error) {
+) (usecase.RefreshResult, error) {
 	if m.refreshFunc == nil {
 		panic("unexpected UserUsecase.Refresh call")
 	}

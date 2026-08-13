@@ -59,6 +59,7 @@ describe("ReelVideo", () => {
     expect(HTMLMediaElement.prototype.pause).toHaveBeenCalled();
     expect(HTMLMediaElement.prototype.load).toHaveBeenCalled();
     expect(videoElement).not.toHaveAttribute("src");
+    expect(videoElement).not.toHaveAttribute("poster");
     expect(container.querySelector("video")).toHaveAttribute("preload", "none");
   });
 
@@ -76,6 +77,10 @@ describe("ReelVideo", () => {
       "https://storage.example.com/video.mp4",
     );
     expect(videoElement).toHaveAttribute("preload", "metadata");
+    expect(videoElement).toHaveAttribute(
+      "poster",
+      "https://storage.example.com/thumbnail.jpg",
+    );
     expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
   });
 

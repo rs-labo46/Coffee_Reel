@@ -5,7 +5,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { listReels } from "../api/video";
 import { useAuth } from "../auth/useAuth";
-import { authenticatedUser, guestUser, publicVideo } from "../tests/videoFixtures";
+import {
+  authenticatedUser,
+  guestUser,
+  publicVideo,
+} from "../tests/videoFixtures";
 import type { PublicVideoListResponse } from "../types/video";
 import SearchPage from "./SearchPage";
 
@@ -56,6 +60,22 @@ describe("SearchPage", () => {
     useAuthMock.mockReturnValue(guestUser());
   });
 
+  it("認証復元中でも公開検索を開始して結果を先に表示する", async () => {
+    useAuthMock.mockReturnValue(guestUser({ isLoading: true }));
+    listReelsMock.mockResolvedValue(
+      response({
+        items: [publicVideo({ title: "認証を待たない検索結果" })],
+      }),
+    );
+
+    renderPage();
+
+    expect(
+      await screen.findByText("認証を待たない検索結果"),
+    ).toBeInTheDocument();
+    expect(listReelsMock).toHaveBeenCalledTimes(1);
+  });
+
   it("初期表示で条件なし公開動画一覧を取得する", async () => {
     listReelsMock.mockResolvedValue(response());
 
@@ -91,9 +111,7 @@ describe("SearchPage", () => {
   });
 
   it("URL QueryからTitleとCategoryをフォームへ復元する", async () => {
-    listReelsMock.mockResolvedValue(
-      response({ result_type: "matched" }),
-    );
+    listReelsMock.mockResolvedValue(response({ result_type: "matched" }));
 
     renderPage("/search?title=%E7%84%99%E7%85%8E&category=roasting");
 
@@ -171,7 +189,9 @@ describe("SearchPage", () => {
       }),
     );
 
-    renderPage("/search?title=%E3%83%8F%E3%83%B3%E3%83%89%E3%83%89%E3%83%AA%E3%83%83%E3%83%96%E3%83%97");
+    renderPage(
+      "/search?title=%E3%83%8F%E3%83%B3%E3%83%89%E3%83%89%E3%83%AA%E3%83%83%E3%83%96%E3%83%97",
+    );
 
     expect(
       await screen.findByText(
@@ -192,9 +212,7 @@ describe("SearchPage", () => {
     renderPage("/search?title=notfound");
 
     expect(
-      await screen.findByText(
-        "一致する動画も、近い動画も見つかりませんでした",
-      ),
+      await screen.findByText("一致する動画も、近い動画も見つかりませんでした"),
     ).toBeInTheDocument();
     expect(
       screen.queryByText(

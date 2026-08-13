@@ -114,7 +114,7 @@ paths:
       tags:
         - Auth
       summary: Access Token再発行
-      description: Refresh Tokenをローテーションし、新しいAccess Tokenと認証Cookieを発行する。使用済みRefresh Tokenの再利用検知時は同じFamilyを失効する。
+      description: Refresh Tokenをローテーションし、新しいAccess Token、CSRF Token、現在User、認証Cookieを発行する。ページ再読み込み時はこのUserを利用し、追加のGET /meを不要にする。使用済みRefresh Tokenの再利用検知時は同じFamilyを失効する。
       operationId: refreshAccessToken
       responses:
         "200":
@@ -1139,6 +1139,8 @@ components:
             - access_token
             - token_type
             - expires_in
+            - csrf_token
+            - user
           properties:
             access_token:
               type: string
@@ -1151,6 +1153,11 @@ components:
               format: int32
               enum:
                 - 900
+            csrf_token:
+              type: string
+              minLength: 1
+            user:
+              $ref: "#/components/schemas/AuthUser"
     ReasonRequest:
       type: object
       required:

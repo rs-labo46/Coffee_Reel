@@ -17,7 +17,7 @@ const apiURL = rawApiURL.replace(/\/+$/, "");
 const refreshPath = "/refresh";
 const csrfHeaderName = "X-CSRF-Token";
 
-let refreshPromise: Promise<string> | null = null;
+let refreshPromise: Promise<RefreshResponse["data"]> | null = null;
 
 type ApiRequestOptions = {
   auth?: boolean;
@@ -57,9 +57,11 @@ function isApiErrorResponse(value: unknown): value is ApiErrorResponse {
 }
 
 function isRefreshResponse(value: unknown): value is RefreshResponse {
-  if (!isRecord(value) || !isRecord(value.data)) {
+  if (!isRecord(value) || !isRecord(value.data) || !isRecord(value.data.user)) {
     return false;
   }
+
+  const user = value.data.user;
 
   return (
     typeof value.data.access_token === "string" &&
@@ -67,7 +69,13 @@ function isRefreshResponse(value: unknown): value is RefreshResponse {
     value.data.token_type === "Bearer" &&
     typeof value.data.expires_in === "number" &&
     typeof value.data.csrf_token === "string" &&
-    value.data.csrf_token !== ""
+    value.data.csrf_token !== "" &&
+    typeof user.id === "number" &&
+    user.id > 0 &&
+    typeof user.name === "string" &&
+    typeof user.email === "string" &&
+    (user.role === "user" || user.role === "admin") &&
+    (user.status === "active" || user.status === "suspended")
   );
 }
 
@@ -196,20 +204,27 @@ export async function apiRequest<T>(
 }
 
 // 同時に複数Requestが401になってもRefresh APIを1回だけ実行する。
-export function refreshAccessToken(): Promise<string> {
+export async function refreshAccessToken(): Promise<string> {
+  const session = await refreshSession();
+
+  return session.access_token;
+}
+
+// ページ再読み込み時はRefresh ResponseのUserも利用し、追加のGET /meを不要にする。
+export function refreshSession(): Promise<RefreshResponse["data"]> {
   if (refreshPromise !== null) {
     return refreshPromise;
   }
 
-  refreshPromise = requestNewAccessToken().finally(() => {
+  refreshPromise = requestNewSession().finally(() => {
     refreshPromise = null;
   });
 
   return refreshPromise;
 }
 
-// メモリ上のCSRF TokenとHttpOnly Refresh Token Cookieを利用してAccess Tokenを再発行する。
-async function requestNewAccessToken(): Promise<string> {
+// メモリ上のCSRF TokenとHttpOnly Refresh Token Cookieを利用して認証Sessionを再発行する。
+async function requestNewSession(): Promise<RefreshResponse["data"]> {
   if (getCSRFToken() === null) {
     clearAuthTokens();
 
@@ -240,7 +255,7 @@ async function requestNewAccessToken(): Promise<string> {
     setAccessToken(response.data.access_token);
     setCSRFToken(response.data.csrf_token);
 
-    return response.data.access_token;
+    return response.data;
   } catch (error: unknown) {
     if (
       error instanceof ApiClientError &&

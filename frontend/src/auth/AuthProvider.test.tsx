@@ -2,10 +2,9 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { refreshAccessToken } from "../api/client";
+import { refreshSession } from "../api/client";
 import {
   fetchCSRFToken,
-  getMe,
   login as requestLogin,
   logout as requestLogout,
 } from "../api/user";
@@ -13,6 +12,8 @@ import {
   clearAuthTokens,
   getAccessToken,
   getCSRFToken,
+  setAccessToken,
+  setCSRFToken,
 } from "./tokenStore";
 import { AuthProvider } from "./AuthProvider";
 import { useAuth } from "./useAuth";
@@ -22,20 +23,18 @@ vi.mock("../api/client", async (importOriginal) => {
 
   return {
     ...actual,
-    refreshAccessToken: vi.fn(),
+    refreshSession: vi.fn(),
   };
 });
 
 vi.mock("../api/user", () => ({
   fetchCSRFToken: vi.fn(),
-  getMe: vi.fn(),
   login: vi.fn(),
   logout: vi.fn(),
 }));
 
-const refreshAccessTokenMock = vi.mocked(refreshAccessToken);
+const refreshSessionMock = vi.mocked(refreshSession);
 const fetchCSRFTokenMock = vi.mocked(fetchCSRFToken);
-const getMeMock = vi.mocked(getMe);
 const requestLoginMock = vi.mocked(requestLogin);
 const requestLogoutMock = vi.mocked(requestLogout);
 
@@ -79,39 +78,49 @@ function renderAuthProvider() {
 describe("AuthProvider", () => {
   beforeEach(() => {
     clearAuthTokens();
-    refreshAccessTokenMock.mockReset();
+    refreshSessionMock.mockReset();
     fetchCSRFTokenMock.mockReset();
-    getMeMock.mockReset();
     requestLoginMock.mockReset();
     requestLogoutMock.mockReset();
   });
 
-  it("ページ読込時にCSRF取得、Refresh、Meの順で認証状態を復元する", async () => {
+  it("ページ読込時にCSRF取得後のRefresh Responseだけで認証状態を復元する", async () => {
     const callOrder: string[] = [];
 
     fetchCSRFTokenMock.mockImplementation(async () => {
       callOrder.push("csrf");
+
       return {
         data: {
           csrf_token: "bootstrap-csrf",
         },
       };
     });
-    refreshAccessTokenMock.mockImplementation(async () => {
+
+    refreshSessionMock.mockImplementation(async () => {
       callOrder.push("refresh");
+
       expect(getCSRFToken()).toBe("bootstrap-csrf");
-      return "restored-token";
-    });
-    getMeMock.mockImplementation(async () => {
-      callOrder.push("me");
+
+      // ---追加---
+      // 実際のrefreshSession()はRefresh成功時に
+      // Access Tokenと新しいCSRF TokenをToken Storeへ保存する。
+      // Mockでも同じ副作用を再現する。
+      setAccessToken("restored-token");
+      setCSRFToken("rotated-csrf");
+      // ---追加---
+
       return {
-        data: {
+        access_token: "restored-token",
+        token_type: "Bearer",
+        expires_in: 900,
+        csrf_token: "rotated-csrf",
+        user: {
           id: 1,
           name: "コーヒー太郎",
           email: "coffee@example.com",
           role: "user",
           status: "active",
-          created_at: "2026-07-21T00:00:00Z",
         },
       };
     });
@@ -124,12 +133,18 @@ describe("AuthProvider", () => {
       expect(screen.getByTestId("authenticated")).toHaveTextContent("true");
     });
 
-    expect(callOrder).toEqual(["csrf", "refresh", "me"]);
+    expect(callOrder).toEqual(["csrf", "refresh"]);
     expect(fetchCSRFTokenMock).toHaveBeenCalledTimes(1);
-    expect(refreshAccessTokenMock).toHaveBeenCalledTimes(1);
-    expect(getMeMock).toHaveBeenCalledTimes(1);
+    expect(refreshSessionMock).toHaveBeenCalledTimes(1);
+
     expect(screen.getByTestId("token")).toHaveTextContent("restored-token");
     expect(screen.getByTestId("user")).toHaveTextContent("coffee@example.com");
+
+    // ---追加---
+    expect(getAccessToken()).toBe("restored-token");
+    // ---追加---
+
+    expect(getCSRFToken()).toBe("rotated-csrf");
   });
 
   it("CSRF取得または認証復元に失敗した場合は未認証状態へ初期化する", async () => {
@@ -144,13 +159,14 @@ describe("AuthProvider", () => {
     expect(screen.getByTestId("authenticated")).toHaveTextContent("false");
     expect(screen.getByTestId("token")).toHaveTextContent("none");
     expect(screen.getByTestId("user")).toHaveTextContent("none");
-    expect(refreshAccessTokenMock).not.toHaveBeenCalled();
-    expect(getMeMock).not.toHaveBeenCalled();
+    expect(refreshSessionMock).not.toHaveBeenCalled();
+    expect(getAccessToken()).toBeNull();
     expect(getCSRFToken()).toBeNull();
   });
 
   it("Login成功時にAccess Token、CSRF Token、Userを保存する", async () => {
     fetchCSRFTokenMock.mockRejectedValue(new Error("unauthorized"));
+
     requestLoginMock.mockResolvedValue({
       data: {
         access_token: "login-token",
@@ -173,7 +189,9 @@ describe("AuthProvider", () => {
       expect(screen.getByTestId("loading")).toHaveTextContent("false");
     });
 
-    await userEvent.setup().click(screen.getByRole("button", { name: "Login" }));
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Login" }));
 
     await waitFor(() => {
       expect(screen.getByTestId("authenticated")).toHaveTextContent("true");
@@ -183,8 +201,10 @@ describe("AuthProvider", () => {
       email: "coffee@example.com",
       password: "password123",
     });
+
     expect(screen.getByTestId("token")).toHaveTextContent("login-token");
     expect(screen.getByTestId("user")).toHaveTextContent("coffee@example.com");
+
     expect(getAccessToken()).toBe("login-token");
     expect(getCSRFToken()).toBe("login-csrf");
   });
@@ -195,17 +215,28 @@ describe("AuthProvider", () => {
         csrf_token: "bootstrap-csrf",
       },
     });
-    refreshAccessTokenMock.mockResolvedValue("restored-token");
-    getMeMock.mockResolvedValue({
-      data: {
-        id: 1,
-        name: "コーヒー太郎",
-        email: "coffee@example.com",
-        role: "user",
-        status: "active",
-        created_at: "2026-07-21T00:00:00Z",
-      },
+
+    // ---変更---
+    refreshSessionMock.mockImplementation(async () => {
+      setAccessToken("restored-token");
+      setCSRFToken("rotated-csrf");
+
+      return {
+        access_token: "restored-token",
+        token_type: "Bearer",
+        expires_in: 900,
+        csrf_token: "rotated-csrf",
+        user: {
+          id: 1,
+          name: "コーヒー太郎",
+          email: "coffee@example.com",
+          role: "user",
+          status: "active",
+        },
+      };
     });
+    // ---変更---
+
     requestLogoutMock.mockResolvedValue(undefined);
 
     renderAuthProvider();
@@ -214,9 +245,16 @@ describe("AuthProvider", () => {
       expect(screen.getByTestId("authenticated")).toHaveTextContent("true");
     });
 
-    expect(getCSRFToken()).toBe("bootstrap-csrf");
+    // ---変更---
+    // Refresh成功後なのでbootstrap値ではなく
+    // Rotation後のCSRF Tokenが保持されている。
+    expect(getAccessToken()).toBe("restored-token");
+    expect(getCSRFToken()).toBe("rotated-csrf");
+    // ---変更---
 
-    await userEvent.setup().click(screen.getByRole("button", { name: "Logout" }));
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Logout" }));
 
     await waitFor(() => {
       expect(screen.getByTestId("authenticated")).toHaveTextContent("false");

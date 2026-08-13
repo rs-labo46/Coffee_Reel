@@ -562,16 +562,25 @@ func TestUserControllerRefreshSuccessRotatesBothCookies(t *testing.T) {
 		refreshFunc: func(
 			_ context.Context,
 			token string,
-		) (usecase.AuthTokens, error) {
+		) (usecase.RefreshResult, error) {
 			if token != "old-refresh" {
 				t.Fatalf("Refresh token = %q", token)
 			}
 
-			return usecase.AuthTokens{
-				AccessToken:           "new-access",
-				RefreshToken:          "new-refresh",
-				CSRFToken:             "new-csrf",
-				RefreshTokenExpiresAt: expiresAt,
+			return usecase.RefreshResult{
+				User: &entity.User{
+					ID:     7,
+					Name:   "Alice",
+					Email:  "alice@example.com",
+					Role:   entity.RoleUser,
+					Status: entity.StatusActive,
+				},
+				AuthTokens: usecase.AuthTokens{
+					AccessToken:           "new-access",
+					RefreshToken:          "new-refresh",
+					CSRFToken:             "new-csrf",
+					RefreshTokenExpiresAt: expiresAt,
+				},
 			}, nil
 		},
 	}
@@ -618,7 +627,9 @@ func TestUserControllerRefreshSuccessRotatesBothCookies(t *testing.T) {
 	if response.Data.AccessToken != "new-access" ||
 		response.Data.TokenType != "Bearer" ||
 		response.Data.ExpiresIn != 900 ||
-		response.Data.CSRFToken != "new-csrf" {
+		response.Data.CSRFToken != "new-csrf" ||
+		response.Data.User.ID != 7 ||
+		response.Data.User.Email != "alice@example.com" {
 		t.Fatalf("response = %+v", response)
 	}
 
@@ -652,8 +663,8 @@ func TestUserControllerRefreshReuseClearsCookiesAndReturnsGenericUnauthorized(t 
 		refreshFunc: func(
 			context.Context,
 			string,
-		) (usecase.AuthTokens, error) {
-			return usecase.AuthTokens{}, entity.ErrRefreshTokenReused
+		) (usecase.RefreshResult, error) {
+			return usecase.RefreshResult{}, entity.ErrRefreshTokenReused
 		},
 	}
 
