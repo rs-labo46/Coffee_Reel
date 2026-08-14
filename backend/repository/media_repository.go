@@ -135,7 +135,10 @@ func (r *mediaRepository) Transcode(ctx context.Context, inputPath, outputPath s
 		"-map", "0:v:0",
 		"-vf", "scale=720:1280:flags=lanczos,fps=30",
 		"-c:v", "libx264",
-		"-preset", "medium",
+		// CPU・Memoryが小さい本番環境でも10秒動画を安定して処理できるよう、
+		// veryfast + Video Encoder 1 threadで負荷を抑える。
+		"-preset", "veryfast",
+		"-threads:v", "1",
 		"-crf", "23",
 		"-maxrate", "3000k",
 		"-bufsize", "6000k",
