@@ -196,7 +196,7 @@ function AuthorVideosPageContent({
 
   return (
     <main className="min-h-dvh bg-[#100b08] px-4 py-6 text-stone-100 sm:px-6 lg:px-10">
-      <div className="mx-auto w-full max-w-5xl">
+      <div className="mx-auto w-full max-w-7xl">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-xs font-black tracking-[0.2em] text-amber-300 uppercase">
@@ -259,7 +259,7 @@ function AuthorVideosPageContent({
           </section>
         ) : (
           <section
-            className="mt-8 grid gap-5 lg:grid-cols-2"
+            className="mt-8 grid grid-cols-3 gap-2 sm:gap-4 lg:gap-5"
             aria-label="投稿者の公開動画一覧"
           >
             {videos.map((video) => (
