@@ -126,6 +126,13 @@ describe("API Client", () => {
             token_type: "Bearer",
             expires_in: 900,
             csrf_token: "new-csrf",
+            user: {
+              id: 1,
+              name: "コーヒー太郎",
+              email: "coffee@example.com",
+              role: "user",
+              status: "active",
+            },
           },
         });
       }
@@ -188,6 +195,13 @@ describe("API Client", () => {
             token_type: "Bearer",
             expires_in: 900,
             csrf_token: "new-csrf",
+            user: {
+              id: 1,
+              name: "コーヒー太郎",
+              email: "coffee@example.com",
+              role: "user",
+              status: "active",
+            },
           },
         });
       }
@@ -240,6 +254,13 @@ describe("API Client", () => {
             token_type: "Bearer",
             expires_in: 900,
             csrf_token: "new-csrf",
+            user: {
+              id: 1,
+              name: "コーヒー太郎",
+              email: "coffee@example.com",
+              role: "user",
+              status: "active",
+            },
           },
         }),
       )

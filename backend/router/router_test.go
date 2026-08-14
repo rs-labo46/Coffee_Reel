@@ -157,7 +157,7 @@ func (s *userUsecaseStub) Login(
 func (s *userUsecaseStub) Refresh(
 	context.Context,
 	string,
-) (usecase.AuthTokens, error) {
+) (usecase.RefreshResult, error) {
 	panic("unexpected Refresh call")
 }
 

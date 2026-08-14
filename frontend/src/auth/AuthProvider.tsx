@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { AuthState, LoginInput, User } from "../types/user";
 import {
   fetchCSRFToken,
-  getMe,
   login as requestLogin,
   logout as requestLogout,
 } from "../api/user";
@@ -13,7 +12,7 @@ import {
   subscribeAccessToken,
 } from "./tokenStore";
 import { AuthContext, type AuthContextValue } from "./authContext";
-import { refreshAccessToken } from "../api/client";
+import { refreshSession } from "../api/client";
 
 type RestoredSession = {
   user: User;
@@ -135,11 +134,10 @@ async function restoreSession(): Promise<RestoredSession> {
   const csrfResponse = await fetchCSRFToken();
   setCSRFToken(csrfResponse.data.csrf_token);
 
-  const accessToken = await refreshAccessToken();
-  const response = await getMe();
+  const session = await refreshSession();
 
   return {
-    user: response.data,
-    accessToken,
+    user: session.user,
+    accessToken: session.access_token,
   };
 }

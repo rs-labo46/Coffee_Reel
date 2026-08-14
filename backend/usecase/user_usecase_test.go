@@ -340,7 +340,10 @@ func TestUserUsecaseRefreshRotatesWithinTheSameFamily(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Refresh() error = %v", err)
 	}
-	if result.AccessToken != "next-access" || result.RefreshToken != "plain-next" || result.CSRFToken != "next-csrf" {
+	if result.User != user ||
+		result.AccessToken != "next-access" ||
+		result.RefreshToken != "plain-next" ||
+		result.CSRFToken != "next-csrf" {
 		t.Fatalf("Refresh() result = %+v", result)
 	}
 	assertTimeNear(t, rotateAt, nowBefore, nowAfter)

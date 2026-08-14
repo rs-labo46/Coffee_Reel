@@ -39,6 +39,35 @@ function appendReels(
   ];
 }
 
+// 認証復元後は再生URLを差し替えず、本人向けLike・保存状態だけ同期
+function mergeInteractionState(
+  currentVideos: PublicVideo[],
+  refreshedVideos: PublicVideo[],
+): PublicVideo[] {
+  if (currentVideos.length === 0) {
+    return refreshedVideos;
+  }
+
+  const refreshedByID = new Map(
+    refreshedVideos.map((video) => [video.id, video] as const),
+  );
+
+  return currentVideos.map((video) => {
+    const refreshed = refreshedByID.get(video.id);
+
+    if (refreshed === undefined) {
+      return video;
+    }
+
+    return {
+      ...video,
+      like_count: refreshed.like_count,
+      is_liked: refreshed.is_liked,
+      is_saved: refreshed.is_saved,
+    };
+  });
+}
+
 // API Errorをリール画面用Messageへ変換
 function errorViewOf(
   error: unknown,
@@ -63,12 +92,13 @@ function errorViewOf(
 // 公開リール、Active動画、次Cursor、保存状態を管理
 export default function ReelPage() {
   const navigate = useNavigate();
-  const { isAuthenticated, isLoading: isAuthLoading, logout, user } = useAuth();
+  const { isAuthenticated, logout, user } = useAuth();
   const visibilityRatiosRef = useRef<Map<number, number>>(new Map());
   const logoutInFlightRef = useRef(false);
   const loadMoreInFlightRef = useRef(false);
   const reelListRef = useRef<HTMLElement | null>(null);
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
+  const hasLoadedInitialReelsRef = useRef(false);
 
   const [videos, setVideos] = useState<PublicVideo[]>([]);
   const [activeVideoID, setActiveVideoID] = useState<number | null>(null);
@@ -81,21 +111,28 @@ export default function ReelPage() {
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [requestID, setRequestID] = useState<string>("");
 
-  // 認証復元後に公開リールの先頭Pageを取得
+  const authRequestKey =
+    isAuthenticated && user !== null ? `user:${user.id}` : "guest";
+
+  // 公開リールは認証復元を待たず取得し、認証確定後は本人向け状態だけ同期
   useEffect(() => {
-    if (isAuthLoading) {
-      return;
+    let isActive = true;
+    const isInteractionRefresh = hasLoadedInitialReelsRef.current;
+
+    if (!isInteractionRefresh) {
+      visibilityRatiosRef.current.clear();
     }
 
-    let isActive = true;
-    visibilityRatiosRef.current.clear();
-
-    const requestKey =
-      isAuthenticated && user !== null ? `user:${user.id}` : "guest";
-
-    requestInitialReels(requestKey)
+    requestInitialReels(authRequestKey)
       .then((response) => {
         if (!isActive) {
+          return;
+        }
+
+        if (isInteractionRefresh) {
+          setVideos((currentVideos) =>
+            mergeInteractionState(currentVideos, response.items),
+          );
           return;
         }
 
@@ -103,6 +140,7 @@ export default function ReelPage() {
         setActiveVideoID(response.items[0]?.id ?? null);
         setNextCursor(response.next_cursor);
         setHasMore(response.has_more);
+        hasLoadedInitialReelsRef.current = true;
       })
       .catch((error: unknown) => {
         if (!isActive) {
@@ -117,7 +155,7 @@ export default function ReelPage() {
         setRequestID(errorView.requestID);
       })
       .finally(() => {
-        if (isActive) {
+        if (isActive && !isInteractionRefresh) {
           setIsInitialLoading(false);
         }
       });
@@ -125,7 +163,7 @@ export default function ReelPage() {
     return () => {
       isActive = false;
     };
-  }, [isAuthLoading, isAuthenticated, user]);
+  }, [authRequestKey]);
 
   // 各動画の表示割合から最も画面内にある1件をActiveへ変更
   const handleVisibilityChange = useCallback(
@@ -440,7 +478,7 @@ export default function ReelPage() {
         </div>
       )}
 
-      {isAuthLoading || isInitialLoading ? (
+      {isInitialLoading ? (
         <div
           className="flex min-h-[calc(100dvh-4.5rem)] items-center justify-center gap-3 text-sm font-bold text-stone-300"
           role="status"

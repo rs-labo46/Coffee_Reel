@@ -43,7 +43,7 @@ type SearchPageContentProps = {
   queryCategory: CategoryCode | "";
   urlValidationError: string;
   isAuthenticated: boolean;
-  isAuthLoading: boolean;
+  authRequestKey: string;
 };
 
 function countCharacters(value: string): number {
@@ -106,6 +106,35 @@ function appendVideos(
   ];
 }
 
+// 認証確定後の再取得では既存カードを維持し、本人向け状態だけ同期
+function mergeInteractionState(
+  currentVideos: PublicVideo[],
+  refreshedVideos: PublicVideo[],
+): PublicVideo[] {
+  if (currentVideos.length === 0) {
+    return refreshedVideos;
+  }
+
+  const refreshedByID = new Map(
+    refreshedVideos.map((video) => [video.id, video] as const),
+  );
+
+  return currentVideos.map((video) => {
+    const refreshed = refreshedByID.get(video.id);
+
+    if (refreshed === undefined) {
+      return video;
+    }
+
+    return {
+      ...video,
+      like_count: refreshed.like_count,
+      is_liked: refreshed.is_liked,
+      is_saved: refreshed.is_saved,
+    };
+  });
+}
+
 function errorViewOf(
   error: unknown,
   fallbackMessage: string,
@@ -138,11 +167,12 @@ function SearchPageContent({
   queryCategory,
   urlValidationError,
   isAuthenticated,
-  isAuthLoading,
+  authRequestKey,
 }: SearchPageContentProps) {
   const [, setSearchParams] = useSearchParams();
   const loadMoreInFlightRef = useRef(false);
   const loadMoreControllerRef = useRef<AbortController | null>(null);
+  const hasLoadedInitialResultsRef = useRef(false);
 
   const [formTitle, setFormTitle] = useState<string>(queryTitle);
   const [formCategory, setFormCategory] = useState<CategoryCode | "">(
@@ -161,14 +191,15 @@ function SearchPageContent({
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [requestID, setRequestID] = useState<string>("");
 
-  // URL条件単位でComponentを作り直し、古い検索RequestはAbortする
+  // 公開検索は認証復元を待たず開始し、認証確定後は本人向け状態だけ同期
   useEffect(() => {
-    if (isAuthLoading || urlValidationError !== "") {
+    if (urlValidationError !== "") {
       return;
     }
 
     const controller = new AbortController();
     let isActive = true;
+    const isInteractionRefresh = hasLoadedInitialResultsRef.current;
 
     listReels(
       {
@@ -183,10 +214,18 @@ function SearchPageContent({
           return;
         }
 
+        if (isInteractionRefresh) {
+          setVideos((currentVideos) =>
+            mergeInteractionState(currentVideos, response.items),
+          );
+          return;
+        }
+
         setVideos(response.items);
         setResultType(requireResultType(response.result_type));
         setNextCursor(response.next_cursor);
         setHasMore(response.has_more);
+        hasLoadedInitialResultsRef.current = true;
       })
       .catch((error: unknown) => {
         if (!isActive) {
@@ -198,7 +237,7 @@ function SearchPageContent({
         setRequestID(errorView.requestID);
       })
       .finally(() => {
-        if (isActive) {
+        if (isActive && !isInteractionRefresh) {
           setIsInitialLoading(false);
         }
       });
@@ -208,7 +247,7 @@ function SearchPageContent({
       controller.abort();
       loadMoreControllerRef.current?.abort();
     };
-  }, [isAuthLoading, queryCategory, queryTitle, urlValidationError]);
+  }, [authRequestKey, queryCategory, queryTitle, urlValidationError]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
@@ -320,8 +359,7 @@ function SearchPageContent({
   }
 
   const hasConditions = queryTitle !== "" || queryCategory !== "";
-  const showInitialLoading =
-    isAuthLoading || (urlValidationError === "" && isInitialLoading);
+  const showInitialLoading = urlValidationError === "" && isInitialLoading;
 
   return (
     <main className="min-h-dvh bg-[#100b08] text-stone-100">
@@ -545,11 +583,11 @@ function SearchPageContent({
 // URL Queryを正本にし、条件・認証Userが変わるたびに検索状態を作り直す
 export default function SearchPage() {
   const [searchParams] = useSearchParams();
-  const { isAuthenticated, isLoading: isAuthLoading, user } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const parsed = conditionsFromURL(searchParams);
-  const authKey =
+  const authRequestKey =
     isAuthenticated && user !== null ? `user:${user.id}` : "guest";
-  const queryKey = `${authKey}|${searchParams.toString()}`;
+  const queryKey = searchParams.toString();
 
   return (
     <SearchPageContent
@@ -558,7 +596,7 @@ export default function SearchPage() {
       queryCategory={parsed.conditions.category}
       urlValidationError={parsed.error}
       isAuthenticated={isAuthenticated}
-      isAuthLoading={isAuthLoading}
+      authRequestKey={authRequestKey}
     />
   );
 }

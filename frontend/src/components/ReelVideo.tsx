@@ -158,7 +158,7 @@ export default function ReelVideo({
         <video
           ref={videoRef}
           src={shouldLoadVideo ? video.playback_url : undefined}
-          poster={video.thumbnail_url}
+          poster={shouldLoadVideo ? video.thumbnail_url : undefined}
           muted={isMuted}
           playsInline
           loop
