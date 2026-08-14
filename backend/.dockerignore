@@ -5,3 +5,4 @@
 tmp/
 coverage.out
 .DS_Store
+docs/search_performance_results/

@@ -2,3 +2,5 @@
 .env.*
 !.env.example
 .DS_Store
+# Search performance benchmark generated results
+/backend/docs/search_performance_results/
