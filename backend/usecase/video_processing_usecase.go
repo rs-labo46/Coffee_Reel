@@ -160,6 +160,7 @@ func (u *videoProcessingUsecase) ProcessNext(ctx context.Context) (bool, error) 
 		trace.logStage("record_source", "skipped", 0)
 	}
 
+	trace.logStageStarted("transcode")
 	stageStartedAt = time.Now()
 	err = u.media.Transcode(processCtx, sourcePath, outputPath, sourceMeta.HasAudio)
 	stageDuration = time.Since(stageStartedAt)
@@ -168,6 +169,7 @@ func (u *videoProcessingUsecase) ProcessNext(ctx context.Context) (bool, error) 
 	}
 	trace.logStage("transcode", "completed", stageDuration)
 
+	trace.logStageStarted("thumbnail")
 	stageStartedAt = time.Now()
 	err = u.media.GenerateThumbnail(processCtx, sourcePath, thumbnailPath)
 	stageDuration = time.Since(stageStartedAt)
@@ -176,6 +178,7 @@ func (u *videoProcessingUsecase) ProcessNext(ctx context.Context) (bool, error) 
 	}
 	trace.logStage("thumbnail", "completed", stageDuration)
 
+	trace.logStageStarted("probe_output")
 	stageStartedAt = time.Now()
 	outputMeta, err := u.media.ProbeOutput(processCtx, outputPath)
 	stageDuration = time.Since(stageStartedAt)
@@ -200,6 +203,7 @@ func (u *videoProcessingUsecase) ProcessNext(ctx context.Context) (bool, error) 
 	}
 	trace.logStage("build_thumbnail_key", "completed", stageDuration)
 
+	trace.logStageStarted("upload_video")
 	stageStartedAt = time.Now()
 	err = u.storage.UploadProcessed(processCtx, videoObjectKey, outputPath)
 	stageDuration = time.Since(stageStartedAt)
@@ -208,6 +212,7 @@ func (u *videoProcessingUsecase) ProcessNext(ctx context.Context) (bool, error) 
 	}
 	trace.logStage("upload_video", "completed", stageDuration)
 
+	trace.logStageStarted("upload_thumbnail")
 	stageStartedAt = time.Now()
 	err = u.storage.UploadThumbnail(processCtx, thumbnailObjectKey, thumbnailPath)
 	stageDuration = time.Since(stageStartedAt)
@@ -218,6 +223,7 @@ func (u *videoProcessingUsecase) ProcessNext(ctx context.Context) (bool, error) 
 
 	outputMeta.VideoObjectKey = videoObjectKey
 	outputMeta.ThumbnailObjectKey = thumbnailObjectKey
+	trace.logStageStarted("complete_processing")
 	stageStartedAt = time.Now()
 	err = u.videos.CompleteProcessing(ctx, repository.ProcessingCompletionInput{
 		JobID:      claim.Job.ID,
@@ -305,6 +311,17 @@ func (t *videoProcessingTrace) logClaim(duration time.Duration) {
 		t.elapsed().Milliseconds(),
 		processingJobWait(t.job).Milliseconds(),
 		processingJobAge(t.job).Milliseconds(),
+	)
+}
+
+func (t *videoProcessingTrace) logStageStarted(stage string) {
+	log.Printf(
+		"video_processing timing job_id=%d video_id=%d attempt=%d stage=%s status=started elapsed_ms=%d",
+		t.jobID,
+		t.videoID,
+		t.attempt,
+		stage,
+		t.elapsed().Milliseconds(),
 	)
 }
 
