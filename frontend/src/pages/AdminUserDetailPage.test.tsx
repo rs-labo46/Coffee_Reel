@@ -104,6 +104,11 @@ describe("AdminUserDetailPage", () => {
     expect(screen.getByText("利用中")).toBeInTheDocument();
     expect(screen.getByText("ハンドドリップの基本")).toBeInTheDocument();
     expect(screen.getByText("published")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", {
+        name: "ハンドドリップの基本の投稿詳細を開く",
+      }),
+    ).toHaveAttribute("href", "/admin/videos/101");
     expect(screen.getByRole("link", { name: "投稿管理" })).toHaveAttribute(
       "href",
       "/admin/videos",

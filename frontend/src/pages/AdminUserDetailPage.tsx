@@ -391,11 +391,13 @@ export default function AdminUserDetailPage() {
               ) : (
                 <div className="mt-6 grid gap-4">
                   {detail.videos.map((video) => (
-                    <article
+                    <Link
                       key={video.id}
-                      className="rounded-2xl border border-white/10 bg-black/20 p-5"
+                      to={`/admin/videos/${video.id}`}
+                      aria-label={`${video.title}の投稿詳細を開く`}
+                      className="group block rounded-2xl border border-white/10 bg-black/20 p-5 transition hover:border-amber-300/40 hover:bg-amber-300/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/70"
                     >
-                      <h3 className="break-words text-base font-black text-white">
+                      <h3 className="break-words text-base font-black text-white transition group-hover:text-amber-200">
                         {video.title}
                       </h3>
                       <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-stone-400">
@@ -405,7 +407,7 @@ export default function AdminUserDetailPage() {
                         <span aria-hidden="true">/</span>
                         <span>{formatDate(video.created_at)}</span>
                       </div>
-                    </article>
+                    </Link>
                   ))}
                 </div>
               )}
