@@ -2,10 +2,13 @@ package db
 
 import (
 	"fmt"
+	"log"
+	"os"
 	"time"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 func NewDB(dsn string) (*gorm.DB, error) {
@@ -13,10 +16,22 @@ func NewDB(dsn string) (*gorm.DB, error) {
 		return nil, fmt.Errorf("database DSN is required")
 	}
 
+	gormLogger := logger.New(
+		log.New(os.Stdout, "\r\n", log.LstdFlags),
+		logger.Config{
+			SlowThreshold:             time.Second,
+			LogLevel:                  logger.Warn,
+			IgnoreRecordNotFoundError: true,
+			ParameterizedQueries:      true,
+			Colorful:                  false,
+		},
+	)
+
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		NowFunc: func() time.Time {
 			return time.Now()
 		},
+		Logger: gormLogger,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("connect to postgres: %w", err)
