@@ -4,30 +4,31 @@ import (
 	"coffee-reel/controller"
 	"coffee-reel/db"
 	"coffee-reel/middleware"
+	"coffee-reel/model"
 	"coffee-reel/repository"
 	"coffee-reel/router"
 	"coffee-reel/usecase"
 	"coffee-reel/validator"
 	"context"
 	"errors"
-	"fmt"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
-	"strings"
 	"syscall"
 	"time"
-
-	"github.com/redis/go-redis/v9"
 )
 
-const secretMinimumBytes = 32
-
 func main() {
-	postgresDB, err := db.NewDB(requiredEnv("DATABASE_URL"))
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	config, err := model.NewConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	postgresDB, err := db.NewDB(config.DatabaseURL)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -37,26 +38,19 @@ func main() {
 		}
 	}()
 
-	redisClient := redis.NewClient(&redis.Options{
-		Addr:     net.JoinHostPort(requiredEnv("REDIS_HOST"), requiredEnv("REDIS_PORT")),
-		Password: os.Getenv("REDIS_PASSWORD"),
-		DB:       requiredIntEnv("REDIS_DB", 0),
-	})
+	redisClient, err := model.NewRedis(ctx, config.Redis)
+	if err != nil {
+		log.Fatal(err)
+	}
 	defer func() {
 		if err := redisClient.Close(); err != nil {
 			log.Println("close redis failed")
 		}
 	}()
 
-	redisContext, redisCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer redisCancel()
-	if err := redisClient.Ping(redisContext).Err(); err != nil {
-		log.Fatal("connect to redis failed")
-	}
-
-	storageContext, storageCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	storageContext, storageCancel := context.WithTimeout(ctx, 10*time.Second)
 	defer storageCancel()
-	storageRepository, err := repository.NewObjectStorageRepository(storageContext, objectStorageConfig())
+	storageRepository, err := repository.NewObjectStorageRepository(storageContext, config.Storage)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -72,7 +66,7 @@ func main() {
 	videoLikeRepository := repository.NewVideoLikeRepository(postgresDB)
 	savedVideoRepository := repository.NewSavedVideoRepository(postgresDB)
 
-	tokenService, err := usecase.NewTokenService(requiredSecretEnv("JWT_SECRET"), requiredSecretEnv("REFRESH_TOKEN_HMAC_KEY"))
+	tokenService, err := usecase.NewTokenService(config.JWTSecret, config.RefreshTokenHMACKey)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -83,23 +77,23 @@ func main() {
 		adminVideoRepository,
 		storageRepository,
 		usecase.AdminVideoUsecaseConfig{
-			ReadURLTTL: requiredDurationEnv("STORAGE_READ_URL_TTL"),
+			ReadURLTTL: config.StorageReadURLTTL,
 		},
 	)
 	if err != nil {
 		log.Fatal(err)
 	}
-	rateLimitUsecase, err := usecase.NewRateLimitUsecase(rateLimitRepository, tokenService, requiredSecretEnv("RATE_LIMIT_HMAC_KEY"))
+	rateLimitUsecase, err := usecase.NewRateLimitUsecase(rateLimitRepository, tokenService, config.RateLimitHMACKey)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	videoUsecase, err := usecase.NewVideoUsecase(videoRepository, storageRepository, usecase.VideoUsecaseConfig{
-		UploadURLTTL:       requiredDurationEnv("STORAGE_UPLOAD_URL_TTL"),
-		ReadURLTTL:         requiredDurationEnv("STORAGE_READ_URL_TTL"),
-		IdempotencyTTL:     requiredDurationEnv("VIDEO_IDEMPOTENCY_TTL"),
-		IdempotencyHMACKey: []byte(requiredSecretEnv("VIDEO_IDEMPOTENCY_HMAC_KEY")),
-		ManagedPrefix:      requiredEnv("STORAGE_MANAGED_PREFIX"),
+		UploadURLTTL:       config.StorageUploadURLTTL,
+		ReadURLTTL:         config.StorageReadURLTTL,
+		IdempotencyTTL:     config.VideoIdempotencyTTL,
+		IdempotencyHMACKey: []byte(config.VideoIdempotencyHMACKey),
+		ManagedPrefix:      config.Storage.ManagedPrefix,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -109,7 +103,7 @@ func main() {
 	videoLikeUsecase := usecase.NewVideoLikeUsecase(videoLikeRepository)
 
 	savedVideoUsecase, err := usecase.NewSavedVideoUsecase(savedVideoRepository, storageRepository, usecase.SavedVideoUsecaseConfig{
-		ReadURLTTL: requiredDurationEnv("STORAGE_READ_URL_TTL"),
+		ReadURLTTL: config.StorageReadURLTTL,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -119,7 +113,7 @@ func main() {
 	adminUserValidator := validator.NewAdminUserValidator(userValidator)
 	adminVideoValidator := validator.NewAdminVideoValidator()
 	videoValidator, err := validator.NewVideoValidator(validator.VideoValidatorConfig{
-		IdempotencyKeyMaxBytes: requiredIntEnv("VIDEO_IDEMPOTENCY_KEY_MAX_BYTES", 1),
+		IdempotencyKeyMaxBytes: config.VideoIdempotencyKeyMaxBytes,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -130,8 +124,8 @@ func main() {
 		rateLimitUsecase,
 		userValidator,
 		controller.CookieConfig{
-			Secure:     requiredBoolEnv("COOKIE_SECURE"),
-			CSRFDomain: os.Getenv("COOKIE_DOMAIN"),
+			Secure:     config.CookieSecure,
+			CSRFDomain: config.CookieDomain,
 		},
 	)
 	adminUserController := controller.NewAdminUserController(adminUserUsecase, adminUserValidator)
@@ -152,7 +146,7 @@ func main() {
 		authMiddleware,
 		csrfMiddleware,
 		rateLimitMiddleware,
-		requiredEnv("FE_URL"),
+		config.FrontendURL,
 		healthController,
 		router.AdminComponents{
 			Controller:      adminUserController,
@@ -166,21 +160,9 @@ func main() {
 		},
 	)
 
-	port := strings.TrimSpace(os.Getenv("PORT"))
-	if port == "" {
-		port = "8080"
-	}
-	parsedPort, err := strconv.ParseUint(port, 10, 16)
-	if err != nil || parsedPort == 0 {
-		log.Fatal("PORT must be between 1 and 65535")
-	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
 	serverError := make(chan error, 1)
 	go func() {
-		serverError <- e.Start(":" + port)
+		serverError <- e.Start(":" + config.Port)
 	}()
 
 	select {
@@ -195,69 +177,4 @@ func main() {
 			log.Println("HTTP server shutdown failed")
 		}
 	}
-}
-
-func objectStorageConfig() repository.ObjectStorageConfig {
-	provider := strings.ToLower(requiredEnv("STORAGE_PROVIDER"))
-	if provider != "s3" {
-		log.Fatal("STORAGE_PROVIDER must be s3")
-	}
-
-	environment := strings.ToLower(strings.TrimSpace(os.Getenv("GO_ENV")))
-	requireHTTPS := environment == "production" || environment == "prod"
-
-	return repository.ObjectStorageConfig{
-		Endpoint:        requiredEnv("STORAGE_ENDPOINT"),
-		PresignEndpoint: strings.TrimSpace(os.Getenv("STORAGE_PRESIGN_ENDPOINT")),
-		Region:          requiredEnv("STORAGE_REGION"),
-		Bucket:          requiredEnv("STORAGE_BUCKET"),
-		AccessKeyID:     requiredEnv("STORAGE_ACCESS_KEY_ID"),
-		SecretAccessKey: requiredEnv("STORAGE_SECRET_ACCESS_KEY"),
-		ManagedPrefix:   requiredEnv("STORAGE_MANAGED_PREFIX"),
-		ForcePathStyle:  requiredBoolEnv("STORAGE_FORCE_PATH_STYLE"),
-		RequireHTTPS:    requireHTTPS,
-	}
-}
-
-func requiredEnv(name string) string {
-	value := strings.TrimSpace(os.Getenv(name))
-	if value == "" {
-		log.Fatal(name + " is required")
-	}
-	return value
-}
-
-func requiredSecretEnv(name string) string {
-	value := os.Getenv(name)
-	if len([]byte(value)) < secretMinimumBytes {
-		log.Fatal(name + " must be at least 32 bytes")
-	}
-	return value
-}
-
-func requiredDurationEnv(name string) time.Duration {
-	value := requiredEnv(name)
-	duration, err := time.ParseDuration(value)
-	if err != nil || duration <= 0 {
-		log.Fatal(name + " must be a positive duration")
-	}
-	return duration
-}
-
-func requiredIntEnv(name string, minimum int) int {
-	value := requiredEnv(name)
-	parsed, err := strconv.Atoi(value)
-	if err != nil || parsed < minimum {
-		log.Fatal(fmt.Sprintf("%s must be an integer greater than or equal to %d", name, minimum))
-	}
-	return parsed
-}
-
-func requiredBoolEnv(name string) bool {
-	value := requiredEnv(name)
-	parsed, err := strconv.ParseBool(value)
-	if err != nil {
-		log.Fatal(name + " must be true or false")
-	}
-	return parsed
 }

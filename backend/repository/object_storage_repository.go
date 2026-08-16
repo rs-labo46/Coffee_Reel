@@ -38,17 +38,7 @@ type IObjectStorageRepository interface {
 	ListManagedObjects(ctx context.Context, cursor *string, limit int32) (ManagedObjectPage, error)
 }
 
-type ObjectStorageConfig struct {
-	Endpoint        string
-	PresignEndpoint string
-	Region          string
-	Bucket          string
-	AccessKeyID     string
-	SecretAccessKey string
-	ManagedPrefix   string
-	ForcePathStyle  bool
-	RequireHTTPS    bool
-}
+type ObjectStorageConfig = entity.ObjectStorageConfig
 
 type UploadTarget struct {
 	Method      string
