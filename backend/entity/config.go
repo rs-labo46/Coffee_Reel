@@ -37,20 +37,20 @@ type ObjectStorageConfig struct {
 }
 
 type Config struct {
-	Environment                Environment
-	Port                       string
-	DatabaseURL                string `json:"-"`
-	Redis                      RedisConfig
-	FrontendURL                string
-	CookieSecure               bool
-	CookieDomain               string
-	JWTSecret                  string `json:"-"`
-	RefreshTokenHMACKey        string `json:"-"`
-	RateLimitHMACKey           string `json:"-"`
-	Storage                    ObjectStorageConfig
-	StorageUploadURLTTL        time.Duration
-	StorageReadURLTTL          time.Duration
-	VideoIdempotencyTTL        time.Duration
-	VideoIdempotencyHMACKey    string `json:"-"`
+	Environment                 Environment
+	Port                        string
+	DatabaseURL                 string `json:"-"`
+	Redis                       RedisConfig
+	FrontendURL                 string
+	CookieSecure                bool
+	CookieDomain                string
+	JWTSecret                   string `json:"-"`
+	RefreshTokenHMACKey         string `json:"-"`
+	RateLimitHMACKey            string `json:"-"`
+	Storage                     ObjectStorageConfig
+	StorageUploadURLTTL         time.Duration
+	StorageReadURLTTL           time.Duration
+	VideoIdempotencyTTL         time.Duration
+	VideoIdempotencyHMACKey     string `json:"-"`
 	VideoIdempotencyKeyMaxBytes int
 }

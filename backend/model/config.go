@@ -151,10 +151,10 @@ func NewConfig() (entity.Config, error) {
 			ForcePathStyle:  forcePathStyle,
 			RequireHTTPS:    environment.IsProduction(),
 		},
-		StorageUploadURLTTL:        uploadURLTTL,
-		StorageReadURLTTL:          readURLTTL,
-		VideoIdempotencyTTL:        idempotencyTTL,
-		VideoIdempotencyHMACKey:    idempotencyHMACKey,
+		StorageUploadURLTTL:         uploadURLTTL,
+		StorageReadURLTTL:           readURLTTL,
+		VideoIdempotencyTTL:         idempotencyTTL,
+		VideoIdempotencyHMACKey:     idempotencyHMACKey,
 		VideoIdempotencyKeyMaxBytes: idempotencyKeyMaxBytes,
 	}, nil
 }
