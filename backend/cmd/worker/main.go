@@ -2,6 +2,7 @@ package main
 
 import (
 	"coffee-reel/db"
+	"coffee-reel/entity"
 	"coffee-reel/repository"
 	"coffee-reel/usecase"
 	"coffee-reel/worker"
@@ -108,8 +109,10 @@ func objectStorageConfig() repository.ObjectStorageConfig {
 		log.Fatal("STORAGE_PROVIDER must be s3")
 	}
 
-	environment := strings.ToLower(strings.TrimSpace(os.Getenv("GO_ENV")))
-	requireHTTPS := environment == "production" || environment == "prod"
+	environment := entity.Environment(strings.ToLower(requiredEnv("ENVIRONMENT")))
+	if !environment.IsValid() {
+		log.Fatal("ENVIRONMENT must be develop or production")
+	}
 
 	return repository.ObjectStorageConfig{
 		Endpoint:        requiredEnv("STORAGE_ENDPOINT"),
@@ -120,7 +123,7 @@ func objectStorageConfig() repository.ObjectStorageConfig {
 		SecretAccessKey: requiredEnv("STORAGE_SECRET_ACCESS_KEY"),
 		ManagedPrefix:   requiredEnv("STORAGE_MANAGED_PREFIX"),
 		ForcePathStyle:  requiredBoolEnv("STORAGE_FORCE_PATH_STYLE"),
-		RequireHTTPS:    requireHTTPS,
+		RequireHTTPS:    environment.IsProduction(),
 	}
 }
 

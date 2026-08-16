@@ -7,7 +7,7 @@ tags:
   - name: System
     description: デプロイ先がAPIと必須依存先の正常性を確認するための運用API。
   - name: Auth
-    description: 会員登録、ログイン、Token再発行、ログアウト、現在ユーザー取得。
+    description: CSRF Token取得、会員登録、ログイン、Token再発行、ログアウト、現在ユーザー取得。
   - name: Admin Users
     description: activeなadminによる一般ユーザー管理。
   - name: Admin Videos
@@ -43,6 +43,22 @@ paths:
                 $ref: "#/components/schemas/HealthResponse"
               example:
                 status: unavailable
+  /csrf:
+    get:
+      tags:
+        - Auth
+      summary: CSRF Token取得
+      description: Browser再読み込み時などにRefresh/Logoutへ使用するCSRF Tokenを新規発行し、csrf_token Cookieを設定すると同時に同じTokenをJSONで返す。認証は不要。
+      operationId: issueCsrfToken
+      responses:
+        "200":
+          description: CSRF Token発行成功。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CSRFResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /signup:
     post:
       tags:
@@ -80,7 +96,7 @@ paths:
       tags:
         - Auth
       summary: ログイン
-      description: 認証成功時、Access TokenをJSONで返し、refresh_token Cookieとcsrf_token Cookieを設定する。
+      description: 認証成功時、Access Token、CSRF Token、User情報をJSONで返し、refresh_token Cookieとcsrf_token Cookieを設定する。
       operationId: login
       responses:
         "200":
@@ -474,8 +490,14 @@ paths:
           $ref: "#/components/responses/ValidationFailed"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/VideoNotFound"
         "409":
-          $ref: "#/components/responses/IdempotencyConflict"
+          description: 409 idempotency_conflict, upload_expired, video_state_conflict。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
         "413":
           $ref: "#/components/responses/RequestTooLarge"
         "429":
@@ -497,9 +519,9 @@ paths:
     get:
       tags:
         - Videos
-      summary: 公開動画一覧・検索
+      summary: 公開動画一覧・投稿者別公開動画一覧・検索
       description:
-        ready/published/未削除のVideoだけを返す。title/category未指定はresult_type=all。条件指定時は通常検索matched。初回matchedが0件かつtitle指定ありの場合だけpg_trgm類似検索へ切り替えresult_type=similar。titleは大文字小文字を区別しない部分一致で、%,
+        ready/published/未削除のVideoだけを返す。author_id指定時は対象投稿者の公開動画へ絞り込む。title/category未指定はresult_type=all。条件指定時は通常検索matched。初回matchedが0件かつtitle指定ありの場合だけpg_trgm類似検索へ切り替えresult_type=similar。categoryまたはauthor_idが指定されている場合はFallback後も同じ条件を維持する。titleは大文字小文字を区別しない部分一致で、%,
         _, \ は文字としてEscapeされる。Bearer Headerなしはゲスト。Headerが存在して不正な場合は401で、ゲストへ降格しない。
       operationId: listPublicVideos
       responses:
@@ -530,6 +552,15 @@ paths:
           description: 指定した場合は定義済みカテゴリー完全一致。空指定は400。
           schema:
             $ref: "#/components/schemas/CategoryCode"
+        - name: author_id
+          in: query
+          required: false
+          description: 投稿者User ID。指定時は対象投稿者のready/published/未削除Videoだけへ絞り込む。title/categoryと併用可能。
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+            maximum: 9223372036854775807
         - $ref: "#/components/parameters/LimitQuery"
         - $ref: "#/components/parameters/PublicCursorQuery"
       security:
@@ -869,7 +900,7 @@ components:
       type: apiKey
       in: cookie
       name: csrf_token
-      description: Login/Refreshで発行されるCSRF Cookie。
+      description: GET /csrf、Login、Refreshで発行されるHttpOnly CSRF Cookie。
     csrfHeader:
       type: apiKey
       in: header
@@ -916,7 +947,7 @@ components:
       name: cursor
       in: query
       required: false
-      description: GET /videosが返した不透明Cursor。同じtitle/category条件のまま再利用する。検索条件変更後の再利用は400。
+      description: GET /videosが返した不透明Cursor。同じtitle/category/author_id条件のまま再利用する。検索条件変更後の再利用は400。
       schema:
         type: string
         minLength: 1
@@ -1113,6 +1144,7 @@ components:
             - access_token
             - token_type
             - expires_in
+            - csrf_token
             - user
           properties:
             access_token:
@@ -1126,6 +1158,9 @@ components:
               format: int32
               enum:
                 - 900
+            csrf_token:
+              type: string
+              minLength: 1
             user:
               $ref: "#/components/schemas/AuthUser"
     RefreshResponse:
@@ -1158,6 +1193,19 @@ components:
               minLength: 1
             user:
               $ref: "#/components/schemas/AuthUser"
+    CSRFResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - csrf_token
+          properties:
+            csrf_token:
+              type: string
+              minLength: 1
     ReasonRequest:
       type: object
       required:

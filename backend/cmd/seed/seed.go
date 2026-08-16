@@ -945,17 +945,17 @@ func objectStorageConfig() repository.ObjectStorageConfig {
 		ForcePathStyle: requiredBoolEnv(
 			"STORAGE_FORCE_PATH_STYLE",
 		),
-		RequireHTTPS: false,
+		RequireHTTPS: isProductionEnvironment(),
 	}
 }
 
 func isProductionEnvironment() bool {
-	environment := strings.ToLower(
-		strings.TrimSpace(os.Getenv("GO_ENV")),
-	)
+	environment := entity.Environment(strings.ToLower(requiredEnv("ENVIRONMENT")))
+	if !environment.IsValid() {
+		log.Fatal("ENVIRONMENT must be develop or production")
+	}
 
-	return environment == "production" ||
-		environment == "prod"
+	return environment.IsProduction()
 }
 
 func productionSeedAllowed() bool {

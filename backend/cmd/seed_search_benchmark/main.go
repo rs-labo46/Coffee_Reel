@@ -757,26 +757,15 @@ func requiredEnv(
 }
 
 func isProductionEnvironment() bool {
-	environmentKeys := []string{
-		"GO_ENV",
-		"APP_ENV",
-		"ENVIRONMENT",
+	value := strings.ToLower(requiredEnv("ENVIRONMENT"))
+	switch value {
+	case "develop":
+		return false
+	case "production":
+		return true
+	default:
+		log.Fatal("ENVIRONMENT must be develop or production")
 	}
 
-	for _, key := range environmentKeys {
-		value := strings.ToLower(
-			strings.TrimSpace(
-				os.Getenv(key),
-			),
-		)
-
-		if value == "production" ||
-			value == "prod" {
-			return true
-		}
-	}
-
-	return strings.TrimSpace(
-		os.Getenv("RENDER"),
-	) != ""
+	return false
 }

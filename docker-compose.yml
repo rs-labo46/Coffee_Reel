@@ -23,6 +23,7 @@ services:
       target: api
     command: ["go", "run", "./cmd/migrate"]
     environment:
+      ENVIRONMENT: "${ENVIRONMENT}"
       DATABASE_URL: "host=db user=${POSTGRES_USER} password=${POSTGRES_PASSWORD} dbname=${POSTGRES_DB} port=5432 sslmode=disable TimeZone=Asia/Tokyo"
     depends_on:
       db:
@@ -111,7 +112,7 @@ services:
     command: ["go", "run", "./cmd/seed"]
     restart: "no"
     environment:
-      GO_ENV: "local"
+      ENVIRONMENT: "${ENVIRONMENT}"
       DATABASE_URL: "host=db user=${POSTGRES_USER} password=${POSTGRES_PASSWORD} dbname=${POSTGRES_DB} port=5432 sslmode=disable TimeZone=Asia/Tokyo"
 
       STORAGE_PROVIDER: "${STORAGE_PROVIDER}"
@@ -138,7 +139,7 @@ services:
     restart: always
     environment:
       PORT: "${PORT}"
-      GO_ENV: "local"
+      ENVIRONMENT: "${ENVIRONMENT}"
       DATABASE_URL: "host=db user=${POSTGRES_USER} password=${POSTGRES_PASSWORD} dbname=${POSTGRES_DB} port=5432 sslmode=disable TimeZone=Asia/Tokyo"
       REDIS_HOST: "redis"
       REDIS_PORT: "6379"
@@ -184,7 +185,7 @@ services:
     restart: always
     command: ["go", "run", "./cmd/worker"]
     environment:
-      GO_ENV: "local"
+      ENVIRONMENT: "${ENVIRONMENT}"
       DATABASE_URL: "host=db user=${POSTGRES_USER} password=${POSTGRES_PASSWORD} dbname=${POSTGRES_DB} port=5432 sslmode=disable TimeZone=Asia/Tokyo"
       STORAGE_PROVIDER: "${STORAGE_PROVIDER}"
       STORAGE_ENDPOINT: "http://minio:9000"

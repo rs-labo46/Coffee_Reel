@@ -12,6 +12,20 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+const savedVideoListSelect = `saved_videos.id AS saved_id, saved_videos.created_at AS saved_created_at,
+	videos.id, videos.user_id, users.name AS author_name, videos.category, videos.title, videos.description,
+	video_output_metas.video_object_key, video_output_metas.thumbnail_object_key, videos.created_at,
+	COALESCE(video_like_counts.like_count, 0) AS like_count,
+	EXISTS (
+		SELECT 1 FROM video_likes WHERE video_likes.user_id = ? AND video_likes.video_id = videos.id
+	) AS is_liked`
+
+const savedVideoLikeCountJoin = `LEFT JOIN (
+	SELECT video_id, COUNT(*) AS like_count
+	FROM video_likes
+	GROUP BY video_id
+) AS video_like_counts ON video_like_counts.video_id = videos.id`
+
 type ISavedVideoRepository interface {
 	Save(ctx context.Context, userID, videoID uint64, now time.Time) error
 	Remove(ctx context.Context, userID, videoID uint64) error
@@ -103,21 +117,11 @@ func (r *savedVideoRepository) ListByUser(ctx context.Context, userID uint64, li
 
 	rows := make([]savedRow, 0, limit+1)
 
-	query := r.db.WithContext(ctx).Table("saved_videos").Select(`saved_videos.id AS saved_id, saved_videos.created_at AS saved_created_at,
-		videos.id, videos.user_id, users.name AS author_name, videos.category, videos.title, videos.description,
-		video_output_metas.video_object_key, video_output_metas.thumbnail_object_key, videos.created_at,
-		COALESCE(video_like_counts.like_count, 0) AS like_count,
-		EXISTS (
-			SELECT 1 FROM video_likes WHERE video_likes.user_id = ? AND video_likes.video_id = videos.id
-		) AS is_liked`, userID).
+	query := r.db.WithContext(ctx).Table("saved_videos").Select(savedVideoListSelect, userID).
 		Joins("JOIN videos ON videos.id = saved_videos.video_id").
 		Joins("JOIN users ON users.id = videos.user_id").
 		Joins("JOIN video_output_metas ON video_output_metas.video_id = videos.id").
-		Joins(`LEFT JOIN (
-			SELECT video_id, COUNT(*) AS like_count
-			FROM video_likes
-			GROUP BY video_id
-		) AS video_like_counts ON video_like_counts.video_id = videos.id`).
+		Joins(savedVideoLikeCountJoin).
 		Where("saved_videos.user_id = ?", userID).
 		Where("videos.processing_status = ? AND videos.publish_status = ? AND videos.deleted_at IS NULL", entity.VideoProcessingReady, entity.VideoPublishPublished)
 
